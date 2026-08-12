@@ -1,0 +1,187 @@
+﻿from uuid import UUID
+
+from geoalchemy2.elements import WKTElement
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.security import hash_password, verify_password
+from app.models.user import User
+from app.repositories.user.repository import UserRepository
+
+
+class UserService:
+    def __init__(self, session: AsyncSession):
+        self.repository = UserRepository(session)
+
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        return await self.repository.get_by_id(user_id)
+
+    async def get_by_email(self, email: str) -> User | None:
+        return await self.repository.get_by_email(email)
+
+    async def get_by_username(self, username: str) -> User | None:
+        return await self.repository.get_by_username(username)
+
+    async def get_by_phone(self, phone: str) -> User | None:
+        return await self.repository.get_by_phone(phone)
+
+    async def get_by_google_id(self, google_id: str) -> User | None:
+        return await self.repository.get_by_google_id(google_id)
+
+    async def register(
+        self,
+        email: str,
+        password: str,
+        full_name: str,
+        username: str,
+        phone: str | None = None,
+        avatar_id: str | None = None,
+    ) -> User:
+        existing_email = await self.repository.get_by_email(email)
+
+        if existing_email is not None:
+            raise ValueError("Email is already registered")
+
+        existing_username = await self.repository.get_by_username(
+            username
+        )
+
+        if existing_username is not None:
+            raise ValueError("Username is already taken")
+
+        if phone:
+            existing_phone = await self.repository.get_by_phone(phone)
+
+            if existing_phone is not None:
+                raise ValueError(
+                    "Phone number is already registered"
+                )
+
+        user = User(
+            email=email,
+            password_hash=hash_password(password),
+            full_name=full_name,
+            username=username,
+            phone=phone,
+            avatar_id=avatar_id,
+        )
+
+        return await self.repository.create(user)
+
+    async def authenticate(
+        self,
+        email: str,
+        password: str,
+    ) -> User | None:
+        user = await self.repository.get_by_email(email)
+
+        if user is None:
+            return None
+
+        if not user.password_hash:
+            return None
+
+        if not verify_password(
+            password,
+            user.password_hash,
+        ):
+            return None
+
+        if not user.is_active:
+            return None
+
+        return user
+
+    async def update_location(
+        self,
+        user: User,
+        latitude: float,
+        longitude: float,
+        source: str,
+    ) -> User:
+        user.latitude = latitude
+        user.longitude = longitude
+        user.location_source = source
+
+        user.location = WKTElement(
+            f"POINT({longitude} {latitude})",
+            srid=4326,
+        )
+
+        return await self.repository.save(user)
+
+    async def update_profile(
+        self,
+        user: User,
+        full_name: str | None = None,
+        username: str | None = None,
+        phone: str | None = None,
+        avatar_id: str | None = None,
+        bio: str | None = None,
+    ) -> User:
+        if username is not None and username != user.username:
+            existing_username = (
+                await self.repository.get_by_username(username)
+            )
+
+            if (
+                existing_username is not None
+                and existing_username.id != user.id
+            ):
+                raise ValueError(
+                    "Username is already taken"
+                )
+
+            user.username = username
+
+        if phone is not None and phone != user.phone:
+            existing_phone = await self.repository.get_by_phone(phone)
+
+            if (
+                existing_phone is not None
+                and existing_phone.id != user.id
+            ):
+                raise ValueError(
+                    "Phone number is already registered"
+                )
+
+            user.phone = phone
+
+        if full_name is not None:
+            user.full_name = full_name
+
+        if avatar_id is not None:
+            user.avatar_id = avatar_id
+
+        if bio is not None:
+            user.bio = bio
+
+        return await self.repository.save(user)
+
+    async def change_password(
+        self,
+        user: User,
+        current_password: str,
+        new_password: str,
+    ) -> None:
+        if not user.password_hash:
+            raise ValueError(
+                "Password authentication is not available"
+            )
+
+        if not verify_password(
+            current_password,
+            user.password_hash,
+        ):
+            raise ValueError(
+                "Current password is incorrect"
+            )
+
+        if current_password == new_password:
+            raise ValueError(
+                "New password must be different from current password"
+            )
+
+        user.password_hash = hash_password(new_password)
+
+        # Invalidate all existing JWT sessions.
+        await self.repository.increment_token_version(user)

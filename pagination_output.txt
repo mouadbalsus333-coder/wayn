@@ -1,0 +1,9 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.7, pytest-8.4.2, pluggy-1.6.0 -- C:\WAYN\wayn\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\WAYN\wayn\backend
+configfile: pytest.ini
+plugins: anyio-4.14.2
+collecting ... collected 29 items
+
+tests/test_pagination.py::test_list_places_page_zero_rejected 
