@@ -3,20 +3,21 @@
 Covers: malformed auth, token type confusion, IDOR, input validation,
 sensitive data exposure, CORS, UUID handling.
 """
+
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from httpx import AsyncClient
 from jose import jwt
+from sqlalchemy import select, text
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
-from app.core.security import create_access_token
+from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.admin_user import AdminUser
 from app.models.user import User
-from app.core.security import hash_password
-from sqlalchemy import insert, select, text
 
 
 def _uuid():
@@ -64,28 +65,28 @@ async def test_garbage_jwt(client):
 @pytest.mark.anyio
 async def test_expired_token(client):
     """Expired token should be rejected."""
+
     email = f"exp_{_uuid()}@wayntest.com"
-    password = "ExpPass123!"
+    username = f"exp_{_uuid()}"
+
     async with AsyncClient(app=app, base_url="http://test") as c:
         resp = await c.post(
             "/api/v1/auth/register",
             json={
                 "email": email,
-                "password": password,
+                "password": "ExpPass123!",
                 "full_name": "Exp",
-                "username": f"exp_{_uuid()}",
+                "username": username,
             },
         )
+
         assert resp.status_code == 201
 
-    # Create an expired token manually
-    from datetime import datetime, timedelta, timezone
-    from app.core.security import settings as s
-    from jose import jwt as _jwt
-
-    user_uuid = None
+    # Create an expired token manually.
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(User).where(User.email == email))
+        result = await session.execute(
+            select(User).where(User.email == email)
+        )
         user_obj = result.scalar_one()
         user_uuid = str(user_obj.id)
 
@@ -95,7 +96,8 @@ async def test_expired_token(client):
         "type": "user",
         "exp": datetime.now(timezone.utc) - timedelta(hours=1),
     }
-    expired_token = _jwt.encode(
+
+    expired_token = jwt.encode(
         expired_payload,
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
@@ -106,11 +108,15 @@ async def test_expired_token(client):
             "/api/v1/auth/me",
             headers={"Authorization": f"Bearer {expired_token}"},
         )
+
         assert resp.status_code == 401
 
-    # Cleanup
+    # Cleanup.
     async with AsyncSessionLocal() as session:
-        await session.execute(text("DELETE FROM users WHERE email = :e"), {"e": email})
+        await session.execute(
+            text("DELETE FROM users WHERE email = :e"),
+            {"e": email},
+        )
         await session.commit()
 
 
@@ -131,33 +137,37 @@ async def test_admin_token_on_user_endpoint(client, admin_token):
 @pytest.mark.anyio
 async def test_user_token_on_admin_endpoint(client, user_token):
     token, _ = user_token
+
     resp = await client.get(
         "/api/v1/admin/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
+
     assert resp.status_code == 403
 
 
 @pytest.mark.anyio
 async def test_token_without_ver_claim(client):
     """A token missing the 'ver' claim should fail at get_current_user."""
-    # Create a token without ver
+
     payload = {
         "sub": "6b6f076f-b599-4477-903a-8570d8911d8f",
         "type": "user",
-        # ver is missing
+        # ver is intentionally missing.
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
     }
-    from datetime import datetime, timedelta, timezone
-    payload["exp"] = datetime.now(timezone.utc) + timedelta(hours=1)
+
     token = jwt.encode(
         payload,
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
     )
+
     resp = await client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
+
     assert resp.status_code == 401
     assert "version" in resp.json()["detail"].lower()
 
@@ -167,12 +177,14 @@ async def test_token_with_wrong_type_claim(client):
     token = create_access_token(
         subject="not-a-uuid",
         token_version=1,
-        token_type="superadmin",  # not "user" or "admin"
+        token_type="superadmin",
     )
+
     resp = await client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
+
     assert resp.status_code == 403
 
 
@@ -184,35 +196,47 @@ async def test_token_with_wrong_type_claim(client):
 @pytest.mark.anyio
 async def test_register_response_no_password(client):
     email = f"exposure_{_uuid()}@wayntest.com"
+    username = f"exposure_{_uuid()}"
+
     resp = await client.post(
         "/api/v1/auth/register",
         json={
             "email": email,
             "password": "SecurePass123!",
             "full_name": "Exposure",
-            "username": f"exposure_{_uuid()}",
+            "username": username,
         },
     )
+
     assert resp.status_code == 201
+
     body = str(resp.json())
+
     assert "password_hash" not in body
     assert '"password"' not in body
 
-    # Cleanup
+    # Cleanup.
     async with AsyncSessionLocal() as session:
-        await session.execute(text("DELETE FROM users WHERE email = :e"), {"e": email})
+        await session.execute(
+            text("DELETE FROM users WHERE email = :e"),
+            {"e": email},
+        )
         await session.commit()
 
 
 @pytest.mark.anyio
 async def test_me_response_no_sensitive_fields(client, user_token):
     token, _ = user_token
+
     resp = await client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
+
     assert resp.status_code == 200
+
     body = str(resp.json())
+
     assert "password_hash" not in body
     assert "token_version" not in body
 
@@ -223,8 +247,11 @@ async def test_admin_me_response_no_password(client, admin_token):
         "/api/v1/admin/auth/me",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
+
     assert resp.status_code == 200
+
     body = str(resp.json())
+
     assert "password" not in body
     assert "password_hash" not in body
 
@@ -236,67 +263,109 @@ async def test_admin_me_response_no_password(client, admin_token):
 
 @pytest.mark.anyio
 async def test_user_cannot_access_other_user_data(client):
-    """Test that user A cannot access user B's data via /me.
+    """Test that user B cannot claim user A's identity."""
 
-    Since /me returns the current user's data, there's no direct IDOR.
-    But we test that a user can't claim another user's identity.
-    """
-    # Register user A
+    # Register user A.
     suffix_a = _uuid()
     email_a = f"idor_a_{suffix_a}@wayntest.com"
+    username_a = f"idor_a_{suffix_a}"
+
     resp = await client.post(
         "/api/v1/auth/register",
         json={
             "email": email_a,
             "password": "UserAPass123!",
             "full_name": "User A",
-            "username": f"idor_a_{suffix_a}",
+            "username": username_a,
         },
     )
+
     assert resp.status_code == 201
 
-    # Register user B
+    # Register user B.
     suffix_b = _uuid()
     email_b = f"idor_b_{suffix_b}@wayntest.com"
+    username_b = f"idor_b_{suffix_b}"
+
     resp = await client.post(
         "/api/v1/auth/register",
         json={
             "email": email_b,
             "password": "UserBPass123!",
             "full_name": "User B",
-            "username": f"idor_b_{suffix_b}",
+            "username": username_b,
         },
     )
+
     assert resp.status_code == 201
+
     token_b = resp.json()["access_token"]
 
-    # User B's /me should return user B's data, not user A's
+    # User B's /me should return user B's data.
     resp = await client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token_b}"},
     )
+
     assert resp.status_code == 200
     assert resp.json()["email"] == email_b
     assert resp.json()["email"] != email_a
 
-    # Cleanup
+    # Cleanup.
     async with AsyncSessionLocal() as session:
-        await session.execute(text("DELETE FROM users WHERE email IN (:a, :b)"), {"a": email_a, "b": email_b})
+        await session.execute(
+            text(
+                "DELETE FROM users "
+                "WHERE email IN (:a, :b)"
+            ),
+            {
+                "a": email_a,
+                "b": email_b,
+            },
+        )
         await session.commit()
 
 
 @pytest.mark.anyio
 async def test_place_get_any_id_returns_404_not_500(client):
     """Non-UUID strings should not cause 500 errors."""
-    resp = await client.get("/api/v1/places/not-a-uuid")
+
+    resp = await client.get(
+        "/api/v1/places/not-a-uuid"
+    )
+
     assert resp.status_code in (404, 422)
 
 
 @pytest.mark.anyio
 async def test_search_empty_string(client):
-    resp = await client.get("/api/v1/places/search?q=")
+    """Empty search should return a valid paginated response."""
+
+    resp = await client.get(
+        "/api/v1/places/search",
+        params={"q": ""},
+    )
+
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+
+    body = resp.json()
+
+    # /places/search uses PaginatedResponse.
+    assert isinstance(body, dict)
+
+    # Required pagination fields.
+    assert "items" in body
+    assert "total" in body
+    assert "page" in body
+    assert "limit" in body
+    assert "pages" in body
+
+    # Empty search should return a list of items.
+    assert isinstance(body["items"], list)
+
+    # Default pagination values.
+    assert body["page"] == 1
+    assert body["limit"] == 20
 
 
 # ------------------------------------------------------------------
@@ -307,35 +376,47 @@ async def test_search_empty_string(client):
 @pytest.mark.anyio
 async def test_token_algorithm_confusion(client):
     """Token signed with 'alg': 'none' should fail."""
+
     try:
         token = jwt.encode(
-            {"sub": "test", "ver": 1, "type": "user"},
+            {
+                "sub": "test",
+                "ver": 1,
+                "type": "user",
+            },
             "",
             algorithm="none",
         )
     except Exception:
-        # python-jose rejects 'none' algorithm at encode time.
-        # This is the correct security behavior — the token cannot even be created.
+        # python-jose rejects 'none' at encode time.
+        # This is acceptable security behavior.
         return
 
     resp = await client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
+
     assert resp.status_code == 401
 
 
 @pytest.mark.anyio
 async def test_token_wrong_secret(client):
     token = jwt.encode(
-        {"sub": "test", "ver": 1, "type": "user"},
+        {
+            "sub": "test",
+            "ver": 1,
+            "type": "user",
+        },
         "wrong-secret-key",
         algorithm=settings.jwt_algorithm,
     )
+
     resp = await client.get(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
+
     assert resp.status_code == 401
 
 
@@ -355,6 +436,7 @@ async def test_register_empty_email(client):
             "username": "empty_email",
         },
     )
+
     assert resp.status_code == 422
 
 
@@ -369,6 +451,7 @@ async def test_register_email_no_domain(client):
             "username": "bad_email",
         },
     )
+
     assert resp.status_code == 422
 
 
@@ -383,6 +466,7 @@ async def test_register_username_too_short(client):
             "username": "x",
         },
     )
+
     assert resp.status_code == 422
 
 
@@ -397,6 +481,7 @@ async def test_register_username_too_long(client):
             "username": "a" * 51,
         },
     )
+
     assert resp.status_code == 422
 
 
@@ -404,8 +489,12 @@ async def test_register_username_too_long(client):
 async def test_nearby_lat_out_of_range(client):
     resp = await client.get(
         "/api/v1/places/nearby",
-        params={"latitude": 91.0, "longitude": 13.0},
+        params={
+            "latitude": 91.0,
+            "longitude": 13.0,
+        },
     )
+
     assert resp.status_code == 422
 
 
@@ -413,13 +502,20 @@ async def test_nearby_lat_out_of_range(client):
 async def test_nearby_long_out_of_range(client):
     resp = await client.get(
         "/api/v1/places/nearby",
-        params={"latitude": 32.0, "longitude": 181.0},
+        params={
+            "latitude": 32.0,
+            "longitude": 181.0,
+        },
     )
+
     assert resp.status_code == 422
 
 
 @pytest.mark.anyio
-async def test_place_create_without_auth(client, existing_category_id):
+async def test_place_create_without_auth(
+    client,
+    existing_category_id,
+):
     resp = await client.post(
         "/api/v1/admin/places",
         json={
@@ -435,23 +531,28 @@ async def test_place_create_without_auth(client, existing_category_id):
             "longitude": 13.1913,
         },
     )
+
     assert resp.status_code in (401, 403)
 
 
 @pytest.mark.anyio
 async def test_place_update_without_auth(client):
     resp = await client.put(
-        "/api/v1/admin/places/00000000-0000-0000-0000-000000000000",
+        "/api/v1/admin/places/"
+        "00000000-0000-0000-0000-000000000000",
         json={"name": "Hacked"},
     )
+
     assert resp.status_code in (401, 403)
 
 
 @pytest.mark.anyio
 async def test_place_delete_without_auth(client):
     resp = await client.delete(
-        "/api/v1/admin/places/00000000-0000-0000-0000-000000000000",
+        "/api/v1/admin/places/"
+        "00000000-0000-0000-0000-000000000000",
     )
+
     assert resp.status_code in (401, 403)
 
 
@@ -467,4 +568,5 @@ async def test_category_create_without_auth(client):
             "is_active": True,
         },
     )
+
     assert resp.status_code in (401, 403)
