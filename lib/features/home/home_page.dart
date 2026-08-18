@@ -9,6 +9,7 @@ import 'widgets/home_header.dart';
 import 'widgets/home_search_bar.dart';
 import 'widgets/place_card.dart';
 import 'widgets/section_header.dart';
+import '../../services/favorite_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,6 +21,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final PlaceService _placeService = PlaceService();
   final CategoryService _categoryService = CategoryService();
+  final FavoriteService _favoriteService = FavoriteService();
+  final Set<String> _favoriteIds = <String>{};
 
   int _selectedFilterIndex = 0;
 
@@ -93,8 +96,32 @@ class _HomePageState extends State<HomePage> {
 
     if (!mounted) return;
 
+    final uniqueCategories = <String, Category>{};
+
+    for (final category in result.categories) {
+      final key = category.nameAr.trim().toLowerCase();
+
+      if (key.isEmpty) {
+        continue;
+      }
+
+      final existing = uniqueCategories[key];
+
+      // Prefer the category that has an icon configured. This also
+      // protects the UI from accidental duplicate rows in the database.
+      if (existing == null ||
+          (existing.icon == null || existing.icon!.trim().isEmpty) &&
+              category.icon != null &&
+              category.icon!.trim().isNotEmpty) {
+        uniqueCategories[key] = category;
+      }
+    }
+
+    final categories = uniqueCategories.values.toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
     setState(() {
-      _categories = result.categories;
+      _categories = categories;
       _categoriesStatus = result.status;
     });
   }
@@ -993,8 +1020,22 @@ class _HomePageState extends State<HomePage> {
   // FAVORITE
   // ================================================================
 
-  void _onFavoritePressed(Place place) {
-    debugPrint('Favorite: ${place.name}');
+  Future<void> _onFavoritePressed(Place place) async {
+    try {
+      if (_favoriteIds.contains(place.id)) {
+        await _favoriteService.remove(place.id);
+        if (mounted) setState(() => _favoriteIds.remove(place.id));
+      } else {
+        await _favoriteService.add(place.id);
+        if (mounted) setState(() => _favoriteIds.add(place.id));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر تحديث المفضلة: $error')),
+        );
+      }
+    }
   }
 
   // ================================================================

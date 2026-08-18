@@ -18,23 +18,58 @@ if project_root not in sys.path:
 from app.core.config import settings
 from app.database.base import Base
 
+# ============================================================
 # Existing application models
+# ============================================================
+
 from app.models.category import Category  # noqa: F401
 from app.models.place import Place  # noqa: F401
 from app.models.user import User  # noqa: F401
 
+# ============================================================
 # Admin system models
+# ============================================================
+
 from app.models.admin_user import AdminUser  # noqa: F401
 from app.models.role import Role  # noqa: F401
 from app.models.permission import Permission  # noqa: F401
 from app.models import admin_associations  # noqa: F401
 
+# ============================================================
+# Existing social / engagement models
+# ============================================================
+
+from app.models.favorite import UserFavorite  # noqa: F401
+from app.models.review import PlaceReview  # noqa: F401
+
+# ============================================================
+# Wallet / Points / Coins models
+# ============================================================
+
+from app.models.wallet import UserWallet  # noqa: F401
+from app.models.wallet_transaction import (  # noqa: F401
+    WalletAsset,
+    WalletTransaction,
+    WalletTransactionStatus,
+    WalletTransactionType,
+)
+from app.models.wallet_transfer import (  # noqa: F401
+    WalletTransfer,
+    WalletTransferStatus,
+)
+
+# ============================================================
+# Store models
+# ============================================================
+
+from app.models.store_category import StoreCategory  # noqa: F401
+from app.models.store_item import StoreItem  # noqa: F401
+from app.models.store_banner import StoreBanner  # noqa: F401
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-
 
 db_url = settings.database_url
 

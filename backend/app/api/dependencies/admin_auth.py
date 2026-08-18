@@ -65,9 +65,12 @@ async def get_current_admin(
         .options(
             selectinload(AdminUser.roles).selectinload(
                 Role.permissions
-            )
+            ),
+            selectinload(AdminUser.direct_permissions),
         )
-        .where(AdminUser.id == admin_id)
+        .where(
+            AdminUser.id == admin_id
+        )
     )
 
     admin_user = result.scalar_one_or_none()
@@ -88,13 +91,30 @@ async def get_current_admin(
     return admin_user
 
 
-def get_admin_permissions(admin_user: AdminUser) -> set[str]:
-    return {
-        permission.name
-        for role in admin_user.roles
-        if role.is_active
-        for permission in role.permissions
-    }
+def get_admin_permissions(
+    admin_user: AdminUser,
+) -> set[str]:
+    permissions: set[str] = set()
+
+    # ============================================================
+    # Permissions inherited from active roles
+    # ============================================================
+
+    for role in admin_user.roles:
+        if not role.is_active:
+            continue
+
+        for permission in role.permissions:
+            permissions.add(permission.name)
+
+    # ============================================================
+    # Permissions assigned directly to this admin user
+    # ============================================================
+
+    for permission in admin_user.direct_permissions:
+        permissions.add(permission.name)
+
+    return permissions
 
 
 def require_permission(permission_name: str):
@@ -103,7 +123,9 @@ def require_permission(permission_name: str):
         admin_user: AdminUser = Depends(get_current_admin),
     ) -> AdminUser:
 
-        permissions = get_admin_permissions(admin_user)
+        permissions = get_admin_permissions(
+            admin_user
+        )
 
         if permission_name not in permissions:
             raise HTTPException(
@@ -123,7 +145,8 @@ def require_role(role_name: str):
     ) -> AdminUser:
 
         has_role = any(
-            role.is_active and role.name == role_name
+            role.is_active
+            and role.name == role_name
             for role in admin_user.roles
         )
 

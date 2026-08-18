@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../../features/admin/admin_login_page.dart';
+import '../../features/auth/login_page.dart';
 import '../../features/home/home_page.dart';
+import '../../features/map/map_page.dart';
 import '../../features/profile/profile_page.dart';
+import '../../features/store/store_page.dart';
+import '../../features/wallet/wallet_page.dart';
+import '../../models/user.dart';
+import '../../services/auth_service.dart';
 
 class WaynShell extends StatefulWidget {
-  const WaynShell({super.key});
+  final User user;
+
+  const WaynShell({super.key, required this.user});
 
   @override
   State<WaynShell> createState() => _WaynShellState();
@@ -12,32 +21,43 @@ class WaynShell extends StatefulWidget {
 
 class _WaynShellState extends State<WaynShell> {
   int _currentIndex = 0;
-
-  late final List<Widget> _pages;
+  late List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    _pages = _buildPages(widget.user);
+  }
 
-    _pages = const [
-      HomePage(),
-      _PlaceholderPage(
-        icon: Icons.map_rounded,
-        title: 'الخريطة',
-        description: 'خريطة WAYN ستكون هنا.',
-      ),
-      _PlaceholderPage(
-        icon: Icons.groups_rounded,
-        title: 'المجتمع',
-        description: 'مجتمع WAYN سيكون هنا.',
-      ),
-      _PlaceholderPage(
-        icon: Icons.local_offer_rounded,
-        title: 'العروض',
-        description: 'عروض WAYN ستكون هنا.',
-      ),
-      ProfilePage(),
+  List<Widget> _buildPages(User user) {
+    return [
+      const HomePage(),
+      const MapPage(),
+      const StorePage(),
+      const WalletPage(),
+      ProfilePage(user: user, onLogout: _logout),
     ];
+  }
+
+  Future<void> _logout() async {
+    await AuthService().logout();
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => LoginPage(
+          onAuthenticated: (user) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (_) => WaynShell(user: user),
+              ),
+              (_) => false,
+            );
+          },
+        ),
+      ),
+      (_) => false,
+    );
   }
 
   @override
@@ -56,10 +76,10 @@ class _WaynShellState extends State<WaynShell> {
 
   Widget _buildBottomNavigation() {
     const items = [
-      (Icons.home_rounded, 'الرئيسية'),
+      (Icons.explore_rounded, 'استكشف'),
       (Icons.map_rounded, 'الخريطة'),
-      (Icons.groups_rounded, 'المجتمع'),
-      (Icons.local_offer_rounded, 'العروض'),
+      (Icons.storefront_rounded, 'المتجر'),
+      (Icons.account_balance_wallet_rounded, 'المحفظة'),
       (Icons.person_rounded, 'حسابي'),
     ];
 
@@ -77,133 +97,47 @@ class _WaynShellState extends State<WaynShell> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
           child: Row(
-            children: List.generate(
-              items.length,
-              (index) {
-                final selected = _currentIndex == index;
+            children: List.generate(items.length, (index) {
+              final selected = _currentIndex == index;
 
-                return Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      setState(() {
-                        _currentIndex = index;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 6,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? const Color(0xFFE6F8F5)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              items[index].$1,
-                              size: 22,
-                              color: selected
-                                  ? const Color(0xFF16A899)
-                                  : const Color(0xFF8B94A3),
-                            ),
+              return Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _currentIndex = index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          items[index].$1,
+                          size: 22,
+                          color: selected
+                              ? const Color(0xFF18A99A)
+                              : const Color(0xFF8B94A3),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          items[index].$2,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.w500,
+                            color: selected
+                                ? const Color(0xFF18A99A)
+                                : const Color(0xFF8B94A3),
                           ),
-                          const SizedBox(height: 3),
-                          Text(
-                            items[index].$2,
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: selected
-                                  ? FontWeight.w800
-                                  : FontWeight.w500,
-                              color: selected
-                                  ? const Color(0xFF16A899)
-                                  : const Color(0xFF8B94A3),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlaceholderPage extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-
-  const _PlaceholderPage({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 82,
-                height: 82,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6F8F5),
-                  borderRadius: BorderRadius.circular(24),
                 ),
-                child: Icon(
-                  icon,
-                  size: 40,
-                  color: const Color(0xFF18A99A),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                title,
-                textDirection: TextDirection.rtl,
-                style: const TextStyle(
-                  fontSize: 23,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF172033),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                description,
-                textDirection: TextDirection.rtl,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF7A8494),
-                ),
-              ),
-            ],
+              );
+            }),
           ),
         ),
       ),

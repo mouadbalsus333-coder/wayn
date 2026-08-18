@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.admin_auth import (
     get_current_admin,
+    get_admin_permissions,
     require_permission,
 )
 from app.core.database import get_session
@@ -60,19 +61,16 @@ async def admin_login(
             detail="Invalid email or password",
         )
 
-    roles = [
-        role.name
-        for role in admin_user.roles
-        if role.is_active
-    ]
-
-    permissions = sorted(
+    roles = sorted(
         {
-            permission.name
+            role.name
             for role in admin_user.roles
             if role.is_active
-            for permission in role.permissions
         }
+    )
+
+    permissions = sorted(
+        get_admin_permissions(admin_user)
     )
 
     access_token = create_access_token(
@@ -99,18 +97,15 @@ async def admin_me(
         "admin_id": admin_user.id,
         "email": admin_user.email,
         "full_name": admin_user.full_name,
-        "roles": [
-            role.name
-            for role in admin_user.roles
-            if role.is_active
-        ],
-        "permissions": sorted(
+        "roles": sorted(
             {
-                permission.name
+                role.name
                 for role in admin_user.roles
                 if role.is_active
-                for permission in role.permissions
             }
+        ),
+        "permissions": sorted(
+            get_admin_permissions(admin_user)
         ),
     }
 

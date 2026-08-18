@@ -180,7 +180,10 @@ class User(Base):
         nullable=False,
     )
 
-    # Relationships (lazy to avoid circular import issues at query time)
+    # ============================================================
+    # Relationships
+    # ============================================================
+
     owned_places = relationship(
         "Place",
         foreign_keys="Place.owner_user_id",
@@ -197,4 +200,11 @@ class User(Base):
         "UserFavorite",
         back_populates="user",
         cascade="all, delete-orphan",
-    )
+    )
+
+    wallet = relationship(
+        "UserWallet",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

@@ -23,7 +23,7 @@ async def conn():
         await connection.close()
 
 
-LATEST_ALEMBIC_HEAD = "7a89b12c3d4e"
+LATEST_ALEMBIC_HEAD = "7e4534ba168d"
 
 
 REQUIRED_TABLES = [

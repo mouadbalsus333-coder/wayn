@@ -1,32 +1,75 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wayn/services/repositories/repository_factory.dart';
+import 'package:wayn/core/config/backend_config.dart';
+import 'package:wayn/core/network/dart_http_api_client.dart';
+import 'package:wayn/services/repositories/fastapi_category_repository.dart';
+import 'package:wayn/services/repositories/fastapi_place_repository.dart';
 
 void main() {
-  test('FastAPI Category Repository Integration Test', () async {
-    final categoryRepo = createCategoryRepository();
-    final result = await categoryRepo.getCategories();
-    print('Category Result Status: ${result.status}');
-    print('Categories Count: ${result.categories.length}');
-    expect(result.categories, isNotNull);
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late DartHttpApiClient apiClient;
+  late FastApiCategoryRepository categoryRepository;
+  late FastApiPlaceRepository placeRepository;
+
+  setUp(() {
+    apiClient = DartHttpApiClient(
+      baseUrl: BackendConfig.backendUrl,
+      secureStorage: InMemoryAuthTokenStorage(),
+    );
+
+    categoryRepository = FastApiCategoryRepository(apiClient);
+    placeRepository = FastApiPlaceRepository(apiClient);
   });
 
-  test('FastAPI Place Repository Integration Test', () async {
-    final placeRepo = createPlaceRepository();
-
-    final places = await placeRepo.getPlaces();
-    print('Places Count: ${places.length}');
-    expect(places, isNotNull);
-
-    final topRated = await placeRepo.getHighestRatedPlaces();
-    print('Top Rated Count: ${topRated.length}');
-    expect(topRated, isNotNull);
-
-    final mostVisited = await placeRepo.getMostVisitedPlaces();
-    print('Most Visited Count: ${mostVisited.length}');
-    expect(mostVisited, isNotNull);
-
-    final searchResults = await placeRepo.searchPlaces('test');
-    print('Search Count: ${searchResults.length}');
-    expect(searchResults, isNotNull);
+  tearDown(() {
+    apiClient.dispose();
   });
+
+  test(
+    'FastAPI Category Repository Integration Test',
+    () async {
+      final result = await categoryRepository.getCategories();
+
+      expect(
+        result.categories,
+        isNotNull,
+      );
+    },
+  );
+
+  test(
+    'FastAPI Place Repository Integration Test',
+    () async {
+      final places = await placeRepository.getPlaces();
+
+      expect(
+        places,
+        isNotNull,
+      );
+
+      final topRatedPlaces =
+          await placeRepository.getHighestRatedPlaces();
+
+      expect(
+        topRatedPlaces,
+        isNotNull,
+      );
+
+      final mostVisitedPlaces =
+          await placeRepository.getMostVisitedPlaces();
+
+      expect(
+        mostVisitedPlaces,
+        isNotNull,
+      );
+
+      final searchResults =
+          await placeRepository.searchPlaces('test');
+
+      expect(
+        searchResults,
+        isNotNull,
+      );
+    },
+  );
 }

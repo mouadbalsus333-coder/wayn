@@ -15,31 +15,46 @@ class UserRepository:
     # Basic lookups
     # ============================================================
 
-    async def get_by_id(self, user_id: UUID) -> User | None:
+    async def get_by_id(
+        self,
+        user_id: UUID,
+    ) -> User | None:
         result = await self.session.execute(
             select(User).where(User.id == user_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_email(self, email: str) -> User | None:
+    async def get_by_email(
+        self,
+        email: str,
+    ) -> User | None:
         result = await self.session.execute(
             select(User).where(User.email == email)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_username(self, username: str) -> User | None:
+    async def get_by_username(
+        self,
+        username: str,
+    ) -> User | None:
         result = await self.session.execute(
             select(User).where(User.username == username)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_phone(self, phone: str) -> User | None:
+    async def get_by_phone(
+        self,
+        phone: str,
+    ) -> User | None:
         result = await self.session.execute(
             select(User).where(User.phone == phone)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_google_id(self, google_id: str) -> User | None:
+    async def get_by_google_id(
+        self,
+        google_id: str,
+    ) -> User | None:
         result = await self.session.execute(
             select(User).where(User.google_id == google_id)
         )
@@ -181,15 +196,28 @@ class UserRepository:
     # Persistence
     # ============================================================
 
-    async def create(self, user: User) -> User:
+    async def create(
+        self,
+        user: User,
+    ) -> User:
+        """
+        Add a new user to the current transaction.
+
+        This method intentionally does NOT commit.
+        The service layer owns the transaction so User + Wallet
+        can be committed atomically.
+        """
         self.session.add(user)
 
-        await self.session.commit()
-        await self.session.refresh(user)
+        # Flush so the database-generated user ID exists.
+        await self.session.flush()
 
         return user
 
-    async def save(self, user: User) -> User:
+    async def save(
+        self,
+        user: User,
+    ) -> User:
         await self.session.commit()
         await self.session.refresh(user)
 

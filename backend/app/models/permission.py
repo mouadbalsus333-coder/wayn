@@ -37,3 +37,9 @@ class Permission(Base):
         secondary="role_permissions",
         back_populates="permissions",
     )
+
+    direct_admin_users = relationship(
+        "AdminUser",
+        secondary="admin_user_permissions",
+        back_populates="direct_permissions",
+    )

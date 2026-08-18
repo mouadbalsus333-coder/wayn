@@ -1,16 +1,7 @@
 import '../../core/config/backend_config.dart';
 import '../../core/network/dart_http_api_client.dart';
 
-import 'supabase_category_repository.dart';
-import 'supabase_contribution_repository.dart';
-import 'supabase_place_repository.dart';
-import 'supabase_point_transaction_repository.dart';
-import 'supabase_task_repository.dart';
-import 'supabase_user_repository.dart';
-
-import 'fastapi_category_repository.dart';
-import 'fastapi_place_repository.dart';
-
+import 'auth_repository.dart';
 import 'category_repository.dart';
 import 'contribution_repository.dart';
 import 'place_repository.dart';
@@ -18,32 +9,109 @@ import 'point_transaction_repository.dart';
 import 'task_repository.dart';
 import 'user_repository.dart';
 
+import 'fastapi_auth_repository.dart';
+import 'fastapi_category_repository.dart';
+import 'fastapi_place_repository.dart';
+import 'fastapi_user_repository.dart';
+
 final DartHttpApiClient _fastApiClient = DartHttpApiClient(
   baseUrl: BackendConfig.backendUrl,
 );
 
-PlaceRepository createPlaceRepository() {
-  if (BackendConfig.backendType == 'fastapi') {
-    return FastApiPlaceRepository(_fastApiClient);
-  }
+// ============================================================
+// AuthRepository
+// ============================================================
 
-  return SupabasePlaceRepository();
+AuthRepository createAuthRepository() {
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return FastApiAuthRepository(_fastApiClient);
+
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
 }
+
+// ============================================================
+// PlaceRepository
+// ============================================================
+
+PlaceRepository createPlaceRepository() {
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return FastApiPlaceRepository(_fastApiClient);
+
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
+}
+
+// ============================================================
+// CategoryRepository
+// ============================================================
 
 CategoryRepository createCategoryRepository() {
-  if (BackendConfig.backendType == 'fastapi') {
-    return FastApiCategoryRepository(_fastApiClient);
-  }
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return FastApiCategoryRepository(_fastApiClient);
 
-  return SupabaseCategoryRepository();
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
 }
 
-UserRepository createUserRepository() => SupabaseUserRepository();
+// ============================================================
+// UserRepository
+// ============================================================
 
-TaskRepository createTaskRepository() => SupabaseTaskRepository();
+UserRepository createUserRepository() {
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return FastApiUserRepository(_fastApiClient);
 
-ContributionRepository createContributionRepository() =>
-    SupabaseContributionRepository();
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
+}
 
-PointTransactionRepository createPointTransactionRepository() =>
-    SupabasePointTransactionRepository();
+// ============================================================
+// TaskRepository
+// ============================================================
+
+TaskRepository createTaskRepository() {
+  throw UnimplementedError(
+    'FastAPI TaskRepository has not been implemented yet.',
+  );
+}
+
+// ============================================================
+// ContributionRepository
+// ============================================================
+
+ContributionRepository createContributionRepository() {
+  throw UnimplementedError(
+    'FastAPI ContributionRepository has not been implemented yet.',
+  );
+}
+
+// ============================================================
+// PointTransactionRepository
+// ============================================================
+
+PointTransactionRepository createPointTransactionRepository() {
+  throw UnimplementedError(
+    'FastAPI PointTransactionRepository has not been implemented yet.',
+  );
+}

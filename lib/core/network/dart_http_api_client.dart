@@ -1,8 +1,93 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import 'api_client.dart';
+
+/// Abstraction over secure token storage.
+///
+/// This allows the HTTP client to use the real FlutterSecureStorage
+/// on the device while tests can inject an in-memory implementation.
+abstract class AuthTokenStorage {
+  Future<void> write({
+    required String key,
+    required String value,
+  });
+
+  Future<String?> read({
+    required String key,
+  });
+
+  Future<void> delete({
+    required String key,
+  });
+}
+
+/// Production implementation backed by flutter_secure_storage.
+class SecureAuthTokenStorage implements AuthTokenStorage {
+  final FlutterSecureStorage _storage;
+
+  SecureAuthTokenStorage({
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+
+  @override
+  Future<void> write({
+    required String key,
+    required String value,
+  }) {
+    return _storage.write(
+      key: key,
+      value: value,
+    );
+  }
+
+  @override
+  Future<String?> read({
+    required String key,
+  }) {
+    return _storage.read(
+      key: key,
+    );
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+  }) {
+    return _storage.delete(
+      key: key,
+    );
+  }
+}
+
+/// Simple in-memory storage useful for tests.
+class InMemoryAuthTokenStorage implements AuthTokenStorage {
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<void> write({
+    required String key,
+    required String value,
+  }) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<String?> read({
+    required String key,
+  }) async {
+    return _values[key];
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+  }) async {
+    _values.remove(key);
+  }
+}
 
 class DartHttpApiClient implements ApiClient {
   @override
@@ -12,16 +97,75 @@ class DartHttpApiClient implements ApiClient {
   final Map<String, String> defaultHeaders;
 
   final http.Client _client;
+  final AuthTokenStorage _secureStorage;
+
+  final String tokenStorageKey;
+
 
   DartHttpApiClient({
     required this.baseUrl,
     Map<String, String>? defaultHeaders,
     http.Client? client,
-  })  : defaultHeaders = defaultHeaders ??
-            const {
-              'Content-Type': 'application/json',
-            },
-        _client = client ?? http.Client();
+    AuthTokenStorage? secureStorage,
+    this.tokenStorageKey = 'wayn_access_token',
+  })  : defaultHeaders = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...?defaultHeaders,
+        },
+        _client = client ?? http.Client(),
+        _secureStorage =
+            secureStorage ?? SecureAuthTokenStorage();
+
+  // ============================================================
+  // Authentication
+  // ============================================================
+
+  /// Saves the JWT access token securely on the device.
+  Future<void> setAuthToken(String token) async {
+    final trimmedToken = token.trim();
+
+    if (trimmedToken.isEmpty) {
+      await clearAuthToken();
+      return;
+    }
+
+    await _secureStorage.write(
+      key: tokenStorageKey,
+      value: trimmedToken,
+    );
+  }
+
+  /// Returns the currently stored JWT access token.
+  Future<String?> getAuthToken() async {
+    final token = await _secureStorage.read(
+      key: tokenStorageKey,
+    );
+
+    if (token == null || token.trim().isEmpty) {
+      return null;
+    }
+
+    return token.trim();
+  }
+
+  /// Removes the JWT access token from secure storage.
+  Future<void> clearAuthToken() async {
+    await _secureStorage.delete(
+      key: tokenStorageKey,
+    );
+  }
+
+  /// Returns true when a valid-looking token is stored.
+  Future<bool> hasAuthToken() async {
+    final token = await getAuthToken();
+
+    return token != null && token.isNotEmpty;
+  }
+
+  // ============================================================
+  // GET
+  // ============================================================
 
   @override
   Future<dynamic> get(
@@ -33,16 +177,19 @@ class DartHttpApiClient implements ApiClient {
       _buildUrl(path, queryParams),
     );
 
+    final requestHeaders = await _buildHeaders(headers);
+
     final response = await _client.get(
       uri,
-      headers: {
-        ...defaultHeaders,
-        ...?headers,
-      },
+      headers: requestHeaders,
     );
 
     return _handleResponse(response);
   }
+
+  // ============================================================
+  // POST
+  // ============================================================
 
   @override
   Future<dynamic> post(
@@ -54,17 +201,22 @@ class DartHttpApiClient implements ApiClient {
       _buildUrl(path, null),
     );
 
+    final requestHeaders = await _buildHeaders(headers);
+
     final response = await _client.post(
       uri,
-      headers: {
-        ...defaultHeaders,
-        ...?headers,
-      },
-      body: jsonEncode(body ?? {}),
+      headers: requestHeaders,
+      body: jsonEncode(
+        body ?? <String, dynamic>{},
+      ),
     );
 
     return _handleResponse(response);
   }
+
+  // ============================================================
+  // PUT
+  // ============================================================
 
   @override
   Future<dynamic> put(
@@ -76,17 +228,22 @@ class DartHttpApiClient implements ApiClient {
       _buildUrl(path, null),
     );
 
+    final requestHeaders = await _buildHeaders(headers);
+
     final response = await _client.put(
       uri,
-      headers: {
-        ...defaultHeaders,
-        ...?headers,
-      },
-      body: jsonEncode(body ?? {}),
+      headers: requestHeaders,
+      body: jsonEncode(
+        body ?? <String, dynamic>{},
+      ),
     );
 
     return _handleResponse(response);
   }
+
+  // ============================================================
+  // PATCH
+  // ============================================================
 
   @override
   Future<dynamic> patch(
@@ -98,17 +255,22 @@ class DartHttpApiClient implements ApiClient {
       _buildUrl(path, null),
     );
 
+    final requestHeaders = await _buildHeaders(headers);
+
     final response = await _client.patch(
       uri,
-      headers: {
-        ...defaultHeaders,
-        ...?headers,
-      },
-      body: jsonEncode(body ?? {}),
+      headers: requestHeaders,
+      body: jsonEncode(
+        body ?? <String, dynamic>{},
+      ),
     );
 
     return _handleResponse(response);
   }
+
+  // ============================================================
+  // DELETE
+  // ============================================================
 
   @override
   Future<dynamic> delete(
@@ -120,54 +282,97 @@ class DartHttpApiClient implements ApiClient {
       _buildUrl(path, null),
     );
 
+    final requestHeaders = await _buildHeaders(headers);
+
     final response = await _client.delete(
       uri,
-      headers: {
-        ...defaultHeaders,
-        ...?headers,
-      },
+      headers: requestHeaders,
       body: body == null ? null : jsonEncode(body),
     );
 
     return _handleResponse(response);
   }
 
+  // ============================================================
+  // Headers
+  // ============================================================
+
+  Future<Map<String, String>> _buildHeaders(
+    Map<String, String>? headers,
+  ) async {
+    final token = await getAuthToken();
+
+    final result = <String, String>{
+      ...defaultHeaders,
+      ...?headers,
+    };
+
+    if (token != null && token.isNotEmpty) {
+      result['Authorization'] = 'Bearer $token';
+    }
+
+    return result;
+  }
+
+  // ============================================================
+  // URL
+  // ============================================================
+
   String _buildUrl(
     String path,
     Map<String, dynamic>? query,
   ) {
     final trimmedBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
+        ? baseUrl.substring(
+            0,
+            baseUrl.length - 1,
+          )
         : baseUrl;
 
-    final normalizedPath =
-        path.startsWith('/') ? path : '/$path';
+    final normalizedPath = path.startsWith('/')
+        ? path
+        : '/$path';
 
     var uri = Uri.parse(
       '$trimmedBase$normalizedPath',
     );
 
     if (query != null && query.isNotEmpty) {
-      uri = uri.replace(
-        queryParameters: query.map(
-          (key, value) => MapEntry(
-            key,
-            value.toString(),
-          ),
-        ),
-      );
+      final queryParameters = <String, String>{};
+
+      query.forEach((key, value) {
+        if (value == null) {
+          return;
+        }
+
+        queryParameters[key] = value.toString();
+      });
+
+      if (queryParameters.isNotEmpty) {
+        uri = uri.replace(
+          queryParameters: queryParameters,
+        );
+      }
     }
 
     return uri.toString();
   }
+
+  // ============================================================
+  // Response handling
+  // ============================================================
 
   dynamic _handleResponse(
     http.Response response,
   ) {
     final status = response.statusCode;
 
+    // ----------------------------------------------------------
+    // Success
+    // ----------------------------------------------------------
+
     if (status >= 200 && status < 300) {
-      if (response.body.isEmpty) {
+      if (status == 204 || response.body.trim().isEmpty) {
         return null;
       }
 
@@ -178,9 +383,53 @@ class DartHttpApiClient implements ApiClient {
       }
     }
 
+    // ----------------------------------------------------------
+    // Error
+    // ----------------------------------------------------------
+
+    String message = 'HTTP $status';
+
+    dynamic decodedBody;
+
+    if (response.body.trim().isNotEmpty) {
+      try {
+        decodedBody = jsonDecode(response.body);
+      } catch (_) {
+        decodedBody = response.body;
+      }
+    }
+
+    if (decodedBody is Map<String, dynamic>) {
+      final detail = decodedBody['detail'];
+
+      if (detail is String && detail.trim().isNotEmpty) {
+        message = detail.trim();
+      } else if (detail != null) {
+        message = detail.toString();
+      } else {
+        final errors = decodedBody['errors'];
+
+        if (errors != null) {
+          message = errors.toString();
+        } else {
+          message = decodedBody.toString();
+        }
+      }
+    } else if (decodedBody != null) {
+      message = decodedBody.toString();
+    }
+
     throw ApiClientException(
-      'HTTP ${response.statusCode}: ${response.body}',
-      statusCode: response.statusCode,
+      message,
+      statusCode: status,
     );
+  }
+
+  // ============================================================
+  // Cleanup
+  // ============================================================
+
+  void dispose() {
+    _client.close();
   }
 }

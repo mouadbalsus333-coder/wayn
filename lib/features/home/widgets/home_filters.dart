@@ -13,10 +13,10 @@ class HomeFilters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final filters = [
-      ('الأقرب', Icons.near_me_rounded),
+      ('كل الأماكن', Icons.apps_rounded),
       ('مفتوح الآن', Icons.access_time_rounded),
       ('الأعلى تقييماً', Icons.star_rounded),
-      ('الأكثر شعبية', Icons.local_fire_department_rounded),
+      ('الأكثر زيارة', Icons.local_fire_department_rounded),
     ];
 
     return SizedBox(

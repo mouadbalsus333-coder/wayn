@@ -1,5 +1,5 @@
 class BackendConfig {
-  /// 'fastapi' (default) or 'supabase'
+  /// FastAPI backend.
   static const String backendType =
       String.fromEnvironment(
         'REPOSITORY_BACKEND',

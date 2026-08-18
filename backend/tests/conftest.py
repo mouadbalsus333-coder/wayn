@@ -169,6 +169,26 @@ async def user_token():
     # Cleanup
     if user_id is not None:
         async with AsyncSessionLocal() as session:
+            # Wallet transfers reference user_wallets via a RESTRICT
+            # foreign key, so they must be removed before the user
+            # (and their wallet) can be deleted.  This applies whether
+            # the test user was the sender or the receiver.
+            await session.execute(
+                text(
+                    """
+                    DELETE FROM wallet_transfers
+                    WHERE sender_wallet_id IN (
+                        SELECT id FROM user_wallets
+                        WHERE user_id = :uid
+                    )
+                    OR receiver_wallet_id IN (
+                        SELECT id FROM user_wallets
+                        WHERE user_id = :uid
+                    )
+                    """
+                ),
+                {"uid": user_id},
+            )
             await session.execute(
                 text("DELETE FROM users WHERE id = :uid"),
                 {"uid": user_id},

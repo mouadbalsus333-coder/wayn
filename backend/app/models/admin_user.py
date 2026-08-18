@@ -61,3 +61,9 @@ class AdminUser(Base):
         secondary="admin_user_roles",
         back_populates="admin_users",
     )
+
+    direct_permissions = relationship(
+        "Permission",
+        secondary="admin_user_permissions",
+        back_populates="direct_admin_users",
+    )

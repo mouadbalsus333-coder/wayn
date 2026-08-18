@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../core/navigation/wayn_shell.dart';
+import '../auth/auth_gate.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -59,7 +59,7 @@ class _SplashPageState extends State<SplashPage>
           animation,
           secondaryAnimation,
         ) {
-          return const WaynShell();
+          return const AuthGate();
         },
         transitionDuration: const Duration(
           milliseconds: 650,

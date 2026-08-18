@@ -6,26 +6,52 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password, verify_password
 from app.models.user import User
 from app.repositories.user.repository import UserRepository
+from app.services.wallet.service import WalletService
 
 
 class UserService:
     def __init__(self, session: AsyncSession):
+        self.session = session
         self.repository = UserRepository(session)
+        self.wallet_service = WalletService(session)
 
-    async def get_by_id(self, user_id: UUID) -> User | None:
+    # ============================================================
+    # Basic lookups
+    # ============================================================
+
+    async def get_by_id(
+        self,
+        user_id: UUID,
+    ) -> User | None:
         return await self.repository.get_by_id(user_id)
 
-    async def get_by_email(self, email: str) -> User | None:
+    async def get_by_email(
+        self,
+        email: str,
+    ) -> User | None:
         return await self.repository.get_by_email(email)
 
-    async def get_by_username(self, username: str) -> User | None:
+    async def get_by_username(
+        self,
+        username: str,
+    ) -> User | None:
         return await self.repository.get_by_username(username)
 
-    async def get_by_phone(self, phone: str) -> User | None:
+    async def get_by_phone(
+        self,
+        phone: str,
+    ) -> User | None:
         return await self.repository.get_by_phone(phone)
 
-    async def get_by_google_id(self, google_id: str) -> User | None:
+    async def get_by_google_id(
+        self,
+        google_id: str,
+    ) -> User | None:
         return await self.repository.get_by_google_id(google_id)
+
+    # ============================================================
+    # Registration
+    # ============================================================
 
     async def register(
         self,
@@ -39,17 +65,23 @@ class UserService:
         existing_email = await self.repository.get_by_email(email)
 
         if existing_email is not None:
-            raise ValueError("Email is already registered")
+            raise ValueError(
+                "Email is already registered"
+            )
 
-        existing_username = await self.repository.get_by_username(
-            username
+        existing_username = (
+            await self.repository.get_by_username(username)
         )
 
         if existing_username is not None:
-            raise ValueError("Username is already taken")
+            raise ValueError(
+                "Username is already taken"
+            )
 
         if phone:
-            existing_phone = await self.repository.get_by_phone(phone)
+            existing_phone = (
+                await self.repository.get_by_phone(phone)
+            )
 
             if existing_phone is not None:
                 raise ValueError(
@@ -65,7 +97,32 @@ class UserService:
             avatar_id=avatar_id,
         )
 
-        return await self.repository.create(user)
+        try:
+            # Create the user without committing.
+            user = await self.repository.create(user)
+
+            # Create the wallet in the same transaction.
+            await self.wallet_service.get_or_create_wallet(
+                user.id
+            )
+
+            # Commit User + Wallet atomically.
+            await self.session.commit()
+
+            # Refresh after the transaction is committed.
+            await self.session.refresh(user)
+
+            return user
+
+        except Exception:
+            # If User or Wallet creation fails,
+            # rollback the entire registration transaction.
+            await self.session.rollback()
+            raise
+
+    # ============================================================
+    # Authentication
+    # ============================================================
 
     async def authenticate(
         self,
@@ -91,6 +148,10 @@ class UserService:
 
         return user
 
+    # ============================================================
+    # Location
+    # ============================================================
+
     async def update_location(
         self,
         user: User,
@@ -108,6 +169,10 @@ class UserService:
         )
 
         return await self.repository.save(user)
+
+    # ============================================================
+    # Profile
+    # ============================================================
 
     async def update_profile(
         self,
@@ -134,7 +199,9 @@ class UserService:
             user.username = username
 
         if phone is not None and phone != user.phone:
-            existing_phone = await self.repository.get_by_phone(phone)
+            existing_phone = (
+                await self.repository.get_by_phone(phone)
+            )
 
             if (
                 existing_phone is not None
@@ -156,6 +223,10 @@ class UserService:
             user.bio = bio
 
         return await self.repository.save(user)
+
+    # ============================================================
+    # Password
+    # ============================================================
 
     async def change_password(
         self,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../home/models/place.dart';
+import '../../services/favorite_service.dart';
+import '../../services/review_service.dart';
 
 class PlaceDetailsPage extends StatefulWidget {
   final Place place;
@@ -16,8 +18,23 @@ class PlaceDetailsPage extends StatefulWidget {
 
 class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   bool _isFavorite = false;
+  final _favorites = FavoriteService();
+  final _reviews = ReviewService();
 
   Place get place => widget.place;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorite();
+  }
+
+  Future<void> _loadFavorite() async {
+    try {
+      final value = await _favorites.check(place.id);
+      if (mounted) setState(() => _isFavorite = value);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -700,11 +717,7 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
     return _buildSection(
       title: 'آراء الزوار',
       trailing: TextButton(
-        onPressed: () {
-          debugPrint(
-            'All reviews pressed for ${place.name}',
-          );
-        },
+        onPressed: _showReviews,
         child: const Text(
           'عرض الكل',
           textDirection: TextDirection.rtl,
@@ -1036,16 +1049,140 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   // FAVORITE
   // ===============================================================
 
-  void _toggleFavorite() {
-    setState(() {
-      _isFavorite = !_isFavorite;
-    });
+  Future<void> _toggleFavorite() async {
+    try {
+      if (_isFavorite) {
+        await _favorites.remove(place.id);
+      } else {
+        await _favorites.add(place.id);
+      }
+      if (mounted) setState(() => _isFavorite = !_isFavorite);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر تحديث المفضلة: $error')),
+        );
+      }
+    }
+  }
 
-    debugPrint(
-      _isFavorite
-          ? 'Added ${place.name} to favorites'
-          : 'Removed ${place.name} from favorites',
+  Future<void> _showReviews() async {
+    try {
+      final reviews = await _reviews.list(place.id);
+      if (!mounted) return;
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * .72,
+            child: Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(18),
+                  child: Text('تقييمات الزوار',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                ),
+                Expanded(
+                  child: reviews.isEmpty
+                      ? const Center(child: Text('لا توجد تقييمات بعد'))
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(18),
+                          itemCount: reviews.length,
+                          separatorBuilder: (_, _) => const Divider(height: 22),
+                          itemBuilder: (_, i) => ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(0xFFE8F8F6),
+                              child: Text(reviews[i].rating.toStringAsFixed(0)),
+                            ),
+                            title: Text(reviews[i].comment ?? 'تقييم بدون تعليق'),
+                            subtitle: Text('تقييم ${reviews[i].rating.toStringAsFixed(1)} من 5'),
+                          ),
+                        ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _writeReview();
+                    },
+                    icon: const Icon(Icons.rate_review_outlined),
+                    label: const Text('أضف تقييمك'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر تحميل التقييمات: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _writeReview() async {
+    double rating = 5;
+    final comment = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('قيّم المكان'),
+          content: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Slider(
+                  value: rating,
+                  min: 1,
+                  max: 5,
+                  divisions: 8,
+                  label: rating.toStringAsFixed(1),
+                  onChanged: (v) => setDialogState(() => rating = v),
+                ),
+                TextField(
+                  controller: comment,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'اكتب تجربتك...',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  await _reviews.create(place.id, rating, comment.text.trim());
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم إرسال تقييمك')),
+                    );
+                  }
+                } catch (error) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(error.toString())),
+                  );
+                }
+              },
+              child: const Text('إرسال'),
+            ),
+          ],
+        ),
+      ),
     );
+    comment.dispose();
   }
 
   // ===============================================================
