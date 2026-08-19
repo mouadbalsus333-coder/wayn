@@ -1,3 +1,4 @@
+
 import '../../core/network/api_client.dart';
 import '../../core/network/dart_http_api_client.dart';
 import '../../models/user.dart';
@@ -197,38 +198,106 @@ class FastApiAuthRepository implements AuthRepository {
   Future<User?> _handleAuthResponse(
     dynamic response,
   ) async {
-    if (response == null) {
-      return null;
-    }
+    try {
+      print('WAYN AUTH: received response');
+      print('WAYN AUTH: response type = ${response.runtimeType}');
 
-    if (response is! Map) {
-      throw ApiClientException(
-        'Invalid authentication response',
+      if (response == null) {
+        print('WAYN AUTH ERROR: response is null');
+        return null;
+      }
+
+      if (response is! Map) {
+        print(
+          'WAYN AUTH ERROR: response is not a Map: '
+          '${response.runtimeType}',
+        );
+
+        throw ApiClientException(
+          'Invalid authentication response',
+        );
+      }
+
+      final data = Map<String, dynamic>.from(response);
+
+      print('WAYN AUTH: response keys = ${data.keys.toList()}');
+
+      // ----------------------------------------------------------
+      // Access token
+      // ----------------------------------------------------------
+
+      final accessToken = data['access_token']?.toString();
+
+      if (accessToken == null || accessToken.trim().isEmpty) {
+        print('WAYN AUTH ERROR: access_token is missing');
+
+        throw ApiClientException(
+          'Authentication response does not contain an access token',
+        );
+      }
+
+      print('WAYN AUTH: access_token received');
+
+      // ----------------------------------------------------------
+      // User
+      // ----------------------------------------------------------
+
+      final userData = data['user'];
+
+      print(
+        'WAYN AUTH: user type = ${userData.runtimeType}',
       );
-    }
 
-    final data = Map<String, dynamic>.from(response);
+      if (userData is! Map) {
+        print('WAYN AUTH ERROR: user is not a Map');
 
-    final accessToken = data['access_token']?.toString();
+        throw ApiClientException(
+          'Authentication response does not contain a valid user',
+        );
+      }
 
-    if (accessToken == null || accessToken.trim().isEmpty) {
-      throw ApiClientException(
-        'Authentication response does not contain an access token',
+      final userMap = Map<String, dynamic>.from(userData);
+
+      print(
+        'WAYN AUTH: user keys = ${userMap.keys.toList()}',
       );
-    }
 
-    final userData = data['user'];
-
-    if (userData is! Map) {
-      throw ApiClientException(
-        'Authentication response does not contain a valid user',
+      print(
+        'WAYN AUTH: user id = ${userMap['id']}',
       );
+
+      print(
+        'WAYN AUTH: user email = ${userMap['email']}',
+      );
+
+      // ----------------------------------------------------------
+      // Save token
+      // ----------------------------------------------------------
+
+      print('WAYN AUTH: saving access token...');
+
+      await _api.setAuthToken(accessToken);
+
+      print('WAYN AUTH: access token saved');
+
+      // ----------------------------------------------------------
+      // Convert API user to Flutter User
+      // ----------------------------------------------------------
+
+      print('WAYN AUTH: converting user...');
+
+      final user = User.fromMap(userMap);
+
+      print(
+        'WAYN AUTH: User.fromMap succeeded: ${user.id}',
+      );
+
+      return user;
+    } catch (error, stackTrace) {
+      print('WAYN AUTH FAILED: $error');
+      print('WAYN AUTH STACKTRACE: $stackTrace');
+
+      rethrow;
     }
-
-    await _api.setAuthToken(accessToken);
-
-    return User.fromMap(
-      Map<String, dynamic>.from(userData),
-    );
   }
 }

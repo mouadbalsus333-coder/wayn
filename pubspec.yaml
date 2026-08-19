@@ -1,5 +1,7 @@
 name: wayn
+
 description: "WAYN - Your Smart Local Guide"
+
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -23,6 +25,7 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -33,3 +36,10 @@ flutter:
     - assets/icons/
     - assets/animations/
     - assets/sounds/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/branding/wayn_logo.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true

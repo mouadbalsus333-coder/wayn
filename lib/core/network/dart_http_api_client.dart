@@ -6,9 +6,6 @@ import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
 /// Abstraction over secure token storage.
-///
-/// This allows the HTTP client to use the real FlutterSecureStorage
-/// on the device while tests can inject an in-memory implementation.
 abstract class AuthTokenStorage {
   Future<void> write({
     required String key,
@@ -101,7 +98,6 @@ class DartHttpApiClient implements ApiClient {
 
   final String tokenStorageKey;
 
-
   DartHttpApiClient({
     required this.baseUrl,
     Map<String, String>? defaultHeaders,
@@ -121,11 +117,11 @@ class DartHttpApiClient implements ApiClient {
   // Authentication
   // ============================================================
 
-  /// Saves the JWT access token securely on the device.
   Future<void> setAuthToken(String token) async {
     final trimmedToken = token.trim();
 
     if (trimmedToken.isEmpty) {
+      print('WAYN AUTH: received empty token');
       await clearAuthToken();
       return;
     }
@@ -134,9 +130,13 @@ class DartHttpApiClient implements ApiClient {
       key: tokenStorageKey,
       value: trimmedToken,
     );
+
+    print(
+      'WAYN AUTH: access token saved successfully '
+      '(length: ${trimmedToken.length})',
+    );
   }
 
-  /// Returns the currently stored JWT access token.
   Future<String?> getAuthToken() async {
     final token = await _secureStorage.read(
       key: tokenStorageKey,
@@ -149,14 +149,14 @@ class DartHttpApiClient implements ApiClient {
     return token.trim();
   }
 
-  /// Removes the JWT access token from secure storage.
   Future<void> clearAuthToken() async {
     await _secureStorage.delete(
       key: tokenStorageKey,
     );
+
+    print('WAYN AUTH: access token cleared');
   }
 
-  /// Returns true when a valid-looking token is stored.
   Future<bool> hasAuthToken() async {
     final token = await getAuthToken();
 
@@ -368,17 +368,45 @@ class DartHttpApiClient implements ApiClient {
     final status = response.statusCode;
 
     // ----------------------------------------------------------
+    // TEMPORARY AUTH DEBUG
+    // ----------------------------------------------------------
+
+    print(
+      'WAYN HTTP: '
+      '${response.request?.method} '
+      '${response.request?.url}',
+    );
+
+    print('WAYN HTTP STATUS: $status');
+
+    print(
+      'WAYN HTTP BODY: ${response.body}',
+    );
+
+    // ----------------------------------------------------------
     // Success
     // ----------------------------------------------------------
 
     if (status >= 200 && status < 300) {
       if (status == 204 || response.body.trim().isEmpty) {
+        print('WAYN HTTP: empty successful response');
         return null;
       }
 
       try {
-        return jsonDecode(response.body);
-      } catch (_) {
+        final decoded = jsonDecode(response.body);
+
+        print(
+          'WAYN HTTP: JSON decoded successfully '
+          '(${decoded.runtimeType})',
+        );
+
+        return decoded;
+      } catch (error) {
+        print(
+          'WAYN HTTP: JSON decode failed: $error',
+        );
+
         return response.body;
       }
     }
@@ -418,6 +446,10 @@ class DartHttpApiClient implements ApiClient {
     } else if (decodedBody != null) {
       message = decodedBody.toString();
     }
+
+    print(
+      'WAYN HTTP ERROR: $message',
+    );
 
     throw ApiClientException(
       message,
