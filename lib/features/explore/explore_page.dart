@@ -11,6 +11,7 @@ import '../home/widgets/home_search_bar.dart';
 import '../home/widgets/place_card.dart';
 import '../home/widgets/section_header.dart';
 import '../../services/favorite_service.dart';
+import '../../features/location/saved_locations_store.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -44,7 +45,7 @@ class _ExplorePageState extends State<ExplorePage> {
   String? _selectedCategory;
   String _selectedCategoryLabel = 'كل الأماكن';
 
-  Position? _currentPosition;
+    Position? _currentPosition;
 
   // ================================================================
   // INIT
@@ -53,8 +54,39 @@ class _ExplorePageState extends State<ExplorePage> {
   @override
   void initState() {
     super.initState();
-
+    SavedLocationsStore.instance.addListener(_onSavedLocationChanged);
     _initializeExplore();
+  }
+
+  /// آخر نقطة مرجعية استُخدمت في تحميل الأماكن، لتجنب إعادة التحميل
+  /// إذا لم يتغيّر الموقع فعليًا.
+  ({double latitude, double longitude})? _lastLoadedReference;
+
+  void _onSavedLocationChanged() {
+    if (!mounted) return;
+
+    final ref = _referencePoint;
+    final last = _lastLoadedReference;
+
+    final changed = (ref == null) != (last == null) ||
+        (ref != null &&
+            last != null &&
+            (ref.latitude != last.latitude ||
+                ref.longitude != last.longitude));
+
+    if (changed) {
+      // الموقع المرجعي تغيّر (اختيار موقع محفوظ أو العودة إلى GPS)
+      // نعيد تحميل الأماكن القريبة والمسافات من النقطة الجديدة.
+      _loadNearbyPlaces();
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    SavedLocationsStore.instance.removeListener(_onSavedLocationChanged);
+    super.dispose();
   }
 
   Future<void> _initializeExplore() async {
@@ -162,24 +194,42 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = error.toString();
       });
 
-      debugPrint('Failed to load places: $error');
+            debugPrint('Failed to load places: $error');
     }
+  }
+
+  // ================================================================
+  // REFERENCE POINT (GPS OR SAVED LOCATION)
+  // ================================================================
+
+  /// يرجّع النقطة المرجعية الحالية: إحداثيات موقع محفوظ إذا كان
+  /// مختارًا، وإلا إحداثيات GPS.
+  ({double latitude, double longitude})? get _referencePoint {
+    final saved = SavedLocationsStore.instance.referencePoint;
+    if (saved != null) return saved;
+
+    final gps = _currentPosition;
+    if (gps != null) {
+      return (latitude: gps.latitude, longitude: gps.longitude);
+    }
+
+    return null;
   }
 
   // ================================================================
   // LOAD NEARBY PLACES
   // ================================================================
 
-  Future<void> _loadNearbyPlaces() async {
-    final position = _currentPosition;
+    Future<void> _loadNearbyPlaces() async {
+    final ref = _referencePoint;
 
-    if (position == null) {
+    if (ref == null) {
       await _loadCurrentLocation();
     }
 
-    final currentPosition = _currentPosition;
+    final currentRef = _referencePoint;
 
-    if (currentPosition == null) {
+    if (currentRef == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -205,19 +255,35 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final places = await _placeService.getNearbyPlaces(
-        latitude: currentPosition.latitude,
-        longitude: currentPosition.longitude,
+            final places = await _placeService.getNearbyPlaces(
+        latitude: currentRef.latitude,
+        longitude: currentRef.longitude,
         radius: 5000,
         limit: 50,
       );
 
       if (!mounted) return;
 
-      setState(() {
+            setState(() {
+        final refPos = Position(
+          latitude: currentRef.latitude,
+          longitude: currentRef.longitude,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        );
         _places = _sortByDistance(
           _preparePlaces(places),
-          currentPosition,
+          refPos,
+        );
+        _lastLoadedReference = (
+          latitude: currentRef.latitude,
+          longitude: currentRef.longitude,
         );
         _isLoading = false;
       });
@@ -256,18 +322,18 @@ class _ExplorePageState extends State<ExplorePage> {
   // DISTANCE
   // ================================================================
 
-  double? _distanceToPlace(Place place) {
-    final position = _currentPosition;
+    double? _distanceToPlace(Place place) {
+    final ref = _referencePoint;
 
-    if (position == null ||
+    if (ref == null ||
         place.latitude == null ||
         place.longitude == null) {
       return null;
     }
 
     return Geolocator.distanceBetween(
-      position.latitude,
-      position.longitude,
+      ref.latitude,
+      ref.longitude,
       place.latitude!,
       place.longitude!,
     );
@@ -433,20 +499,33 @@ class _ExplorePageState extends State<ExplorePage> {
       List<Place> places;
 
       switch (index) {
-        case 0:
-          final position = _currentPosition;
+                case 0:
+          final ref = _referencePoint;
 
-          if (position != null) {
+          if (ref != null) {
             final nearby = await _placeService.getNearbyPlaces(
-              latitude: position.latitude,
-              longitude: position.longitude,
+              latitude: ref.latitude,
+              longitude: ref.longitude,
               radius: 5000,
               limit: 50,
             );
 
+            final refPos = Position(
+              latitude: ref.latitude,
+              longitude: ref.longitude,
+              timestamp: DateTime.now(),
+              accuracy: 0,
+              altitude: 0,
+              altitudeAccuracy: 0,
+              heading: 0,
+              headingAccuracy: 0,
+              speed: 0,
+              speedAccuracy: 0,
+            );
+
             places = _sortByDistance(
               _preparePlaces(nearby),
-              position,
+              refPos,
             );
           } else {
             places = await _placeService.getPlaces();
@@ -593,7 +672,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // BUILD
   // ================================================================
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -601,144 +680,111 @@ class _ExplorePageState extends State<ExplorePage> {
         backgroundColor: const Color(0xFFF7F9FC),
         resizeToAvoidBottomInset: false,
         body: SafeArea(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              await Future.wait([
-                _loadCurrentLocation(),
-                _loadCategories(),
-              ]);
-
-              await _loadPlaces();
-            },
-            color: const Color(0xFF18A99A),
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              WaynHeader(
+                onMenuPressed: _onMenuPressed,
+                onNotificationsPressed: _onNotificationsPressed,
               ),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: WaynHeader(
-                    onMenuPressed: _onMenuPressed,
-                    onNotificationsPressed:
-                        _onNotificationsPressed,
-                  ),
-                ),
-
-                SliverToBoxAdapter(
-                  child: HomeSearchBar(
-                    selectedCategory: _selectedCategoryLabel,
-                    onCategoryPressed: _onCategoryPressed,
-                    onSearchChanged: _searchPlaces,
-                  ),
-                ),
-
-                SliverToBoxAdapter(
-                  child: HomeFilters(
-                    selectedIndex: _selectedFilterIndex,
-                    onFilterSelected: _onFilterSelected,
-                  ),
-                ),
-
-                SliverToBoxAdapter(
-                  child: _buildExploreCategoriesSection(),
-                ),
-
-                SliverToBoxAdapter(
-                  child: _buildSuggestionsSection(),
-                ),
-
-                SliverToBoxAdapter(
-                  child: SectionHeader(
-                    title: _buildResultsTitle(),
-                    action: 'عرض الكل',
-                    onActionPressed: _onViewAllPressed,
-                  ),
-                ),
-
-                if (_isLoading)
-                  const SliverToBoxAdapter(
-                    child: _LoadingPlaces(),
-                  )
-                else if (_errorMessage != null)
-                  SliverToBoxAdapter(
-                    child: _buildErrorState(),
-                  )
-                else if (_places.isEmpty)
-                  SliverToBoxAdapter(
-                    child: _buildEmptyState(),
-                  )
-                else
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final place = _places[index];
-                        final distance =
-                            _distanceToPlace(place);
-
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 8,
-                          ),
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.stretch,
-                            children: [
-                              PlaceCard(
-                                place: place,
-                                onFavoritePressed: () {
-                                  _onFavoritePressed(place);
-                                },
-                                onPressed: () {
-                                  _onPlacePressed(place);
-                                },
-                              ),
-
-                              if (distance != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: 5,
-                                    right: 8,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.start,
-                                    children: [
-                                      const Icon(
-                                        Icons.near_me_rounded,
-                                        size: 14,
-                                        color:
-                                            Color(0xFF18A99A),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _formatDistance(distance),
-                                        textDirection:
-                                            TextDirection.rtl,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight:
-                                              FontWeight.w700,
-                                          color:
-                                              Color(0xFF697386),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                      childCount: _places.length,
+              HomeSearchBar(
+                selectedCategory: _selectedCategoryLabel,
+                onCategoryPressed: _onCategoryPressed,
+                onSearchChanged: _searchPlaces,
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    await Future.wait([
+                      _loadCurrentLocation(),
+                      _loadCategories(),
+                    ]);
+                    await _loadPlaces();
+                  },
+                  color: const Color(0xFF18A99A),
+                  child: ListView(
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
                     ),
+                    padding: EdgeInsets.zero,
+                    children: [
+                      HomeFilters(
+                        selectedIndex: _selectedFilterIndex,
+                        onFilterSelected: _onFilterSelected,
+                      ),
+                      _buildExploreCategoriesSection(),
+                      _buildSuggestionsSection(),
+                      SectionHeader(
+                        title: _buildResultsTitle(),
+                        action: 'عرض الكل',
+                        onActionPressed: _onViewAllPressed,
+                      ),
+                      if (_isLoading)
+                        const _LoadingPlaces()
+                      else if (_errorMessage != null)
+                        _buildErrorState()
+                      else if (_places.isEmpty)
+                        _buildEmptyState()
+                      else
+                        ...List.generate(_places.length, (index) {
+                          final place = _places[index];
+                          final distance = _distanceToPlace(place);
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.stretch,
+                              children: [
+                                PlaceCard(
+                                  place: place,
+                                  onFavoritePressed: () {
+                                    _onFavoritePressed(place);
+                                  },
+                                  onPressed: () {
+                                    _onPlacePressed(place);
+                                  },
+                                ),
+                                if (distance != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 5,
+                                      right: 8,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.near_me_rounded,
+                                          size: 14,
+                                          color: Color(0xFF18A99A),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _formatDistance(distance),
+                                          textDirection:
+                                              TextDirection.rtl,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF697386),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }),
+                      const SizedBox(height: 100),
+                    ],
                   ),
-
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 100),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

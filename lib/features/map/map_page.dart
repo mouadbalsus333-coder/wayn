@@ -163,6 +163,9 @@ class _MapPageState extends State<MapPage> {
   // ===============================================================
 
   Future<void> _initializeMap() async {
+    // نضمن تحميل المواقع المحفوظة أولًا حتى يستخدم المرجع الصحيح
+    // (موقع محفوظ مختار سابقًا) عند تحميل الأماكن.
+    await SavedLocationsStore.instance.ensureLoaded();
     await _loadCurrentLocation();
     await _loadPlaces();
   }
@@ -1266,8 +1269,8 @@ class _MapPageState extends State<MapPage> {
       return true;
     }).toList();
 
-    if (_statusFilter == _MapStatusFilter.near &&
-        _currentPosition != null) {
+        if (_statusFilter == _MapStatusFilter.near &&
+        _referenceOrGps != null) {
       result.sort(
         (a, b) =>
             _distanceToPlace(a).compareTo(
@@ -1295,13 +1298,13 @@ class _MapPageState extends State<MapPage> {
     return list;
   }
 
-  double _distanceToPlace(Place place) {
-    final position = _currentPosition;
+    double _distanceToPlace(Place place) {
+    final ref = _referenceOrGps;
 
     final latitude = place.latitude;
     final longitude = place.longitude;
 
-    if (position == null ||
+        if (ref == null ||
         latitude == null ||
         longitude == null) {
       return double.infinity;
@@ -1310,14 +1313,14 @@ class _MapPageState extends State<MapPage> {
     const earthRadius = 6371.0;
 
     final dLat =
-        _toRadians(latitude - position.latitude);
+        _toRadians(latitude - ref.latitude);
 
     final dLon =
-        _toRadians(longitude - position.longitude);
+        _toRadians(longitude - ref.longitude);
 
     final a =
         math.sin(dLat / 2) * math.sin(dLat / 2) +
-            math.cos(_toRadians(position.latitude)) *
+            math.cos(_toRadians(ref.latitude)) *
                 math.cos(_toRadians(latitude)) *
                 math.sin(dLon / 2) *
                 math.sin(dLon / 2);
@@ -1536,15 +1539,8 @@ class _MapPageState extends State<MapPage> {
   // ===============================================================
 
   Widget _buildMap() {
-    final initialCenter =
-        _currentPosition != null
-            ? LatLng(
-                _currentPosition!
-                    .latitude,
-                _currentPosition!
-                    .longitude,
-              )
-            : _defaultCenter;
+        final initialCenter =
+        _referenceOrGps ?? _defaultCenter;
 
     return Positioned.fill(
       child: MapLibreMap(

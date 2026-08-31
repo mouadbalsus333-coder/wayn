@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/widgets/wayn_header.dart';
 import '../../models/user.dart';
@@ -148,15 +149,21 @@ class _ProfilePageState extends State<ProfilePage> {
                           bio: bio.text.trim(),
                         );
 
-                        if (updated == null || !mounted) return;
+                        if (updated == null || !mounted) {
+                          return;
+                        }
 
-                        setState(() => _user = updated);
+                        setState(() {
+                          _user = updated;
+                        });
 
                         if (sheetContext.mounted) {
                           Navigator.of(sheetContext).pop();
                         }
                       } catch (error) {
-                        if (!mounted) return;
+                        if (!mounted) {
+                          return;
+                        }
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -194,230 +201,203 @@ class _ProfilePageState extends State<ProfilePage> {
         : displayName.substring(0, 1);
 
     final trustTitle = _trustTitle(_user.trustLevel);
-    final trustIcon = _trustIcon(_user.trustLevel);
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F9FC),
         body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 35),
+          child: Column(
             children: [
               WaynHeader(
                 onMenuPressed: _onMenuOrNotificationsPressed,
                 onNotificationsPressed: _onMenuOrNotificationsPressed,
               ),
-              const SizedBox(height: 10),
-              // =========================
-              // Profile Header
-              // =========================
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 34,
-                    backgroundColor: const Color(0xFFE5F8F5),
-                    child: Text(
-                      avatarLetter,
-                      style: const TextStyle(
-                        fontSize: 27,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF18A99A),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 35),
+                  children: [
+                    const SizedBox(height: 10),
+
+                    // =========================
+                    // Profile Header
+                    // =========================
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                displayName,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 21,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
+                        CircleAvatar(
+                          radius: 34,
+                          backgroundColor: const Color(0xFFE5F8F5),
+                          child: Text(
+                            avatarLetter,
+                            style: const TextStyle(
+                              fontSize: 27,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF18A99A),
                             ),
-                            if (_user.isVerified) ...[
-                              const SizedBox(width: 5),
-                              const Icon(
-                                Icons.verified_rounded,
-                                size: 18,
-                                color: Color(0xFF18A99A),
-                              ),
-                            ],
-                          ],
-                        ),
-                        Text(
-                          '@$username',
-                          style: const TextStyle(
-                            color: Color(0xFF7A8494),
                           ),
                         ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Icon(
-                              trustIcon,
-                              size: 15,
-                              color: const Color(0xFF18A99A),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              trustTitle,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF18A99A),
-                                fontWeight: FontWeight.w800,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      displayName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 21,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
+                              Text(
+                                '@$username',
+                                style: const TextStyle(
+                                  color: Color(0xFF7A8494),
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              _buildCopyableId(),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    onPressed: _editProfile,
-                    icon: const Icon(Icons.edit_rounded),
-                  ),
-                ],
-              ),
 
-              if (_user.bio?.trim().isNotEmpty == true)
-                Padding(
-                  padding: const EdgeInsets.only(top: 14),
-                  child: Text(
-                    _user.bio!,
-                    style: const TextStyle(
-                      color: Color(0xFF596273),
+                    if (_user.bio?.trim().isNotEmpty == true)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: Text(
+                          _user.bio!,
+                          style: const TextStyle(
+                            color: Color(0xFF596273),
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 20),
+
+                    // =========================
+                    // User Stats
+                    // =========================
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _statCard(
+                            icon: Icons.stars_rounded,
+                            title: 'النقاط',
+                            value: '${_user.pointsBalance}',
+                            subtitle: 'نقاط WAYN',
+                            iconColor: const Color(0xFFF59E0B),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _statCard(
+                            icon: Icons.workspace_premium_rounded,
+                            title: 'السمعة',
+                            value: '${_user.reputationScore}',
+                            subtitle: trustTitle,
+                            iconColor: const Color(0xFF8B5CF6),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+
+                    const SizedBox(height: 20),
+
+                    // =========================
+                    // Account
+                    // =========================
+                    _card(
+                      children: [
+                        _row(
+                          Icons.account_balance_wallet_rounded,
+                          'محفظتي',
+                          'النقاط والعملات والتحويلات',
+                          () => _push(const WalletPage()),
+                        ),
+                        _divider(),
+                        _row(
+                          Icons.bookmark_border_rounded,
+                          'المحفوظات',
+                          'منشوراتك وأماكنك المحفوظة',
+                          () => _push(const SavedPostsPage()),
+                        ),
+                        _divider(),
+                        _row(
+                          Icons.history_rounded,
+                          'النشاط',
+                          'مراجعاتك وتفاعلاتك',
+                          () => _message('سجل النشاط'),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      'الحساب والأمان',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    _card(
+                      children: [
+                        _row(
+                          Icons.lock_outline_rounded,
+                          'تغيير كلمة المرور',
+                          'تحديث كلمة المرور',
+                          _changePassword,
+                        ),
+                        _divider(),
+                        _row(
+                          Icons.location_on_outlined,
+                          'موقعي',
+                          'تحديث موقعك الجغرافي',
+                          _location,
+                        ),
+                        _divider(),
+                        _row(
+                          Icons.info_outline_rounded,
+                          'عن WAYN',
+                          'دليل الأماكن والخدمات في ليبيا',
+                          () => _message('WAYN — دليلك المحلي الذكي'),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    _card(
+                      children: [
+                        _row(
+                          Icons.admin_panel_settings_outlined,
+                          'دخول لوحة الإدارة',
+                          'للمستخدمين الإداريين فقط',
+                          () => _push(const AdminLoginPage()),
+                        ),
+                        _divider(),
+                        _row(
+                          Icons.logout_rounded,
+                          'تسجيل الخروج',
+                          'الخروج من الحساب',
+                          widget.onLogout,
+                          destructive: true,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-
-              const SizedBox(height: 20),
-
-              // =========================
-              // User Stats
-              // =========================
-              Row(
-                children: [
-                  Expanded(
-                    child: _statCard(
-                      icon: Icons.stars_rounded,
-                      title: 'النقاط',
-                      value: '${_user.pointsBalance}',
-                      subtitle: 'نقاط WAYN',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _statCard(
-                      icon: Icons.workspace_premium_rounded,
-                      title: 'السمعة',
-                      value: '${_user.reputationScore}',
-                      subtitle: trustTitle,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // =========================
-              // Account
-              // =========================
-              _card(
-                children: [
-                  _row(
-                    Icons.account_balance_wallet_rounded,
-                    'محفظتي',
-                    'النقاط والعملات والتحويلات',
-                    () => _push(const WalletPage()),
-                  ),
-                  _divider(),
-                  _row(
-                    Icons.bookmark_border_rounded,
-                    'المحفوظات',
-                    'منشوراتك وأماكنك المحفوظة',
-                    () => _push(const SavedPostsPage()),
-                  ),
-                  _divider(),
-                  _row(
-                    Icons.history_rounded,
-                    'النشاط',
-                    'مراجعاتك وتفاعلاتك',
-                    () => _message(
-                      'سجل النشاط',
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text(
-                'الحساب والأمان',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              _card(
-                children: [
-                  _row(
-                    Icons.lock_outline_rounded,
-                    'تغيير كلمة المرور',
-                    'تحديث كلمة المرور',
-                    _changePassword,
-                  ),
-                  _divider(),
-                  _row(
-                    Icons.location_on_outlined,
-                    'موقعي',
-                    'تحديث موقعك الجغرافي',
-                    _location,
-                  ),
-                  _divider(),
-                  _row(
-                    Icons.info_outline_rounded,
-                    'عن WAYN',
-                    'دليل الأماكن والخدمات في ليبيا',
-                    () => _message(
-                      'WAYN — دليلك المحلي الذكي',
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              _card(
-                children: [
-                  _row(
-                    Icons.admin_panel_settings_outlined,
-                    'دخول لوحة الإدارة',
-                    'للمستخدمين الإداريين فقط',
-                    () => _push(
-                      const AdminLoginPage(),
-                    ),
-                  ),
-                  _divider(),
-                  _row(
-                    Icons.logout_rounded,
-                    'تسجيل الخروج',
-                    'الخروج من الحساب',
-                    widget.onLogout,
-                    destructive: true,
-                  ),
-                ],
               ),
             ],
           ),
@@ -426,11 +406,99 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildCopyableId() {
+    final id = _user.id;
+    final displayId = id.length > 10 ? id.substring(0, 10) : id;
+    final truncated = id.length > 10 ? '$displayId...' : displayId;
+
+    final username = _user.username ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'ID: $truncated',
+              textDirection: TextDirection.ltr,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF7A8494),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => _copyToClipboard(
+                id,
+                'تم نسخ المعرف',
+              ),
+              child: const Icon(
+                Icons.copy_rounded,
+                size: 14,
+                color: Color(0xFF18A99A),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                username,
+                overflow: TextOverflow.ellipsis,
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF7A8494),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => _copyToClipboard(
+                username,
+                'تم نسخ اسم المستخدم',
+              ),
+              child: const Icon(
+                Icons.copy_rounded,
+                size: 14,
+                color: Color(0xFF18A99A),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _copyToClipboard(
+    String value,
+    String message,
+  ) async {
+    await Clipboard.setData(
+      ClipboardData(text: value),
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            textDirection: TextDirection.rtl,
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _statCard({
     required IconData icon,
     required String title,
     required String value,
     required String subtitle,
+    Color iconColor = const Color(0xFF18A99A),
   }) {
     return Container(
       padding: const EdgeInsets.all(17),
@@ -444,12 +512,12 @@ class _ProfilePageState extends State<ProfilePage> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F8F6),
+              color: iconColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               icon,
-              color: const Color(0xFF18A99A),
+              color: iconColor,
             ),
           ),
           const SizedBox(width: 11),
@@ -613,17 +681,21 @@ class _ProfilePageState extends State<ProfilePage> {
                     newPassword: newPassword.text,
                   );
 
-                  if (!dialogContext.mounted) return;
+                  if (!dialogContext.mounted) {
+                    return;
+                  }
 
                   Navigator.of(dialogContext).pop();
 
-                  if (!mounted) return;
+                  if (!mounted) {
+                    return;
+                  }
 
-                  _message(
-                    'تم تغيير كلمة المرور',
-                  );
+                  _message('تم تغيير كلمة المرور');
                 } catch (error) {
-                  if (!dialogContext.mounted) return;
+                  if (!dialogContext.mounted) {
+                    return;
+                  }
 
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(

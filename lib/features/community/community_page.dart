@@ -353,18 +353,6 @@ class _CommunityPageState extends State<CommunityPage> {
               WaynHeader(
                 onMenuPressed: _onMenuOrNotificationsPressed,
                 onNotificationsPressed: _onMenuOrNotificationsPressed,
-                trailing: [
-                  IconButton(
-                    tooltip: 'تحديث',
-                    onPressed: _isRefreshing
-                        ? null
-                        : () => _loadPosts(refresh: true),
-                    icon: const Icon(
-                      Icons.refresh_rounded,
-                      color: Color(0xFF172033),
-                    ),
-                  ),
-                ],
               ),
               Expanded(child: _buildBody()),
             ],
