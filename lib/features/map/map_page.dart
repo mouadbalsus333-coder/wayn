@@ -19,6 +19,7 @@ import '../community/community_page.dart';
 import '../community/services/community_service.dart';
 import '../community/widgets/comments_sheet.dart';
 import '../../../core/widgets/wayn_header.dart';
+import '../../../core/widgets/wayn_menu_drawer.dart';
 import '../../../features/location/saved_locations_store.dart';
 
 enum _MapStatusFilter { all, open, closed, near }
@@ -139,7 +140,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onMenuPressed() {
-    debugPrint('Map menu pressed');
+    showWaynMenu(context);
   }
 
   void _onNotificationsPressed() {

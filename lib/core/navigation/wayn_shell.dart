@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../features/auth/login_page.dart';
 import '../../features/community/community_page.dart';
 import '../../features/explore/explore_page.dart';
 import '../../features/map/map_page.dart';
 import '../../features/profile/profile_page.dart';
 import '../../features/store/store_page.dart';
 import '../../models/user.dart';
-import '../../services/auth_service.dart';
 
 class WaynShell extends StatefulWidget {
   final User user;
@@ -39,33 +37,8 @@ class _WaynShellState extends State<WaynShell> {
       const CommunityPage(),
       ProfilePage(
         user: user,
-        onLogout: _logout,
       ),
     ];
-  }
-
-  Future<void> _logout() async {
-    await AuthService().logout();
-
-    if (!mounted) return;
-
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => LoginPage(
-          onAuthenticated: (user) {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (_) => WaynShell(
-                  user: user,
-                ),
-              ),
-              (_) => false,
-            );
-          },
-        ),
-      ),
-      (_) => false,
-    );
   }
 
   @override

@@ -6,6 +6,7 @@ import '../../services/place_service.dart';
 import '../places/place_details_page.dart';
 import '../home/models/place.dart';
 import '../../core/widgets/wayn_header.dart';
+import '../../core/widgets/wayn_menu_drawer.dart';
 import '../home/widgets/home_filters.dart';
 import '../home/widgets/home_search_bar.dart';
 import '../home/widgets/place_card.dart';
@@ -1301,7 +1302,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   void _onMenuPressed() {
-    debugPrint('Menu pressed');
+    showWaynMenu(context);
   }
 
   void _onNotificationsPressed() {

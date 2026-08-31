@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/repositories/repository_factory.dart';
 import '../../core/widgets/wayn_header.dart';
+import '../../core/widgets/wayn_menu_drawer.dart';
 import 'create_post_page.dart';
 import 'models/community_post.dart';
 import 'services/community_service.dart';
@@ -351,8 +352,8 @@ class _CommunityPageState extends State<CommunityPage> {
           child: Column(
             children: [
               WaynHeader(
-                onMenuPressed: _onMenuOrNotificationsPressed,
-                onNotificationsPressed: _onMenuOrNotificationsPressed,
+                onMenuPressed: _onMenuPressed,
+                onNotificationsPressed: _onNotificationsPressed,
               ),
               Expanded(child: _buildBody()),
             ],
@@ -362,8 +363,12 @@ class _CommunityPageState extends State<CommunityPage> {
     );
   }
 
-  void _onMenuOrNotificationsPressed() {
-    debugPrint('Community menu/notifications pressed');
+  void _onMenuPressed() {
+    showWaynMenu(context);
+  }
+
+  void _onNotificationsPressed() {
+    debugPrint('Community notifications pressed');
   }
 
   // ===========================================================================

@@ -36,7 +36,6 @@ class WalletResponse(BaseModel):
     id: UUID
     user_id: UUID
     wallet_number: str
-    points_balance: int
     coins_balance: int
 
 

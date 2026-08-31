@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/wayn_header.dart';
+import '../../core/widgets/wayn_menu_drawer.dart';
 import '../../core/network/api_client.dart';
 import '../../services/repositories/repository_factory.dart';
 import 'community_page.dart';
@@ -105,8 +106,8 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
             child: Column(
               children: [
                 WaynHeader(
-                  onMenuPressed: _onMenuOrNotificationsPressed,
-                  onNotificationsPressed: _onMenuOrNotificationsPressed,
+                  onMenuPressed: _onMenuPressed,
+                  onNotificationsPressed: _onNotificationsPressed,
                 ),
                 const TabBar(
                   labelColor: Color(0xFF18A99A),
@@ -131,8 +132,12 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
     );
   }
 
-  void _onMenuOrNotificationsPressed() {
-    debugPrint('Saved posts menu/notifications pressed');
+  void _onMenuPressed() {
+    showWaynMenu(context);
+  }
+
+  void _onNotificationsPressed() {
+    debugPrint('Saved posts notifications pressed');
   }
 
   Widget _buildPostsBody() {

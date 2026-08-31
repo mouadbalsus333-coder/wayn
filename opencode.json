@@ -9,7 +9,7 @@
       "name": "Genspark LLM Proxy",
       "options": {
         "baseURL": "https://www.genspark.ai/api/llm_proxy/v1",
-        "apiKey": "gsk-eyJjb2dlbl9pZCI6ImE0MjY5MDAzLWFiNDktNDAwNi1hZmQ2LTAxYmEwZjc1MDRlZSIsImtleV9pZCI6IjA4YjI0OWRkLWQ5MjQtNGVhMi1hYWZiLTY1ZWNjMTc4NTBiYSIsImN0aW1lIjoxNzg3OTU4MjA2LCJjbGF1ZGVfYmlnX21vZGVsIjpudWxsLCJjbGF1ZGVfbWlkZGxlX21vZGVsIjpudWxsLCJjbGF1ZGVfc21hbGxfbW9kZWwiOm51bGx9fMvM9Az5mPtRT58RE1K_4HxwQD8VxmDJRe6d1bDfs8Uy",
+        "apiKey": "gsk-eyJjb2dlbl9pZCI6ImE0MjY5MDAzLWFiNDktNDAwNi1hZmQ2LTAxYmEwZjc1MDRlZSIsImtleV9pZCI6ImY2ODIyYWI2LWFhZTgtNGQ0My1iNmQyLThiZmZiZmYyYTQzZSIsImN0aW1lIjoxNzg4MjEyNzExLCJjbGF1ZGVfYmlnX21vZGVsIjpudWxsLCJjbGF1ZGVfbWlkZGxlX21vZGVsIjpudWxsLCJjbGF1ZGVfc21hbGxfbW9kZWwiOm51bGx9fDqalP1j-pCAijfWdDHZgTLcHf9SV6Ne7pAsGG87bP7U",
         "litellmProxy": true
       },
       "models": {
@@ -697,6 +697,22 @@
               "text"
             ]
           }
+        },
+        "glm-5p3": {
+          "name": "GLM-5.3",
+          "limit": {
+            "context": 1000000,
+            "input": 868928,
+            "output": 131072
+          },
+          "modalities": {
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
         }
       }
     },
@@ -704,7 +720,7 @@
       "npm": "@ai-sdk/google",
       "name": "Genspark Gemini Proxy",
       "options": {
-        "apiKey": "gsk-eyJjb2dlbl9pZCI6ImE0MjY5MDAzLWFiNDktNDAwNi1hZmQ2LTAxYmEwZjc1MDRlZSIsImtleV9pZCI6IjA4YjI0OWRkLWQ5MjQtNGVhMi1hYWZiLTY1ZWNjMTc4NTBiYSIsImN0aW1lIjoxNzg3OTU4MjA2LCJjbGF1ZGVfYmlnX21vZGVsIjpudWxsLCJjbGF1ZGVfbWlkZGxlX21vZGVsIjpudWxsLCJjbGF1ZGVfc21hbGxfbW9kZWwiOm51bGx9fMvM9Az5mPtRT58RE1K_4HxwQD8VxmDJRe6d1bDfs8Uy",
+        "apiKey": "gsk-eyJjb2dlbl9pZCI6ImE0MjY5MDAzLWFiNDktNDAwNi1hZmQ2LTAxYmEwZjc1MDRlZSIsImtleV9pZCI6ImY2ODIyYWI2LWFhZTgtNGQ0My1iNmQyLThiZmZiZmYyYTQzZSIsImN0aW1lIjoxNzg4MjEyNzExLCJjbGF1ZGVfYmlnX21vZGVsIjpudWxsLCJjbGF1ZGVfbWlkZGxlX21vZGVsIjpudWxsLCJjbGF1ZGVfc21hbGxfbW9kZWwiOm51bGx9fDqalP1j-pCAijfWdDHZgTLcHf9SV6Ne7pAsGG87bP7U",
         "baseURL": "https://www.genspark.ai/api/llm_proxy/gemini/v1beta"
       },
       "models": {

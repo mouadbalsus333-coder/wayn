@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/wayn_header.dart';
+import '../../core/widgets/wayn_menu_drawer.dart';
 import '../../models/store.dart';
 import '../../services/store_service.dart';
 
@@ -63,8 +64,8 @@ class _StorePageState extends State<StorePage> {
           child: Column(
             children: [
               WaynHeader(
-                onMenuPressed: _onMenuOrNotificationsPressed,
-                onNotificationsPressed: _onMenuOrNotificationsPressed,
+                onMenuPressed: _onMenuPressed,
+                onNotificationsPressed: _onNotificationsPressed,
               ),
               Expanded(
                 child: _loading
@@ -156,8 +157,12 @@ class _StorePageState extends State<StorePage> {
     );
   }
 
-  void _onMenuOrNotificationsPressed() {
-    debugPrint('Store menu/notifications pressed');
+  void _onMenuPressed() {
+    showWaynMenu(context);
+  }
+
+  void _onNotificationsPressed() {
+    debugPrint('Store notifications pressed');
   }
 
   Widget _banner(StoreBanner banner) {
