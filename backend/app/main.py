@@ -1,5 +1,4 @@
-﻿import logging
-from typing import Any
+import logging
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -15,12 +14,16 @@ from app.api.routers import (
     admin_users,
     auth,
     categories,
+    community,
     favorites,
     health,
     places,
     reviews,
     store,
+    user_point,
     wallet,
+    place_contributions,
+    media,
 )
 from app.core.config import settings
 
@@ -169,6 +172,17 @@ app.include_router(
 
 
 # ============================================================
+# Community
+# User-generated posts, likes, saves, and comments
+# ============================================================
+
+app.include_router(
+    community.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
 # Wallet
 # ============================================================
 
@@ -179,11 +193,31 @@ app.include_router(
 
 
 # ============================================================
+# User Points
+# ============================================================
+
+app.include_router(
+    user_point.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
 # Store
 # ============================================================
 
 app.include_router(
     store.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
+# Place Contributions
+# ============================================================
+
+app.include_router(
+    place_contributions.router,
     prefix="/api/v1",
 )
 
@@ -234,5 +268,10 @@ app.include_router(
 
 app.include_router(
     admin_users.router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    media.router,
     prefix="/api/v1",
 )

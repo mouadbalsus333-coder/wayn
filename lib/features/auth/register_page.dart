@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import 'email_verification_page.dart';
 
 class RegisterPage extends StatefulWidget {
   final ValueChanged<User> onAuthenticated;
@@ -92,7 +93,7 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      final user = await _auth.register(
+      final result = await _auth.register(
         email: email,
         password: password,
         fullName: fullName,
@@ -104,30 +105,54 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      // --------------------------------------------------------
-      // Backend returned 201 and AuthRepository successfully
-      // stored the access token and returned the created user.
-      // --------------------------------------------------------
-
-      if (user != null) {
+      if (result == null) {
         setState(() {
           _loading = false;
+          _error =
+              'تعذر إنشاء الحساب. حاول مرة أخرى.';
         });
+        return;
+      }
 
-        widget.onAuthenticated(user);
+      setState(() {
+        _loading = false;
+      });
+
+      // --------------------------------------------------------
+      // Email verification required
+      // --------------------------------------------------------
+
+      if (result.verificationRequired) {
+        final verifiedUser =
+            await Navigator.of(context).push<User>(
+          MaterialPageRoute(
+            builder: (_) => EmailVerificationPage(
+              email: email,
+            ),
+          ),
+        );
+
+        if (!mounted || verifiedUser == null) {
+          return;
+        }
+
+        widget.onAuthenticated(verifiedUser);
         return;
       }
 
       // --------------------------------------------------------
-      // Unexpected response: registration succeeded on the
-      // server but no user object was returned to Flutter.
+      // Registration completed without verification.
+      //
+      // The registration endpoint does not return an access
+      // token, so we do NOT authenticate the user here.
+      // Return to login and let the user sign in normally.
       // --------------------------------------------------------
 
-      setState(() {
-        _loading = false;
-        _error =
-            'تم إنشاء الحساب، لكن تعذر إكمال تسجيل الدخول تلقائيًا. حاول تسجيل الدخول مرة أخرى.';
-      });
+      await _showSuccessAndReturnToLogin(
+        result.message.isNotEmpty
+            ? result.message
+            : 'تم إنشاء الحساب بنجاح. يمكنك الآن تسجيل الدخول.',
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -140,6 +165,78 @@ class _RegisterPageState extends State<RegisterPage> {
         _error = _translateError(message);
       });
     }
+  }
+
+  // ============================================================
+  // Success
+  // ============================================================
+
+  Future<void> _showSuccessAndReturnToLogin(
+    String message,
+  ) async {
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  color: Color(0xFF18A99A),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'تم إنشاء الحساب',
+                  style: TextStyle(
+                    color: Color(0xFF172033),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xFF5F6877),
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF18A99A),
+                ),
+                child: const Text(
+                  'حسنًا',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pop();
   }
 
   // ============================================================
@@ -385,7 +482,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   maxWidth: 520,
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 8),
 
@@ -433,22 +531,28 @@ class _RegisterPageState extends State<RegisterPage> {
                     _field(
                       'البريد الإلكتروني',
                       _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textDirection: TextDirection.ltr,
+                      keyboardType:
+                          TextInputType.emailAddress,
+                      textDirection:
+                          TextDirection.ltr,
                     ),
 
                     _field(
                       'رقم الهاتف (اختياري)',
                       _phoneController,
-                      keyboardType: TextInputType.phone,
-                      textDirection: TextDirection.ltr,
+                      keyboardType:
+                          TextInputType.phone,
+                      textDirection:
+                          TextDirection.ltr,
                     ),
 
                     _field(
                       'كلمة المرور',
                       _passwordController,
-                      obscureText: _obscurePassword,
-                      textDirection: TextDirection.ltr,
+                      obscureText:
+                          _obscurePassword,
+                      textDirection:
+                          TextDirection.ltr,
                       suffixIcon: IconButton(
                         onPressed: _loading
                             ? null
@@ -460,8 +564,10 @@ class _RegisterPageState extends State<RegisterPage> {
                               },
                         icon: Icon(
                           _obscurePassword
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
+                              ? Icons
+                                  .visibility_off_outlined
+                              : Icons
+                                  .visibility_outlined,
                         ),
                       ),
                     ),
@@ -474,18 +580,24 @@ class _RegisterPageState extends State<RegisterPage> {
                       const SizedBox(height: 2),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(12),
+                        padding:
+                            const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF1F1),
-                          borderRadius: BorderRadius.circular(12),
+                          color:
+                              const Color(0xFFFFF1F1),
+                          borderRadius:
+                              BorderRadius.circular(12),
                         ),
                         child: Text(
                           _error!,
-                          textAlign: TextAlign.right,
+                          textAlign:
+                              TextAlign.right,
                           style: const TextStyle(
-                            color: Color(0xFFD34E4E),
+                            color:
+                                Color(0xFFD34E4E),
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontWeight:
+                                FontWeight.w600,
                           ),
                         ),
                       ),
@@ -498,21 +610,28 @@ class _RegisterPageState extends State<RegisterPage> {
                     // ------------------------------------------------
 
                     FilledButton(
-                      onPressed: _loading ? null : _register,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF18A99A),
+                      onPressed:
+                          _loading ? null : _register,
+                      style:
+                          FilledButton.styleFrom(
+                        backgroundColor:
+                            const Color(0xFF18A99A),
                         disabledBackgroundColor:
                             const Color(0xFF9BD8D1),
-                        minimumSize: const Size.fromHeight(54),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
+                        minimumSize:
+                            const Size.fromHeight(54),
+                        shape:
+                            RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(15),
                         ),
                       ),
                       child: _loading
                           ? const SizedBox(
                               width: 22,
                               height: 22,
-                              child: CircularProgressIndicator(
+                              child:
+                                  CircularProgressIndicator(
                                 color: Colors.white,
                                 strokeWidth: 2,
                               ),
@@ -520,7 +639,8 @@ class _RegisterPageState extends State<RegisterPage> {
                           : const Text(
                               'إنشاء الحساب',
                               style: TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight:
+                                    FontWeight.w800,
                                 fontSize: 15,
                               ),
                             ),
@@ -531,9 +651,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     if (_loading)
                       const Text(
                         'جارٍ إنشاء الحساب...',
-                        textAlign: TextAlign.center,
+                        textAlign:
+                            TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFF7A8494),
+                          color:
+                              Color(0xFF7A8494),
                           fontSize: 12,
                         ),
                       ),

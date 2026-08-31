@@ -1,7 +1,7 @@
 import asyncio
 import getpass
 
-from sqlalchemy import delete, insert, select
+from sqlalchemy import insert, select
 
 from app.core.database import AsyncSessionLocal
 from app.core.security import hash_password
@@ -25,6 +25,11 @@ PERMISSIONS = [
     ("categories.write", "Create and update categories"),
     ("reports.read", "View reports"),
     ("reports.write", "Handle reports"),
+
+    # Place contributions
+    ("contributions.read", "View place contributions"),
+    ("contributions.approve", "Approve place contributions"),
+    ("contributions.reject", "Reject place contributions"),
 ]
 
 
@@ -60,7 +65,13 @@ ROLE_PERMISSIONS = {
         "categories.write",
         "reports.read",
         "reports.write",
+
+        # Place contributions
+        "contributions.read",
+        "contributions.approve",
+        "contributions.reject",
     ],
+
     "admin": [
         "users.read",
         "users.write",
@@ -70,13 +81,25 @@ ROLE_PERMISSIONS = {
         "categories.write",
         "reports.read",
         "reports.write",
+
+        # Place contributions
+        "contributions.read",
+        "contributions.approve",
+        "contributions.reject",
     ],
+
     "moderator": [
         "users.read",
         "places.read",
         "reports.read",
         "reports.write",
+
+        # Place contributions
+        "contributions.read",
+        "contributions.approve",
+        "contributions.reject",
     ],
+
     "editor": [
         "places.read",
         "places.write",
@@ -347,4 +370,3 @@ async def create_admin() -> None:
 
 if __name__ == "__main__":
     asyncio.run(create_admin())
-

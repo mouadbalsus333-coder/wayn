@@ -1,27 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../services/category_service.dart';
 import '../../services/place_service.dart';
 import '../places/place_details_page.dart';
-import 'models/place.dart';
-import 'widgets/home_filters.dart';
-import 'widgets/home_header.dart';
-import 'widgets/home_search_bar.dart';
-import 'widgets/place_card.dart';
-import 'widgets/section_header.dart';
+import '../home/models/place.dart';
+import '../../core/widgets/wayn_header.dart';
+import '../home/widgets/home_filters.dart';
+import '../home/widgets/home_search_bar.dart';
+import '../home/widgets/place_card.dart';
+import '../home/widgets/section_header.dart';
 import '../../services/favorite_service.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class ExplorePage extends StatefulWidget {
+  const ExplorePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<ExplorePage> createState() => _ExplorePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _ExplorePageState extends State<ExplorePage> {
   final PlaceService _placeService = PlaceService();
   final CategoryService _categoryService = CategoryService();
   final FavoriteService _favoriteService = FavoriteService();
+
   final Set<String> _favoriteIds = <String>{};
 
   int _selectedFilterIndex = 0;
@@ -30,6 +32,9 @@ class _HomePageState extends State<HomePage> {
   List<Category> _categories = [];
 
   bool _isLoading = true;
+  bool _isLoadingLocation = false;
+  bool _hasLocationPermission = false;
+
   CategoryLoadStatus _categoriesStatus = CategoryLoadStatus.loading;
 
   String? _errorMessage;
@@ -39,12 +44,92 @@ class _HomePageState extends State<HomePage> {
   String? _selectedCategory;
   String _selectedCategoryLabel = 'كل الأماكن';
 
+  Position? _currentPosition;
+
+  // ================================================================
+  // INIT
+  // ================================================================
+
   @override
   void initState() {
     super.initState();
 
-    _loadPlaces();
-    _loadCategories();
+    _initializeExplore();
+  }
+
+  Future<void> _initializeExplore() async {
+    await _loadCurrentLocation();
+    await Future.wait([
+      _loadPlaces(),
+      _loadCategories(),
+    ]);
+  }
+
+  // ================================================================
+  // LOCATION
+  // ================================================================
+
+  Future<void> _loadCurrentLocation() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      final serviceEnabled =
+          await Geolocator.isLocationServiceEnabled();
+
+      if (!serviceEnabled) {
+        if (mounted) {
+          setState(() {
+            _isLoadingLocation = false;
+            _hasLocationPermission = false;
+          });
+        }
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() {
+            _isLoadingLocation = false;
+            _hasLocationPermission = false;
+          });
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentPosition = position;
+        _isLoadingLocation = false;
+        _hasLocationPermission = true;
+      });
+    } catch (error) {
+      debugPrint('Explore location error: $error');
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingLocation = false;
+        _hasLocationPermission = false;
+      });
+    }
   }
 
   // ================================================================
@@ -65,7 +150,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       setState(() {
-        _places = places;
+        _places = _preparePlaces(places);
         _isLoading = false;
       });
     } catch (error) {
@@ -79,6 +164,168 @@ class _HomePageState extends State<HomePage> {
 
       debugPrint('Failed to load places: $error');
     }
+  }
+
+  // ================================================================
+  // LOAD NEARBY PLACES
+  // ================================================================
+
+  Future<void> _loadNearbyPlaces() async {
+    final position = _currentPosition;
+
+    if (position == null) {
+      await _loadCurrentLocation();
+    }
+
+    final currentPosition = _currentPosition;
+
+    if (currentPosition == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'فعّل الموقع حتى نقدر نعرض الأماكن القريبة منك.',
+              textDirection: TextDirection.rtl,
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _selectedFilterIndex = 0;
+      _selectedCategory = null;
+      _selectedCategoryLabel = 'كل الأماكن';
+      _searchQuery = '';
+    });
+
+    try {
+      final places = await _placeService.getNearbyPlaces(
+        latitude: currentPosition.latitude,
+        longitude: currentPosition.longitude,
+        radius: 5000,
+        limit: 50,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _places = _sortByDistance(
+          _preparePlaces(places),
+          currentPosition,
+        );
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _places = [];
+        _isLoading = false;
+        _errorMessage = error.toString();
+      });
+
+      debugPrint('Nearby places error: $error');
+    }
+  }
+
+  // ================================================================
+  // PREPARE PLACES
+  // ================================================================
+
+  List<Place> _preparePlaces(List<Place> places) {
+    return places
+        .where(
+          (place) =>
+              place.latitude != null &&
+              place.longitude != null &&
+              place.latitude! >= -90 &&
+              place.latitude! <= 90 &&
+              place.longitude! >= -180 &&
+              place.longitude! <= 180,
+        )
+        .toList();
+  }
+
+  // ================================================================
+  // DISTANCE
+  // ================================================================
+
+  double? _distanceToPlace(Place place) {
+    final position = _currentPosition;
+
+    if (position == null ||
+        place.latitude == null ||
+        place.longitude == null) {
+      return null;
+    }
+
+    return Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      place.latitude!,
+      place.longitude!,
+    );
+  }
+
+  List<Place> _sortByDistance(
+    List<Place> places,
+    Position position,
+  ) {
+    final sorted = List<Place>.from(places);
+
+    sorted.sort((a, b) {
+      if (a.latitude == null ||
+          a.longitude == null) {
+        return 1;
+      }
+
+      if (b.latitude == null ||
+          b.longitude == null) {
+        return -1;
+      }
+
+      final distanceA = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        a.latitude!,
+        a.longitude!,
+      );
+
+      final distanceB = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        b.latitude!,
+        b.longitude!,
+      );
+
+      return distanceA.compareTo(distanceB);
+    });
+
+    return sorted;
+  }
+
+  String _formatDistance(double? meters) {
+    if (meters == null) {
+      return '';
+    }
+
+    if (meters < 1000) {
+      return '${meters.round()} م';
+    }
+
+    final kilometers = meters / 1000;
+
+    if (kilometers < 10) {
+      return '${kilometers.toStringAsFixed(1)} كم';
+    }
+
+    return '${kilometers.round()} كم';
   }
 
   // ================================================================
@@ -107,12 +354,11 @@ class _HomePageState extends State<HomePage> {
 
       final existing = uniqueCategories[key];
 
-      // Prefer the category that has an icon configured. This also
-      // protects the UI from accidental duplicate rows in the database.
       if (existing == null ||
-          (existing.icon == null || existing.icon!.trim().isEmpty) &&
+          ((existing.icon == null ||
+                  existing.icon!.trim().isEmpty) &&
               category.icon != null &&
-              category.icon!.trim().isNotEmpty) {
+              category.icon!.trim().isNotEmpty)) {
         uniqueCategories[key] = category;
       }
     }
@@ -133,13 +379,16 @@ class _HomePageState extends State<HomePage> {
   Future<void> _searchPlaces(String query) async {
     final search = query.trim();
 
+    if (search.isEmpty) {
+      await _selectAllPlaces();
+      return;
+    }
+
     setState(() {
       _searchQuery = search;
       _selectedCategory = null;
       _selectedCategoryLabel = 'كل الأماكن';
-
       _selectedFilterIndex = -1;
-
       _isLoading = true;
       _errorMessage = null;
     });
@@ -150,7 +399,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       setState(() {
-        _places = places;
+        _places = _preparePlaces(places);
         _isLoading = false;
       });
     } catch (error) {
@@ -173,12 +422,9 @@ class _HomePageState extends State<HomePage> {
   Future<void> _onFilterSelected(int index) async {
     setState(() {
       _selectedFilterIndex = index;
-
       _selectedCategory = null;
       _selectedCategoryLabel = 'كل الأماكن';
-
       _searchQuery = '';
-
       _isLoading = true;
       _errorMessage = null;
     });
@@ -188,23 +434,44 @@ class _HomePageState extends State<HomePage> {
 
       switch (index) {
         case 0:
-          places = await _placeService.getPlaces();
+          final position = _currentPosition;
+
+          if (position != null) {
+            final nearby = await _placeService.getNearbyPlaces(
+              latitude: position.latitude,
+              longitude: position.longitude,
+              radius: 5000,
+              limit: 50,
+            );
+
+            places = _sortByDistance(
+              _preparePlaces(nearby),
+              position,
+            );
+          } else {
+            places = await _placeService.getPlaces();
+            places = _preparePlaces(places);
+          }
           break;
 
         case 1:
           places = await _placeService.getOpenPlaces();
+          places = _preparePlaces(places);
           break;
 
         case 2:
           places = await _placeService.getHighestRatedPlaces();
+          places = _preparePlaces(places);
           break;
 
         case 3:
           places = await _placeService.getMostVisitedPlaces();
+          places = _preparePlaces(places);
           break;
 
         default:
           places = await _placeService.getPlaces();
+          places = _preparePlaces(places);
       }
 
       if (!mounted) return;
@@ -234,10 +501,8 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _selectedCategory = category.id;
       _selectedCategoryLabel = category.nameAr;
-
       _selectedFilterIndex = -1;
       _searchQuery = '';
-
       _isLoading = true;
       _errorMessage = null;
     });
@@ -250,7 +515,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       setState(() {
-        _places = places;
+        _places = _preparePlaces(places);
         _isLoading = false;
       });
     } catch (error) {
@@ -276,10 +541,8 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _selectedCategory = null;
       _selectedCategoryLabel = 'كل الأماكن';
-
       _selectedFilterIndex = 0;
       _searchQuery = '';
-
       _isLoading = true;
       _errorMessage = null;
     });
@@ -303,21 +566,14 @@ class _HomePageState extends State<HomePage> {
             categories: _categories,
             status: _categoriesStatus,
             selectedCategory: _selectedCategory,
-
-            // كل الأماكن
             onAllPressed: () async {
               Navigator.of(sheetContext).pop();
-
               await _selectAllPlaces();
             },
-
-            // اختيار فئة
             onCategoryPressed: (category) async {
               Navigator.of(sheetContext).pop();
-
               await _onCategorySelected(category);
             },
-
             iconFromName: _iconFromName,
           ),
         );
@@ -343,13 +599,16 @@ class _HomePageState extends State<HomePage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F9FC),
+        resizeToAvoidBottomInset: false,
         body: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async {
               await Future.wait([
-                _loadPlaces(),
+                _loadCurrentLocation(),
                 _loadCategories(),
               ]);
+
+              await _loadPlaces();
             },
             color: const Color(0xFF18A99A),
             child: CustomScrollView(
@@ -357,21 +616,13 @@ class _HomePageState extends State<HomePage> {
                 parent: AlwaysScrollableScrollPhysics(),
               ),
               slivers: [
-                // =====================================================
-                // HEADER
-                // =====================================================
-
                 SliverToBoxAdapter(
-                  child: HomeHeader(
+                  child: WaynHeader(
                     onMenuPressed: _onMenuPressed,
                     onNotificationsPressed:
                         _onNotificationsPressed,
                   ),
                 ),
-
-                // =====================================================
-                // SEARCH
-                // =====================================================
 
                 SliverToBoxAdapter(
                   child: HomeSearchBar(
@@ -381,10 +632,6 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
-                // =====================================================
-                // FILTERS
-                // =====================================================
-
                 SliverToBoxAdapter(
                   child: HomeFilters(
                     selectedIndex: _selectedFilterIndex,
@@ -392,25 +639,13 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
-                // =====================================================
-                // EXPLORE BY CATEGORY
-                // =====================================================
-
                 SliverToBoxAdapter(
                   child: _buildExploreCategoriesSection(),
                 ),
 
-                // =====================================================
-                // SUGGESTIONS
-                // =====================================================
-
                 SliverToBoxAdapter(
                   child: _buildSuggestionsSection(),
                 ),
-
-                // =====================================================
-                // RESULTS HEADER
-                // =====================================================
 
                 SliverToBoxAdapter(
                   child: SectionHeader(
@@ -419,10 +654,6 @@ class _HomePageState extends State<HomePage> {
                     onActionPressed: _onViewAllPressed,
                   ),
                 ),
-
-                // =====================================================
-                // RESULTS
-                // =====================================================
 
                 if (_isLoading)
                   const SliverToBoxAdapter(
@@ -441,30 +672,67 @@ class _HomePageState extends State<HomePage> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final place = _places[index];
+                        final distance =
+                            _distanceToPlace(place);
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
                             vertical: 8,
                           ),
-                          child: PlaceCard(
-                            place: place,
-                            onFavoritePressed: () {
-                              _onFavoritePressed(place);
-                            },
-                            onPressed: () {
-                              _onPlacePressed(place);
-                            },
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.stretch,
+                            children: [
+                              PlaceCard(
+                                place: place,
+                                onFavoritePressed: () {
+                                  _onFavoritePressed(place);
+                                },
+                                onPressed: () {
+                                  _onPlacePressed(place);
+                                },
+                              ),
+
+                              if (distance != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: 5,
+                                    right: 8,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.near_me_rounded,
+                                        size: 14,
+                                        color:
+                                            Color(0xFF18A99A),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _formatDistance(distance),
+                                        textDirection:
+                                            TextDirection.rtl,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight:
+                                              FontWeight.w700,
+                                          color:
+                                              Color(0xFF697386),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
                         );
                       },
                       childCount: _places.length,
                     ),
                   ),
-
-                // =====================================================
-                // BOTTOM SPACE
-                // =====================================================
 
                 const SliverToBoxAdapter(
                   child: SizedBox(height: 100),
@@ -491,6 +759,9 @@ class _HomePageState extends State<HomePage> {
     }
 
     switch (_selectedFilterIndex) {
+      case 0:
+        return 'أماكن قريبة منك';
+
       case 1:
         return 'مفتوح الآن';
 
@@ -534,7 +805,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ),
-
         SizedBox(
           height: 108,
           child: ListView.separated(
@@ -601,9 +871,7 @@ class _HomePageState extends State<HomePage> {
                           size: 24,
                         ),
                       ),
-
                       const SizedBox(height: 7),
-
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 5,
@@ -640,64 +908,44 @@ class _HomePageState extends State<HomePage> {
     switch (iconName) {
       case 'restaurant':
         return Icons.restaurant_rounded;
-
       case 'park':
         return Icons.park_rounded;
-
       case 'beach_access':
         return Icons.beach_access_rounded;
-
       case 'hotel':
         return Icons.hotel_rounded;
-
       case 'shopping_bag':
         return Icons.shopping_bag_rounded;
-
       case 'sports_soccer':
         return Icons.sports_soccer_rounded;
-
       case 'mosque':
         return Icons.mosque_rounded;
-
       case 'local_hospital':
         return Icons.local_hospital_rounded;
-
       case 'school':
         return Icons.school_rounded;
-
       case 'local_cafe':
         return Icons.local_cafe_rounded;
-
       case 'local_gas_station':
         return Icons.local_gas_station_rounded;
-
       case 'pharmacy':
         return Icons.local_pharmacy_rounded;
-
       case 'museum':
         return Icons.museum_rounded;
-
       case 'store':
         return Icons.store_rounded;
-
       case 'shopping_cart':
         return Icons.shopping_cart_rounded;
-
       case 'local_parking':
         return Icons.local_parking_rounded;
-
       case 'fitness_center':
         return Icons.fitness_center_rounded;
-
       case 'local_atm':
         return Icons.local_atm_rounded;
-
       case 'bank':
         return Icons.account_balance_rounded;
-
       case 'government':
         return Icons.account_balance_rounded;
-
       default:
         return Icons.place_rounded;
     }
@@ -731,12 +979,12 @@ class _HomePageState extends State<HomePage> {
 
         _buildSuggestionCard(
           title: 'أماكن قريبة منك',
-          subtitle: 'أماكن مميزة حول موقعك الحالي',
+          subtitle: _hasLocationPermission
+              ? 'أماكن مميزة حول موقعك الحالي'
+              : 'فعّل موقعك لاكتشاف الأماكن القريبة',
           icon: Icons.near_me_rounded,
           iconColor: const Color(0xFF18A99A),
-          onPressed: () {
-            debugPrint('Nearby places pressed');
-          },
+          onPressed: _loadNearbyPlaces,
         ),
 
         _buildSuggestionCard(
@@ -756,6 +1004,23 @@ class _HomePageState extends State<HomePage> {
           iconColor: const Color(0xFF2997FF),
           onPressed: _openPlacesSuggestion,
         ),
+
+        if (_isLoadingLocation)
+          const Padding(
+            padding: EdgeInsets.only(
+              top: 6,
+            ),
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFF18A99A),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -811,9 +1076,7 @@ class _HomePageState extends State<HomePage> {
                   size: 25,
                 ),
               ),
-
               const SizedBox(width: 14),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -828,9 +1091,7 @@ class _HomePageState extends State<HomePage> {
                         color: Color(0xFF172033),
                       ),
                     ),
-
                     const SizedBox(height: 4),
-
                     Text(
                       subtitle,
                       textDirection: TextDirection.rtl,
@@ -843,9 +1104,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-
               const SizedBox(width: 10),
-
               const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 size: 15,
@@ -887,9 +1146,7 @@ class _HomePageState extends State<HomePage> {
               size: 42,
               color: Color(0xFF9AA3B1),
             ),
-
             const SizedBox(height: 12),
-
             const Text(
               'تعذر تحميل الأماكن',
               textDirection: TextDirection.rtl,
@@ -899,9 +1156,7 @@ class _HomePageState extends State<HomePage> {
                 color: Color(0xFF172033),
               ),
             ),
-
             const SizedBox(height: 6),
-
             const Text(
               'تحقق من اتصال الإنترنت وحاول مرة أخرى.',
               textDirection: TextDirection.rtl,
@@ -911,9 +1166,7 @@ class _HomePageState extends State<HomePage> {
                 color: Color(0xFF8993A3),
               ),
             ),
-
             const SizedBox(height: 15),
-
             ElevatedButton(
               onPressed: _loadPlaces,
               style: ElevatedButton.styleFrom(
@@ -951,6 +1204,9 @@ class _HomePageState extends State<HomePage> {
       message = 'لا توجد أماكن في هذه الفئة';
     } else if (_selectedFilterIndex == 1) {
       message = 'لا توجد أماكن مفتوحة الآن';
+    } else if (_selectedFilterIndex == 0 &&
+        _hasLocationPermission) {
+      message = 'لا توجد أماكن قريبة منك حاليًا';
     }
 
     return Padding(
@@ -977,9 +1233,7 @@ class _HomePageState extends State<HomePage> {
               size: 42,
               color: Color(0xFF9AA3B1),
             ),
-
             const SizedBox(height: 12),
-
             Text(
               message,
               textDirection: TextDirection.rtl,
@@ -1024,15 +1278,29 @@ class _HomePageState extends State<HomePage> {
     try {
       if (_favoriteIds.contains(place.id)) {
         await _favoriteService.remove(place.id);
-        if (mounted) setState(() => _favoriteIds.remove(place.id));
+
+        if (mounted) {
+          setState(() {
+            _favoriteIds.remove(place.id);
+          });
+        }
       } else {
         await _favoriteService.add(place.id);
-        if (mounted) setState(() => _favoriteIds.add(place.id));
+
+        if (mounted) {
+          setState(() {
+            _favoriteIds.add(place.id);
+          });
+        }
       }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذر تحديث المفضلة: $error')),
+          SnackBar(
+            content: Text(
+              'تعذر تحديث المفضلة: $error',
+            ),
+          ),
         );
       }
     }
@@ -1076,7 +1344,8 @@ class _CategoryBottomSheet extends StatelessWidget {
     required this.iconFromName,
   });
 
-  bool get isLoading => status == CategoryLoadStatus.loading;
+  bool get isLoading =>
+      status == CategoryLoadStatus.loading;
 
   @override
   Widget build(BuildContext context) {
@@ -1096,7 +1365,6 @@ class _CategoryBottomSheet extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 12),
-
             Container(
               width: 42,
               height: 5,
@@ -1105,9 +1373,7 @@ class _CategoryBottomSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-
             const SizedBox(height: 18),
-
             const Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: 20,
@@ -1125,94 +1391,74 @@ class _CategoryBottomSheet extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 14),
-
             Expanded(
               child: status == CategoryLoadStatus.error
                   ? const _CategoryStateMessage(
                       icon: Icons.cloud_off_rounded,
-                      message: 'تعذر تحميل الفئات. تحقق من الاتصال وحاول مرة أخرى.',
+                      message:
+                          'تعذر تحميل الفئات. تحقق من الاتصال وحاول مرة أخرى.',
                     )
                   : isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF18A99A),
-                      ),
-                    )
-                  : categories.isEmpty
-                      ? status == CategoryLoadStatus.permissionDenied
-                          ? const _CategoryStateMessage(
-                              icon: Icons.lock_outline_rounded,
-                              message: 'تعذر الوصول إلى الفئات بسبب الصلاحيات.',
-                            )
-                          : status == CategoryLoadStatus.failure
-                              ? const _CategoryStateMessage(
-                                  icon: Icons.cloud_off_rounded,
-                                  message: 'تعذر تحميل الفئات. حاول مرة أخرى.',
-                                )
-                              : Center(
-                          child: Text(
-                            'لا توجد فئات متاحة',
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                              color: Color(0xFF8993A3),
-                            ),
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF18A99A),
                           ),
                         )
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(
-                            20,
-                            0,
-                            20,
-                            20,
-                          ),
-                          children: [
-                            _buildAllTile(),
-
-                            const SizedBox(height: 8),
-
-                            ...categories.map(
-                              (category) =>
-                                  _buildCategoryTile(
-                                context,
-                                category,
+                      : categories.isEmpty
+                          ? status ==
+                                  CategoryLoadStatus
+                                      .permissionDenied
+                              ? const _CategoryStateMessage(
+                                  icon: Icons.lock_outline_rounded,
+                                  message:
+                                      'تعذر الوصول إلى الفئات بسبب الصلاحيات.',
+                                )
+                              : status ==
+                                      CategoryLoadStatus
+                                          .failure
+                                  ? const _CategoryStateMessage(
+                                      icon:
+                                          Icons.cloud_off_rounded,
+                                      message:
+                                          'تعذر تحميل الفئات. حاول مرة أخرى.',
+                                    )
+                                  : const Center(
+                                      child: Text(
+                                        'لا توجد فئات متاحة',
+                                        textDirection:
+                                            TextDirection.rtl,
+                                        style: TextStyle(
+                                          color:
+                                              Color(0xFF8993A3),
+                                        ),
+                                      ),
+                                    )
+                          : ListView(
+                              padding:
+                                  const EdgeInsets.fromLTRB(
+                                20,
+                                0,
+                                20,
+                                20,
                               ),
+                              children: [
+                                _buildAllTile(),
+                                const SizedBox(height: 8),
+                                ...categories.map(
+                                  (category) =>
+                                      _buildCategoryTile(
+                                    context,
+                                    category,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  // ignore: unused_element
-  Widget _buildEmptyState() {
-    switch (status) {
-      case CategoryLoadStatus.permissionDenied:
-        return const _CategoryStateMessage(
-          icon: Icons.lock_outline_rounded,
-          message: 'تعذر الوصول إلى الفئات بسبب الصلاحيات.',
-        );
-      case CategoryLoadStatus.failure:
-        return const _CategoryStateMessage(
-          icon: Icons.cloud_off_rounded,
-          message: 'تعذر تحميل الفئات. حاول مرة أخرى.',
-        );
-      case CategoryLoadStatus.loading:
-      case CategoryLoadStatus.empty:
-      case CategoryLoadStatus.loaded:
-      case CategoryLoadStatus.error:
-        return const Center(
-          child: Text(
-            'لا توجد فئات متاحة',
-            textDirection: TextDirection.rtl,
-            style: TextStyle(color: Color(0xFF8993A3)),
-          ),
-        );
-    }
   }
 
   // ================================================================
@@ -1240,12 +1486,8 @@ class _CategoryBottomSheet extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _iconContainer(
-              Icons.apps_rounded,
-            ),
-
+            _iconContainer(Icons.apps_rounded),
             const SizedBox(width: 14),
-
             const Expanded(
               child: Text(
                 'كل الأماكن',
@@ -1257,7 +1499,6 @@ class _CategoryBottomSheet extends StatelessWidget {
                 ),
               ),
             ),
-
             if (selected)
               const Icon(
                 Icons.check_circle_rounded,
@@ -1278,7 +1519,8 @@ class _CategoryBottomSheet extends StatelessWidget {
     BuildContext context,
     Category category,
   ) {
-    final selected = selectedCategory == category.id;
+    final selected =
+        selectedCategory == category.id;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1305,9 +1547,7 @@ class _CategoryBottomSheet extends StatelessWidget {
               _iconContainer(
                 iconFromName(category.icon),
               ),
-
               const SizedBox(width: 14),
-
               Expanded(
                 child: Text(
                   category.nameAr,
@@ -1319,7 +1559,6 @@ class _CategoryBottomSheet extends StatelessWidget {
                   ),
                 ),
               ),
-
               if (selected)
                 const Icon(
                   Icons.check_circle_rounded,
@@ -1361,7 +1600,7 @@ class _CategoryBottomSheet extends StatelessWidget {
 }
 
 // ==================================================================
-// LOADING
+// CATEGORY STATE
 // ==================================================================
 
 class _CategoryStateMessage extends StatelessWidget {
@@ -1377,17 +1616,24 @@ class _CategoryStateMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 28,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: const Color(0xFF8993A3)),
+            Icon(
+              icon,
+              color: const Color(0xFF8993A3),
+            ),
             const SizedBox(height: 10),
             Text(
               message,
               textDirection: TextDirection.rtl,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF8993A3)),
+              style: const TextStyle(
+                color: Color(0xFF8993A3),
+              ),
             ),
           ],
         ),
@@ -1395,6 +1641,10 @@ class _CategoryStateMessage extends StatelessWidget {
     );
   }
 }
+
+// ==================================================================
+// LOADING
+// ==================================================================
 
 class _LoadingPlaces extends StatelessWidget {
   const _LoadingPlaces();

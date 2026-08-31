@@ -1,6 +1,8 @@
 import '../../core/config/backend_config.dart';
 import '../../core/network/dart_http_api_client.dart';
 
+import '../../features/community/repositories/community_repository.dart';
+
 import 'auth_repository.dart';
 import 'category_repository.dart';
 import 'contribution_repository.dart';
@@ -11,6 +13,7 @@ import 'user_repository.dart';
 
 import 'fastapi_auth_repository.dart';
 import 'fastapi_category_repository.dart';
+import 'fastapi_contribution_repository.dart';
 import 'fastapi_place_repository.dart';
 import 'fastapi_user_repository.dart';
 
@@ -87,6 +90,23 @@ UserRepository createUserRepository() {
 }
 
 // ============================================================
+// CommunityRepository
+// ============================================================
+
+CommunityRepository createCommunityRepository() {
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return CommunityRepository(_fastApiClient);
+
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
+}
+
+// ============================================================
 // TaskRepository
 // ============================================================
 
@@ -101,9 +121,18 @@ TaskRepository createTaskRepository() {
 // ============================================================
 
 ContributionRepository createContributionRepository() {
-  throw UnimplementedError(
-    'FastAPI ContributionRepository has not been implemented yet.',
-  );
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return FastApiContributionRepository(
+        _fastApiClient,
+      );
+
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
 }
 
 // ============================================================

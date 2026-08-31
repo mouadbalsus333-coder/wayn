@@ -1,3 +1,5 @@
+"""User model for the WAYN backend."""
+
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
@@ -18,6 +20,10 @@ class AccountStatus(str, Enum):
 
 class User(Base):
     __tablename__ = "users"
+
+    # ============================================================
+    # Identity
+    # ============================================================
 
     id: Mapped[UUID] = mapped_column(
         sa.Uuid,
@@ -64,6 +70,10 @@ class User(Base):
         index=True,
     )
 
+    # ============================================================
+    # Profile
+    # ============================================================
+
     avatar_id: Mapped[str | None] = mapped_column(
         sa.String(100),
         nullable=True,
@@ -73,6 +83,10 @@ class User(Base):
         sa.Text,
         nullable=True,
     )
+
+    # ============================================================
+    # Location
+    # ============================================================
 
     latitude: Mapped[float | None] = mapped_column(
         sa.Float,
@@ -98,7 +112,26 @@ class User(Base):
     )
 
     # ============================================================
-    # Account status
+    # User Points
+    # ============================================================
+    #
+    # Points belong directly to the user.
+    #
+    # They are intentionally NOT stored inside UserWallet.
+    #
+    # Every balance mutation must also create an immutable
+    # UserPointTransaction ledger record.
+    #
+
+    points: Mapped[int] = mapped_column(
+        sa.BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
+    # ============================================================
+    # Account Status
     # ============================================================
 
     account_status: Mapped[AccountStatus] = mapped_column(
@@ -134,7 +167,7 @@ class User(Base):
     )
 
     # ============================================================
-    # Authentication invalidation
+    # Authentication Invalidation
     # ============================================================
 
     token_version: Mapped[int] = mapped_column(
@@ -145,7 +178,7 @@ class User(Base):
     )
 
     # ============================================================
-    # Existing account flags
+    # Account Flags
     # ============================================================
 
     is_active: Mapped[bool] = mapped_column(
@@ -161,6 +194,10 @@ class User(Base):
         default=False,
         server_default=sa.text("false"),
     )
+
+    # ============================================================
+    # Login / Timestamps
+    # ============================================================
 
     last_login_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True),
@@ -201,6 +238,50 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+
+    place_contributions = relationship(
+        "PlaceContribution",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="PlaceContribution.created_at.desc()",
+    )
+
+    community_posts = relationship(
+        "CommunityPost",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="CommunityPost.created_at.desc()",
+    )
+
+    # ============================================================
+    # Points Transactions
+    # ============================================================
+    #
+    # Independent ledger for User.points.
+    #
+    # This records:
+    # - points earned
+    # - points removed
+    # - admin adjustments
+    # - penalties
+    # - rewards
+    # - other point operations
+    #
+
+    point_transactions = relationship(
+        "UserPointTransaction",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="UserPointTransaction.created_at.desc()",
+    )
+
+    # ============================================================
+    # Wallet
+    # ============================================================
+    #
+    # UserWallet contains coins and wallet-specific operations.
+    # Points are intentionally kept outside the wallet.
+    #
 
     wallet = relationship(
         "UserWallet",

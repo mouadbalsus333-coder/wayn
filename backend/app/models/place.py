@@ -50,7 +50,7 @@ class Place(Base):
         sa.Enum(
             VerificationStatus,
             name="verification_status",
-            create_constraint=False,  # managed by migration
+            create_constraint=False,
         ),
         nullable=False,
         server_default="UNVERIFIED",
@@ -214,6 +214,10 @@ class Place(Base):
         ),
     )
 
+    # ============================================================
+    # Relationships
+    # ============================================================
+
     category = relationship(
         "Category",
         back_populates="places",
@@ -235,4 +239,18 @@ class Place(Base):
         "UserFavorite",
         back_populates="place",
         cascade="all, delete-orphan",
+    )
+
+    contributions = relationship(
+        "PlaceContribution",
+        back_populates="place",
+        cascade="all, delete-orphan",
+        order_by="PlaceContribution.created_at.desc()",
+    )
+
+    community_posts = relationship(
+        "CommunityPost",
+        back_populates="place",
+        cascade="all, delete-orphan",
+        order_by="CommunityPost.created_at.desc()",
     )

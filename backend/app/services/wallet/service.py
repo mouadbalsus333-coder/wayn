@@ -1,10 +1,12 @@
-"""Business logic for user wallets and wallet transfers."""
+"""Business logic for user wallets, coins, and user points."""
 
 from datetime import datetime, timezone
 from uuid import UUID
 
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.user import User
 from app.models.wallet import UserWallet, WalletStatus
 from app.models.wallet_transaction import (
     WalletAsset,
@@ -21,6 +23,7 @@ from app.repositories.wallet.repository import WalletRepository
 
 class WalletService:
     def __init__(self, session: AsyncSession) -> None:
+        self.session = session
         self.repository = WalletRepository(session)
 
     # ============================================================
@@ -48,7 +51,6 @@ class WalletService:
 
         wallet = UserWallet(
             user_id=user_id,
-            points_balance=0,
             coins_balance=0,
         )
 
@@ -85,11 +87,13 @@ class WalletService:
         """
         Validate the general operational state of a wallet.
 
-        This method is intentionally strict:
-        - ACTIVE wallets are allowed.
-        - SUSPENDED wallets are rejected.
-        - HIDDEN wallets are rejected.
-        - Any unknown/non-active status is rejected.
+        ACTIVE wallets are allowed.
+
+        SUSPENDED wallets are rejected.
+
+        HIDDEN wallets are rejected.
+
+        Any unknown/non-active status is rejected.
         """
 
         if wallet.status == WalletStatus.SUSPENDED:
@@ -151,33 +155,171 @@ class WalletService:
 
                 # The block has expired.
                 #
-                # We intentionally do not clear the database field
-                # here because it is useful as historical protection
-                # metadata. The expired timestamp is simply treated
-                # as inactive.
+                # We intentionally do not clear the database
+                # fields here because they are useful as
+                # historical protection metadata.
+
             else:
-                # No expiry timestamp — the block is permanent
+                # No expiry timestamp means the block is permanent
                 # until explicitly removed.
                 raise ValueError(
                     "Wallet transfers are temporarily blocked"
                 )
 
     # ============================================================
-    # Balance
+    # User points
     # ============================================================
 
     async def get_points_balance(
         self,
         user_id: UUID | str,
     ) -> int:
-        wallet = await self.repository.get_wallet_by_user_id(
-            user_id
+        """
+        Return the user's points.
+
+        Points are stored directly on users.points and are
+        intentionally independent from the wallet.
+        """
+
+        result = await self.session.execute(
+            sa.select(User.points).where(
+                User.id == user_id
+            )
         )
 
-        if wallet is None:
+        points = result.scalar_one_or_none()
+
+        if points is None:
             return 0
 
-        return wallet.points_balance
+        return int(points)
+
+    async def _change_points(
+        self,
+        user_id: UUID | str,
+        *,
+        amount: int,
+        description: str | None = None,
+        reference_type: str | None = None,
+        reference_id: UUID | None = None,
+        extra_data: dict | None = None,
+    ) -> int:
+        """
+        Change a user's points balance.
+
+        Points are NOT wallet assets.
+
+        The user row is locked with FOR UPDATE so concurrent
+        point changes cannot overwrite each other.
+
+        The resulting points balance is returned.
+        """
+
+        if amount == 0:
+            raise ValueError(
+                "Points amount cannot be zero"
+            )
+
+        result = await self.session.execute(
+            sa.select(User)
+            .where(User.id == user_id)
+            .with_for_update()
+        )
+
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            raise ValueError(
+                "User not found"
+            )
+
+        # Points cannot become negative.
+        new_balance = user.points + amount
+
+        if new_balance < 0:
+            raise ValueError(
+                "Insufficient points balance"
+            )
+
+        user.points = new_balance
+
+        try:
+            await self.session.commit()
+
+        except Exception:
+            await self.session.rollback()
+            raise
+
+        return int(new_balance)
+
+    async def add_points(
+        self,
+        user_id: UUID | str,
+        amount: int,
+        *,
+        description: str | None = None,
+        reference_type: str | None = None,
+        reference_id: UUID | None = None,
+        extra_data: dict | None = None,
+    ) -> int:
+        """
+        Add points directly to the user.
+
+        Intended for controlled internal operations such as:
+        - admin rewards
+        - moderation rewards
+        - user contributions
+        - campaigns
+        - system rewards
+        """
+
+        if amount <= 0:
+            raise ValueError(
+                "Points amount must be greater than zero"
+            )
+
+        return await self._change_points(
+            user_id,
+            amount=amount,
+            description=description,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            extra_data=extra_data,
+        )
+
+    async def remove_points(
+        self,
+        user_id: UUID | str,
+        amount: int,
+        *,
+        description: str | None = None,
+        reference_type: str | None = None,
+        reference_id: UUID | None = None,
+        extra_data: dict | None = None,
+    ) -> int:
+        """
+        Remove points directly from the user.
+
+        The balance can never become negative.
+        """
+
+        if amount <= 0:
+            raise ValueError(
+                "Points amount must be greater than zero"
+            )
+
+        return await self._change_points(
+            user_id,
+            amount=-amount,
+            description=description,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            extra_data=extra_data,
+        )
+
+    # ============================================================
+    # Coins balance
+    # ============================================================
 
     async def get_coins_balance(
         self,
@@ -204,6 +346,14 @@ class WalletService:
         offset: int = 0,
         status: WalletTransactionStatus | None = None,
     ) -> list[WalletTransaction]:
+        """
+        List wallet transactions.
+
+        Wallet transactions currently represent wallet assets,
+        which means Coins. User Points are stored separately
+        on users.points.
+        """
+
         if limit < 1:
             raise ValueError(
                 "Limit must be greater than zero"
@@ -234,14 +384,13 @@ class WalletService:
         )
 
     # ============================================================
-    # Internal balance mutation
+    # Internal coins balance mutation
     # ============================================================
 
-    async def _change_balance(
+    async def _change_coins(
         self,
         user_id: UUID | str,
         *,
-        asset: WalletAsset,
         amount: int,
         transaction_type: WalletTransactionType,
         description: str | None = None,
@@ -249,6 +398,14 @@ class WalletService:
         reference_id: UUID | None = None,
         extra_data: dict | None = None,
     ) -> WalletTransaction:
+        """
+        Change a user's Coins balance.
+
+        Coins belong to UserWallet.
+
+        Points intentionally do not use this method.
+        """
+
         if amount == 0:
             raise ValueError(
                 "Transaction amount cannot be zero"
@@ -264,46 +421,20 @@ class WalletService:
                 "Wallet not found"
             )
 
-        # Balance mutations are internal financial operations.
-        # Do not allow them on inactive wallets.
         self._validate_wallet_active(wallet)
 
-        # --------------------------------------------------------
-        # Calculate and validate new balance
-        # --------------------------------------------------------
+        new_balance = wallet.coins_balance + amount
 
-        if asset == WalletAsset.POINTS:
-            new_balance = wallet.points_balance + amount
-
-            if new_balance < 0:
-                raise ValueError(
-                    "Insufficient points balance"
-                )
-
-            wallet.points_balance = new_balance
-
-        elif asset == WalletAsset.COINS:
-            new_balance = wallet.coins_balance + amount
-
-            if new_balance < 0:
-                raise ValueError(
-                    "Insufficient coins balance"
-                )
-
-            wallet.coins_balance = new_balance
-
-        else:
+        if new_balance < 0:
             raise ValueError(
-                "Unsupported wallet asset"
+                "Insufficient coins balance"
             )
 
-        # --------------------------------------------------------
-        # Create immutable ledger record
-        # --------------------------------------------------------
+        wallet.coins_balance = new_balance
 
         transaction = WalletTransaction(
             wallet_id=wallet.id,
-            asset=asset,
+            asset=WalletAsset.COINS,
             type=transaction_type,
             status=WalletTransactionStatus.CONFIRMED,
             amount=amount,
@@ -342,10 +473,13 @@ class WalletService:
         idempotency_key: str | None = None,
     ) -> WalletTransfer:
         """
-        Transfer points or coins between two wallets.
+        Transfer Coins between two wallets.
+
+        Points cannot be transferred through the wallet system.
 
         Guarantees:
         - Positive transfer amount.
+        - Coins only.
         - Sender must own an active wallet.
         - Sender transfers can be temporarily blocked.
         - Receiver must have an active wallet.
@@ -354,7 +488,8 @@ class WalletService:
         - Balance changes and ledger entries are atomic.
         - Idempotency keys prevent duplicate transfers.
         - Repeated identical requests return the original transfer.
-        - Reusing an idempotency key for a different operation is rejected.
+        - Reusing an idempotency key for a different operation
+          is rejected.
         """
 
         # ========================================================
@@ -366,12 +501,10 @@ class WalletService:
                 "Transfer amount must be greater than zero"
             )
 
-        if asset not in (
-            WalletAsset.POINTS,
-            WalletAsset.COINS,
-        ):
+        # Points are no longer wallet assets.
+        if asset != WalletAsset.COINS:
             raise ValueError(
-                "Unsupported wallet asset"
+                "Only coins can be transferred between wallets"
             )
 
         receiver_wallet_number = (
@@ -419,15 +552,6 @@ class WalletService:
         # ========================================================
         # Idempotency lookup
         # ========================================================
-        #
-        # This intentionally happens before transfer permission
-        # validation.
-        #
-        # If a transfer already completed and the client retries
-        # because of a network timeout, the original transfer
-        # should be returned instead of rejecting the retry because
-        # the wallet's status may have changed after the transfer.
-        # ========================================================
 
         if idempotency_key is not None:
             existing_transfer = (
@@ -439,10 +563,6 @@ class WalletService:
 
             if existing_transfer is not None:
 
-                # ------------------------------------------------
-                # Validate asset and amount
-                # ------------------------------------------------
-
                 if (
                     existing_transfer.asset != asset
                     or existing_transfer.amount != amount
@@ -451,10 +571,6 @@ class WalletService:
                         "Idempotency key was already used "
                         "with different transfer parameters"
                     )
-
-                # ------------------------------------------------
-                # Resolve receiver
-                # ------------------------------------------------
 
                 receiver_wallet = (
                     await self.repository.get_wallet_by_number(
@@ -467,10 +583,6 @@ class WalletService:
                         "Receiver wallet not found"
                     )
 
-                # ------------------------------------------------
-                # Validate receiver
-                # ------------------------------------------------
-
                 if (
                     existing_transfer.receiver_wallet_id
                     != receiver_wallet.id
@@ -480,10 +592,6 @@ class WalletService:
                         "with a different receiver wallet"
                     )
 
-                # ------------------------------------------------
-                # Validate description
-                # ------------------------------------------------
-
                 if (
                     existing_transfer.description
                     != description
@@ -492,10 +600,6 @@ class WalletService:
                         "Idempotency key was already used "
                         "with a different description"
                     )
-
-                # ------------------------------------------------
-                # Same operation -> return original transfer
-                # ------------------------------------------------
 
                 return existing_transfer
 
@@ -534,16 +638,6 @@ class WalletService:
         # ========================================================
         # Lock both wallets
         # ========================================================
-        #
-        # The repository sorts wallet UUIDs before FOR UPDATE.
-        #
-        # This prevents:
-        #
-        # A -> B
-        # B -> A
-        #
-        # from acquiring locks in opposite orders.
-        # ========================================================
 
         (
             sender_wallet,
@@ -574,11 +668,6 @@ class WalletService:
         # ========================================================
         # Validate receiver
         # ========================================================
-        #
-        # Receiving money does not require transfer permission.
-        # However, inactive wallets must not participate in
-        # transfers.
-        # ========================================================
 
         if receiver_wallet.status != WalletStatus.ACTIVE:
             raise ValueError(
@@ -586,20 +675,13 @@ class WalletService:
             )
 
         # ========================================================
-        # Validate balance
+        # Validate Coins balance
         # ========================================================
 
-        if asset == WalletAsset.POINTS:
-            if sender_wallet.points_balance < amount:
-                raise ValueError(
-                    "Insufficient points balance"
-                )
-
-        elif asset == WalletAsset.COINS:
-            if sender_wallet.coins_balance < amount:
-                raise ValueError(
-                    "Insufficient coins balance"
-                )
+        if sender_wallet.coins_balance < amount:
+            raise ValueError(
+                "Insufficient coins balance"
+            )
 
         # ========================================================
         # Atomic transfer
@@ -607,16 +689,11 @@ class WalletService:
 
         try:
             # ----------------------------------------------------
-            # Update balances
+            # Update Coins balances
             # ----------------------------------------------------
 
-            if asset == WalletAsset.POINTS:
-                sender_wallet.points_balance -= amount
-                receiver_wallet.points_balance += amount
-
-            else:
-                sender_wallet.coins_balance -= amount
-                receiver_wallet.coins_balance += amount
+            sender_wallet.coins_balance -= amount
+            receiver_wallet.coins_balance += amount
 
             # ----------------------------------------------------
             # Create transfer record
@@ -625,7 +702,7 @@ class WalletService:
             transfer = WalletTransfer(
                 sender_wallet_id=sender_wallet.id,
                 receiver_wallet_id=receiver_wallet.id,
-                asset=asset,
+                asset=WalletAsset.COINS,
                 amount=amount,
                 status=WalletTransferStatus.PENDING,
                 description=description,
@@ -642,7 +719,7 @@ class WalletService:
 
             sender_transaction = WalletTransaction(
                 wallet_id=sender_wallet.id,
-                asset=asset,
+                asset=WalletAsset.COINS,
                 type=WalletTransactionType.TRANSFER,
                 status=WalletTransactionStatus.CONFIRMED,
                 amount=-amount,
@@ -674,7 +751,7 @@ class WalletService:
 
             receiver_transaction = WalletTransaction(
                 wallet_id=receiver_wallet.id,
-                asset=asset,
+                asset=WalletAsset.COINS,
                 type=WalletTransactionType.TRANSFER,
                 status=WalletTransactionStatus.CONFIRMED,
                 amount=amount,
@@ -731,64 +808,6 @@ class WalletService:
             raise
 
     # ============================================================
-    # Points
-    # ============================================================
-
-    async def add_points(
-        self,
-        user_id: UUID | str,
-        amount: int,
-        *,
-        transaction_type: WalletTransactionType,
-        description: str | None = None,
-        reference_type: str | None = None,
-        reference_id: UUID | None = None,
-        extra_data: dict | None = None,
-    ) -> WalletTransaction:
-        if amount <= 0:
-            raise ValueError(
-                "Points amount must be greater than zero"
-            )
-
-        return await self._change_balance(
-            user_id,
-            asset=WalletAsset.POINTS,
-            amount=amount,
-            transaction_type=transaction_type,
-            description=description,
-            reference_type=reference_type,
-            reference_id=reference_id,
-            extra_data=extra_data,
-        )
-
-    async def remove_points(
-        self,
-        user_id: UUID | str,
-        amount: int,
-        *,
-        transaction_type: WalletTransactionType,
-        description: str | None = None,
-        reference_type: str | None = None,
-        reference_id: UUID | None = None,
-        extra_data: dict | None = None,
-    ) -> WalletTransaction:
-        if amount <= 0:
-            raise ValueError(
-                "Points amount must be greater than zero"
-            )
-
-        return await self._change_balance(
-            user_id,
-            asset=WalletAsset.POINTS,
-            amount=-amount,
-            transaction_type=transaction_type,
-            description=description,
-            reference_type=reference_type,
-            reference_id=reference_id,
-            extra_data=extra_data,
-        )
-
-    # ============================================================
     # Coins
     # ============================================================
 
@@ -803,14 +822,20 @@ class WalletService:
         reference_id: UUID | None = None,
         extra_data: dict | None = None,
     ) -> WalletTransaction:
+        """
+        Add Coins to the user's wallet.
+
+        This is suitable for controlled internal operations,
+        including administrator adjustments.
+        """
+
         if amount <= 0:
             raise ValueError(
                 "Coins amount must be greater than zero"
             )
 
-        return await self._change_balance(
+        return await self._change_coins(
             user_id,
-            asset=WalletAsset.COINS,
             amount=amount,
             transaction_type=transaction_type,
             description=description,
@@ -830,14 +855,19 @@ class WalletService:
         reference_id: UUID | None = None,
         extra_data: dict | None = None,
     ) -> WalletTransaction:
+        """
+        Remove Coins from the user's wallet.
+
+        The balance can never become negative.
+        """
+
         if amount <= 0:
             raise ValueError(
                 "Coins amount must be greater than zero"
             )
 
-        return await self._change_balance(
+        return await self._change_coins(
             user_id,
-            asset=WalletAsset.COINS,
             amount=-amount,
             transaction_type=transaction_type,
             description=description,

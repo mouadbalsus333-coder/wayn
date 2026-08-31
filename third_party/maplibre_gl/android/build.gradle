@@ -1,0 +1,86 @@
+group 'org.maplibre.maplibregl'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    ext.kotlin_version = '2.3.20'
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+def agpMajor =
+        com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0] as int
+
+// Always apply KGP so that Kotlin source files in this module (e.g.
+// MapLibreMapOptionsSink.kt, LocationEngineFactory.kt, setMapLanguage.kt) are
+// compiled and visible to the Java sources that reference them.
+// When AGP >= 9, AGP 9 may also provide built-in Kotlin, but KGP being applied
+// guarantees the kotlin {} extension below is available.
+apply plugin: 'kotlin-android'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'org.maplibre.maplibregl'
+    }
+
+    compileSdkVersion 36
+    buildToolsVersion "36.0.0"
+
+    ndkVersion "28.2.13676358"
+
+    defaultConfig {
+        minSdkVersion 21
+        compileSdk 36
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        multiDexEnabled true
+    }
+
+    lintOptions {
+        disable 'InvalidPackage'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    configurations.all {
+        exclude group: 'org.maplibre.gl', module: 'android-sdk'
+    }
+
+    dependencies {
+        implementation 'org.maplibre.gl:android-sdk-opengl:13.5.0'
+        implementation 'com.squareup.okhttp3:okhttp:5.4.0'
+        implementation 'com.google.android.gms:play-services-base:18.10.0'
+        implementation 'com.google.android.gms:play-services-location:21.4.0'
+    }
+}
+
+// Set through the Kotlin extension rather than android.kotlinOptions, which AGP 9
+// removes. The extension is present whether KGP was applied above or AGP provides
+// Kotlin itself.
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.18.0'
+}

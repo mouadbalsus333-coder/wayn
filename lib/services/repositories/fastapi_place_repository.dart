@@ -9,20 +9,45 @@ class FastApiPlaceRepository implements PlaceRepository {
 
   @override
   Future<List<Place>> getPlaces() async {
-    final response = await _apiClient.get('/api/v1/places');
+    final response = await _apiClient.get(
+      '/api/v1/places',
+    );
+
+    return _placesFromResponse(response);
+  }
+
+  @override
+  Future<List<Place>> getNearbyPlaces({
+    required double latitude,
+    required double longitude,
+    double radius = 5000,
+    int limit = 50,
+  }) async {
+    final response = await _apiClient.get(
+      '/api/v1/places/nearby',
+      queryParams: {
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius': radius,
+        'limit': limit,
+      },
+    );
+
     return _placesFromResponse(response);
   }
 
   @override
   Future<Place?> getPlaceById(String id) async {
     try {
-      final response = await _apiClient.get('/api/v1/places/$id');
+      final response = await _apiClient.get(
+        '/api/v1/places/$id',
+      );
 
       if (response == null || response is! Map) {
         return null;
       }
 
-      return _placeFromMap(
+      return Place.fromMap(
         Map<String, dynamic>.from(response),
       );
     } on ApiClientException catch (e) {
@@ -44,14 +69,18 @@ class FastApiPlaceRepository implements PlaceRepository {
 
     final response = await _apiClient.get(
       '/api/v1/places/search',
-      queryParams: {'q': search},
+      queryParams: {
+        'q': search,
+      },
     );
 
     return _placesFromResponse(response);
   }
 
   @override
-  Future<List<Place>> getPlacesByCategory(String categoryId) async {
+  Future<List<Place>> getPlacesByCategory(
+    String categoryId,
+  ) async {
     final response = await _apiClient.get(
       '/api/v1/places/category/$categoryId',
     );
@@ -61,7 +90,9 @@ class FastApiPlaceRepository implements PlaceRepository {
 
   @override
   Future<List<Place>> getOpenPlaces() async {
-    final response = await _apiClient.get('/api/v1/places/open');
+    final response = await _apiClient.get(
+      '/api/v1/places/open',
+    );
 
     return _placesFromResponse(response);
   }
@@ -92,168 +123,68 @@ class FastApiPlaceRepository implements PlaceRepository {
     return places.take(limit).toList();
   }
 
+  // ===============================================================
+  // RESPONSE PARSING
+  // ===============================================================
+
   List<Place> _placesFromResponse(dynamic response) {
-    // The new API contract returns a PaginatedResponse object:
-    // { "items": [...], "total": n, "page": n, "limit": n, "pages": n }
-    // Extract the items list from the response.
     if (response == null) {
       return [];
     }
 
+    // PaginatedResponse:
+    //
+    // {
+    //   "items": [...],
+    //   "total": 100,
+    //   "page": 1,
+    //   "limit": 50,
+    //   "pages": 2
+    // }
     if (response is Map) {
       final items = response['items'];
+
       if (items is List) {
-        return items
-            .map(
-              (item) => _placeFromMap(
-                Map<String, dynamic>.from(item as Map),
-              ),
-            )
-            .toList();
+        return _placesFromList(items);
       }
+
       return [];
     }
 
+    // Direct list response:
+    //
+    // [
+    //   {...},
+    //   {...}
+    // ]
     if (response is List) {
-      return response
-          .map(
-            (item) => _placeFromMap(
-              Map<String, dynamic>.from(item as Map),
-            ),
-          )
-          .toList();
+      return _placesFromList(response);
     }
 
     return [];
   }
 
-  Place _placeFromMap(Map<String, dynamic> data) {
-    return Place(
-      id: _stringValue(data['id']),
-      categoryId: _nullableString(data['category_id']),
-      name: _stringValue(data['name']),
-      city: _stringValue(data['city']),
+  List<Place> _placesFromList(List<dynamic> items) {
+    final places = <Place>[];
 
-      // FastAPI يستخدم category_name
-      // بينما Flutter Place يستخدم category.
-      category: _stringValue(data['category_name']),
+    for (final item in items) {
+      if (item is! Map) {
+        continue;
+      }
 
-      imageUrl: _stringValue(data['image_url']),
-      rating: _doubleValue(data['rating']),
-      isOpen: _boolValue(data['is_open']),
-
-      description: _nullableString(data['description']),
-      address: _nullableString(data['address']),
-      phone: _nullableString(data['phone']),
-      website: _nullableString(data['website']),
-
-      latitude: _nullableDouble(data['latitude']),
-      longitude: _nullableDouble(data['longitude']),
-
-      images: _stringList(data['images']),
-      services: _stringList(data['services']),
-
-      openingTime: _timeValue(data['opening_time']),
-      closingTime: _timeValue(data['closing_time']),
-
-      reviewsCount: _intValue(data['reviews_count']),
-      visitsCount: _intValue(data['visits_count']),
-    );
-  }
-
-  String _stringValue(dynamic value) {
-    if (value == null) {
-      return '';
+      try {
+        places.add(
+          Place.fromMap(
+            Map<String, dynamic>.from(item),
+          ),
+        );
+      } catch (_) {
+        // Ignore malformed place objects instead of
+        // breaking the entire places response.
+        continue;
+      }
     }
 
-    return value.toString();
-  }
-
-  String? _nullableString(dynamic value) {
-    if (value == null) {
-      return null;
-    }
-
-    return value.toString();
-  }
-
-  double _doubleValue(dynamic value) {
-    if (value == null) {
-      return 0.0;
-    }
-
-    if (value is double) {
-      return value;
-    }
-
-    if (value is num) {
-      return value.toDouble();
-    }
-
-    return double.tryParse(value.toString()) ?? 0.0;
-  }
-
-  double? _nullableDouble(dynamic value) {
-    if (value == null) {
-      return null;
-    }
-
-    if (value is double) {
-      return value;
-    }
-
-    if (value is num) {
-      return value.toDouble();
-    }
-
-    return double.tryParse(value.toString());
-  }
-
-  bool _boolValue(dynamic value) {
-    if (value is bool) {
-      return value;
-    }
-
-    if (value is String) {
-      return value.toLowerCase() == 'true';
-    }
-
-    if (value is num) {
-      return value != 0;
-    }
-
-    return false;
-  }
-
-  int _intValue(dynamic value) {
-    if (value is int) {
-      return value;
-    }
-
-    if (value is num) {
-      return value.toInt();
-    }
-
-    if (value is String) {
-      return int.tryParse(value) ?? 0;
-    }
-
-    return 0;
-  }
-
-  String? _timeValue(dynamic value) {
-    if (value == null) {
-      return null;
-    }
-
-    return value.toString();
-  }
-
-  List<String> _stringList(dynamic value) {
-    if (value is List) {
-      return value.map((item) => item.toString()).toList();
-    }
-
-    return [];
+    return places;
   }
 }

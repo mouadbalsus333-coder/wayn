@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+﻿from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -8,7 +8,10 @@ from app.models.user import AccountStatus, User
 
 
 class UserRepository:
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self,
+        session: AsyncSession,
+    ):
         self.session = session
 
     # ============================================================
@@ -20,8 +23,11 @@ class UserRepository:
         user_id: UUID,
     ) -> User | None:
         result = await self.session.execute(
-            select(User).where(User.id == user_id)
+            select(User).where(
+                User.id == user_id,
+            )
         )
+
         return result.scalar_one_or_none()
 
     async def get_by_email(
@@ -29,8 +35,11 @@ class UserRepository:
         email: str,
     ) -> User | None:
         result = await self.session.execute(
-            select(User).where(User.email == email)
+            select(User).where(
+                User.email == email,
+            )
         )
+
         return result.scalar_one_or_none()
 
     async def get_by_username(
@@ -38,8 +47,11 @@ class UserRepository:
         username: str,
     ) -> User | None:
         result = await self.session.execute(
-            select(User).where(User.username == username)
+            select(User).where(
+                User.username == username,
+            )
         )
+
         return result.scalar_one_or_none()
 
     async def get_by_phone(
@@ -47,8 +59,11 @@ class UserRepository:
         phone: str,
     ) -> User | None:
         result = await self.session.execute(
-            select(User).where(User.phone == phone)
+            select(User).where(
+                User.phone == phone,
+            )
         )
+
         return result.scalar_one_or_none()
 
     async def get_by_google_id(
@@ -56,8 +71,11 @@ class UserRepository:
         google_id: str,
     ) -> User | None:
         result = await self.session.execute(
-            select(User).where(User.google_id == google_id)
+            select(User).where(
+                User.google_id == google_id,
+            )
         )
+
         return result.scalar_one_or_none()
 
     # ============================================================
@@ -105,14 +123,18 @@ class UserRepository:
 
         query = (
             query
-            .order_by(User.created_at.desc())
+            .order_by(
+                User.created_at.desc()
+            )
             .offset(offset)
             .limit(limit)
         )
 
         result = await self.session.execute(query)
 
-        return list(result.scalars().all())
+        return list(
+            result.scalars().all()
+        )
 
     # ============================================================
     # Admin: count users
@@ -126,7 +148,9 @@ class UserRepository:
         is_active: bool | None = None,
         is_verified: bool | None = None,
     ) -> int:
-        query = select(func.count(User.id))
+        query = select(
+            func.count(User.id)
+        )
 
         if search:
             search_term = f"%{search.strip()}%"
@@ -157,7 +181,9 @@ class UserRepository:
 
         result = await self.session.execute(query)
 
-        return int(result.scalar_one())
+        return int(
+            result.scalar_one()
+        )
 
     # ============================================================
     # Admin: account status
@@ -174,7 +200,9 @@ class UserRepository:
     ) -> User:
         user.account_status = status
         user.status_reason = reason
-        user.status_changed_at = datetime.utcnow()
+        user.status_changed_at = datetime.now(
+            timezone.utc
+        )
         user.status_changed_by = changed_by
         user.suspended_until = suspended_until
 

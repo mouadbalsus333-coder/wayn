@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/network/wayn_api.dart';
-import 'admin_panel.dart';
+import 'dashboard/admin_dashboard_page.dart';
 
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});
@@ -13,6 +13,7 @@ class AdminLoginPage extends StatefulWidget {
 class _AdminLoginPageState extends State<AdminLoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+
   bool _loading = false;
   String? _error;
 
@@ -25,6 +26,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
   Future<void> _login() async {
     FocusManager.instance.primaryFocus?.unfocus();
+
     setState(() {
       _loading = true;
       _error = null;
@@ -42,6 +44,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       );
 
       final token = data['access_token']?.toString();
+
       if (token == null || token.isEmpty) {
         throw Exception('لم يتم استلام رمز دخول لوحة الإدارة.');
       }
@@ -49,19 +52,20 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       await waynAdminApi.setAuthToken(token);
 
       if (!mounted) return;
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => AdminPanel(
+          builder: (_) => AdminDashboardPage(
             adminName: data['full_name']?.toString() ?? 'مدير',
           ),
         ),
       );
     } catch (error) {
-      if (mounted) {
-        setState(() {
-          _error = error.toString().replaceFirst('Exception: ', '');
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -131,7 +135,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                       alignment: Alignment.centerRight,
                       child: Text(
                         _error!,
-                        style: const TextStyle(color: Color(0xFFD95757)),
+                        style: const TextStyle(
+                          color: Color(0xFFD95757),
+                        ),
                       ),
                     ),
                   ],
@@ -153,7 +159,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                           )
                         : const Text(
                             'دخول لوحة الإدارة',
-                            style: TextStyle(fontWeight: FontWeight.w800),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                   ),
                 ],

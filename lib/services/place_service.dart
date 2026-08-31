@@ -5,8 +5,10 @@ import 'repositories/repository_factory.dart';
 class PlaceService {
   final PlaceRepository _placeRepository;
 
-  PlaceService({PlaceRepository? placeRepository})
-    : _placeRepository = placeRepository ?? createPlaceRepository();
+  PlaceService({
+    PlaceRepository? placeRepository,
+  }) : _placeRepository =
+            placeRepository ?? createPlaceRepository();
 
   // ===============================================================
   // GET ALL ACTIVE PLACES
@@ -14,6 +16,24 @@ class PlaceService {
 
   Future<List<Place>> getPlaces() async {
     return _placeRepository.getPlaces();
+  }
+
+  // ===============================================================
+  // GET NEARBY PLACES
+  // ===============================================================
+
+  Future<List<Place>> getNearbyPlaces({
+    required double latitude,
+    required double longitude,
+    double radius = 5000,
+    int limit = 50,
+  }) async {
+    return _placeRepository.getNearbyPlaces(
+      latitude: latitude,
+      longitude: longitude,
+      radius: radius,
+      limit: limit,
+    );
   }
 
   // ===============================================================
@@ -36,8 +56,12 @@ class PlaceService {
   // GET PLACES BY CATEGORY
   // ===============================================================
 
-  Future<List<Place>> getPlacesByCategory(String categoryId) async {
-    return _placeRepository.getPlacesByCategory(categoryId);
+  Future<List<Place>> getPlacesByCategory(
+    String categoryId,
+  ) async {
+    return _placeRepository.getPlacesByCategory(
+      categoryId,
+    );
   }
 
   // ===============================================================
@@ -52,15 +76,23 @@ class PlaceService {
   // GET HIGHEST RATED PLACES
   // ===============================================================
 
-  Future<List<Place>> getHighestRatedPlaces({int limit = 10}) async {
-    return _placeRepository.getHighestRatedPlaces(limit: limit);
+  Future<List<Place>> getHighestRatedPlaces({
+    int limit = 10,
+  }) async {
+    return _placeRepository.getHighestRatedPlaces(
+      limit: limit,
+    );
   }
 
   // ===============================================================
   // GET MOST VISITED PLACES
   // ===============================================================
 
-  Future<List<Place>> getMostVisitedPlaces({int limit = 10}) async {
-    return _placeRepository.getMostVisitedPlaces(limit: limit);
+  Future<List<Place>> getMostVisitedPlaces({
+    int limit = 10,
+  }) async {
+    return _placeRepository.getMostVisitedPlaces(
+      limit: limit,
+    );
   }
 }

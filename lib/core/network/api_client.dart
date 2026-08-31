@@ -32,13 +32,29 @@ abstract class ApiClient {
     Map<String, dynamic>? body,
     Map<String, String>? headers,
   });
+
+  /// Upload a file using multipart/form-data.
+  ///
+  /// The returned value is the decoded API response.
+  Future<dynamic> uploadFile(
+    String path, {
+    required List<int> fileBytes,
+    required String fileName,
+    String fieldName = 'file',
+    String? contentType,
+    Map<String, String>? fields,
+    Map<String, String>? headers,
+  });
 }
 
 class ApiClientException implements Exception {
   final String message;
   final int? statusCode;
 
-  ApiClientException(this.message, {this.statusCode});
+  ApiClientException(
+    this.message, {
+    this.statusCode,
+  });
 
   @override
   String toString() =>

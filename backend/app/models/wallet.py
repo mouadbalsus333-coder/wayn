@@ -42,7 +42,10 @@ class UserWallet(Base):
 
     user_id: Mapped[UUID] = mapped_column(
         sa.Uuid,
-        sa.ForeignKey("users.id", ondelete="CASCADE"),
+        sa.ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
         unique=True,
         nullable=False,
         index=True,
@@ -56,12 +59,15 @@ class UserWallet(Base):
         default=generate_wallet_number,
     )
 
-    points_balance: Mapped[int] = mapped_column(
-        sa.BigInteger,
-        nullable=False,
-        default=0,
-        server_default="0",
-    )
+    # ============================================================
+    # Coins balance
+    # ============================================================
+    #
+    # Coins belong to the wallet.
+    #
+    # Points do NOT belong to the wallet.
+    # User points are stored directly in users.points.
+    # ============================================================
 
     coins_balance: Mapped[int] = mapped_column(
         sa.BigInteger,

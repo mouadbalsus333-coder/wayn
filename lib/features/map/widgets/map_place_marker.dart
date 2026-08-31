@@ -41,8 +41,8 @@ class MapPlaceMarker extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: selected ? 50 : 44,
-            height: selected ? 50 : 44,
+            width: selected ? 62 : 56,
+            height: selected ? 62 : 56,
             decoration: BoxDecoration(
               color: const Color(0xFF18A99A),
               shape: BoxShape.circle,
@@ -61,12 +61,12 @@ class MapPlaceMarker extends StatelessWidget {
             child: Icon(
               _icon,
               color: Colors.white,
-              size: selected ? 25 : 22,
+              size: selected ? 32 : 28,
             ),
           ),
 
           CustomPaint(
-            size: const Size(12, 7),
+            size: const Size(14, 8),
             painter: _MarkerArrowPainter(),
           ),
         ],

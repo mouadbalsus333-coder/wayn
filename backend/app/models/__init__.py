@@ -1,16 +1,51 @@
 """Data models for the WAYN backend."""
 
+# ============================================================
+# Admin / Roles / Permissions
+# ============================================================
+
 from app.models.admin_user import AdminUser
-from app.models.role import Role
 from app.models.permission import Permission
+from app.models.role import Role
+
+# ============================================================
+# Places / Categories / Users
+# ============================================================
 
 from app.models.category import Category
+from app.models.favorite import UserFavorite
 from app.models.place import Place
+from app.models.place_contribution import (
+    PlaceContribution,
+    PlaceContributionStatus,
+    PlaceContributionType,
+)
+from app.models.review import PlaceReview
 from app.models.user import User
+from app.models.user_verification_code import UserVerificationCode
 
 from app.models import admin_associations
-from app.models.favorite import UserFavorite
-from app.models.review import PlaceReview
+
+# ============================================================
+# Community
+# ============================================================
+
+from app.models.community import (
+    CommunityComment,
+    CommunityPost,
+    CommunityPostLike,
+    CommunityPostSave,
+)
+
+# ============================================================
+# User Points
+# ============================================================
+
+from app.models.user_point_transaction import (
+    UserPointTransaction,
+    UserPointTransactionStatus,
+    UserPointTransactionType,
+)
 
 # ============================================================
 # Wallet
@@ -32,13 +67,13 @@ from app.models.wallet_transfer import (
 # Store
 # ============================================================
 
+from app.models.store_banner import StoreBanner
 from app.models.store_category import StoreCategory
 from app.models.store_item import (
     StoreItem,
     StoreItemCurrency,
     StoreItemType,
 )
-from app.models.store_banner import StoreBanner
 
 
 __all__ = [
@@ -56,10 +91,31 @@ __all__ = [
 
     "Category",
     "Place",
+    "PlaceContribution",
+    "PlaceContributionStatus",
+    "PlaceContributionType",
     "User",
     "admin_associations",
     "UserFavorite",
     "PlaceReview",
+    "UserVerificationCode",
+
+    # ========================================================
+    # Community
+    # ========================================================
+
+    "CommunityPost",
+    "CommunityPostLike",
+    "CommunityPostSave",
+    "CommunityComment",
+
+    # ========================================================
+    # User Points
+    # ========================================================
+
+    "UserPointTransaction",
+    "UserPointTransactionStatus",
+    "UserPointTransactionType",
 
     # ========================================================
     # Wallet

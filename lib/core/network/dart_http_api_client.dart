@@ -294,6 +294,82 @@ class DartHttpApiClient implements ApiClient {
   }
 
   // ============================================================
+  // FILE UPLOAD
+  // ============================================================
+
+  @override
+  Future<dynamic> uploadFile(
+    String path, {
+    required List<int> fileBytes,
+    required String fileName,
+    String fieldName = 'file',
+    String? contentType,
+    Map<String, String>? fields,
+    Map<String, String>? headers,
+  }) async {
+    if (fileBytes.isEmpty) {
+      throw ApiClientException(
+        'Cannot upload an empty file',
+      );
+    }
+
+    final uri = Uri.parse(
+      _buildUrl(path, null),
+    );
+
+    final request = http.MultipartRequest(
+      'POST',
+      uri,
+    );
+
+    final requestHeaders = await _buildHeaders(headers);
+
+    // MultipartRequest generates its own Content-Type header
+    // including the required boundary.
+    requestHeaders.remove('Content-Type');
+    requestHeaders.remove('content-type');
+
+    request.headers.addAll(requestHeaders);
+
+    if (fields != null && fields.isNotEmpty) {
+      request.fields.addAll(fields);
+    }
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        fieldName,
+        fileBytes,
+        filename: fileName,
+      ),
+    );
+
+    print(
+      'WAYN HTTP UPLOAD: POST $uri',
+    );
+
+    print(
+      'WAYN HTTP UPLOAD FILE: $fileName '
+      '(${fileBytes.length} bytes)',
+    );
+
+    if (contentType != null && contentType.trim().isNotEmpty) {
+      print(
+        'WAYN HTTP UPLOAD CONTENT TYPE: $contentType',
+      );
+    }
+
+    final streamedResponse = await _client.send(
+      request,
+    );
+
+    final response = await http.Response.fromStream(
+      streamedResponse,
+    );
+
+    return _handleResponse(response);
+  }
+
+  // ============================================================
   // Headers
   // ============================================================
 

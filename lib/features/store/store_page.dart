@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/wayn_header.dart';
 import '../../models/store.dart';
 import '../../services/store_service.dart';
 
@@ -57,22 +58,22 @@ class _StorePageState extends State<StorePage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F9FC),
-        appBar: AppBar(
-          title: const Text(
-            'متجر WAYN',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          centerTitle: true,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _load,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
-                  children: [
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              WaynHeader(
+                onMenuPressed: _onMenuOrNotificationsPressed,
+                onNotificationsPressed: _onMenuOrNotificationsPressed,
+              ),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+                          children: [
                     if (_banners.isNotEmpty) _banner(_banners.first),
                     if (_banners.isNotEmpty) const SizedBox(height: 20),
                     const Text(
@@ -147,8 +148,16 @@ class _StorePageState extends State<StorePage> {
                   ],
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
       ),
     );
+  }
+
+  void _onMenuOrNotificationsPressed() {
+    debugPrint('Store menu/notifications pressed');
   }
 
   Widget _banner(StoreBanner banner) {

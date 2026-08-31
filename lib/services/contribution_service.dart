@@ -5,33 +5,62 @@ import 'repositories/repository_factory.dart';
 class ContributionService {
   final ContributionRepository _contributionRepository;
 
-  ContributionService({ContributionRepository? contributionRepository})
-    : _contributionRepository =
+  ContributionService({
+    ContributionRepository? contributionRepository,
+  }) : _contributionRepository =
           contributionRepository ?? createContributionRepository();
 
-  Future<List<Contribution>> getContributionsByUser(String userId) async {
-    return _contributionRepository.getContributionsByUser(userId);
-  }
+  // ============================================================
+  // Get current user's contributions
+  // ============================================================
 
-  Future<Contribution?> getContributionById(String id) async {
-    return _contributionRepository.getContributionById(id);
-  }
-
-  Future<Contribution?> submitContribution(Contribution contribution) async {
-    return _contributionRepository.submitContribution(contribution);
-  }
-
-  Future<Contribution?> updateContributionStatus(
-    String contributionId,
-    ContributionStatus status, {
-    String? reviewedBy,
-    String? reviewNote,
+  Future<List<Contribution>> getContributionsByUser(
+    String userId, {
+    ContributionStatus? status,
+    int offset = 0,
+    int limit = 20,
   }) async {
-    return _contributionRepository.updateContributionStatus(
+    return _contributionRepository.getContributionsByUser(
+      userId,
+      status: status,
+      offset: offset,
+      limit: limit,
+    );
+  }
+
+  // ============================================================
+  // Get one contribution
+  // ============================================================
+
+  Future<Contribution?> getContributionById(
+    String id,
+  ) async {
+    return _contributionRepository.getContributionById(
+      id,
+    );
+  }
+
+  // ============================================================
+  // Submit contribution
+  // ============================================================
+
+  Future<Contribution?> submitContribution(
+    Contribution contribution,
+  ) async {
+    return _contributionRepository.submitContribution(
+      contribution,
+    );
+  }
+
+  // ============================================================
+  // Cancel pending contribution
+  // ============================================================
+
+  Future<Contribution?> cancelContribution(
+    String contributionId,
+  ) async {
+    return _contributionRepository.cancelContribution(
       contributionId,
-      status,
-      reviewedBy: reviewedBy,
-      reviewNote: reviewNote,
     );
   }
 }

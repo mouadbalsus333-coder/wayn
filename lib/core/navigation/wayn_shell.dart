@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
 
-import '../../features/admin/admin_login_page.dart';
 import '../../features/auth/login_page.dart';
-import '../../features/home/home_page.dart';
+import '../../features/community/community_page.dart';
+import '../../features/explore/explore_page.dart';
 import '../../features/map/map_page.dart';
 import '../../features/profile/profile_page.dart';
 import '../../features/store/store_page.dart';
-import '../../features/wallet/wallet_page.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
 
 class WaynShell extends StatefulWidget {
   final User user;
 
-  const WaynShell({super.key, required this.user});
+  const WaynShell({
+    super.key,
+    required this.user,
+  });
 
   @override
   State<WaynShell> createState() => _WaynShellState();
@@ -31,16 +33,20 @@ class _WaynShellState extends State<WaynShell> {
 
   List<Widget> _buildPages(User user) {
     return [
-      const HomePage(),
+      const ExplorePage(),
       const MapPage(),
       const StorePage(),
-      const WalletPage(),
-      ProfilePage(user: user, onLogout: _logout),
+      const CommunityPage(),
+      ProfilePage(
+        user: user,
+        onLogout: _logout,
+      ),
     ];
   }
 
   Future<void> _logout() async {
     await AuthService().logout();
+
     if (!mounted) return;
 
     Navigator.of(context).pushAndRemoveUntil(
@@ -49,7 +55,9 @@ class _WaynShellState extends State<WaynShell> {
           onAuthenticated: (user) {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(
-                builder: (_) => WaynShell(user: user),
+                builder: (_) => WaynShell(
+                  user: user,
+                ),
               ),
               (_) => false,
             );
@@ -65,6 +73,9 @@ class _WaynShellState extends State<WaynShell> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        // نبقي جسم الشل متغير الحجم ثابتًا عند ظهور الكيبورد حتى لا تهتز
+        // المكوّنات داخله (خصوصًا الخريطة في تبويب الخريطة).
+        resizeToAvoidBottomInset: false,
         body: IndexedStack(
           index: _currentIndex,
           children: _pages,
@@ -76,11 +87,26 @@ class _WaynShellState extends State<WaynShell> {
 
   Widget _buildBottomNavigation() {
     const items = [
-      (Icons.explore_rounded, 'استكشف'),
-      (Icons.map_rounded, 'الخريطة'),
-      (Icons.storefront_rounded, 'المتجر'),
-      (Icons.account_balance_wallet_rounded, 'المحفظة'),
-      (Icons.person_rounded, 'حسابي'),
+      (
+        Icons.explore_rounded,
+        'استكشف',
+      ),
+      (
+        Icons.map_rounded,
+        'الخريطة',
+      ),
+      (
+        Icons.storefront_rounded,
+        'المتجر',
+      ),
+      (
+        Icons.groups_rounded,
+        'المجتمع',
+      ),
+      (
+        Icons.person_rounded,
+        'حسابي',
+      ),
     ];
 
     return Container(
@@ -97,47 +123,61 @@ class _WaynShellState extends State<WaynShell> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 7,
+            vertical: 7,
+          ),
           child: Row(
-            children: List.generate(items.length, (index) {
-              final selected = _currentIndex == index;
+            children: List.generate(
+              items.length,
+              (index) {
+                final selected = _currentIndex == index;
 
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _currentIndex = index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          items[index].$1,
-                          size: 22,
-                          color: selected
-                              ? const Color(0xFF18A99A)
-                              : const Color(0xFF8B94A3),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          items[index].$2,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: selected
-                                ? FontWeight.w800
-                                : FontWeight.w500,
+                return Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(
+                        milliseconds: 180,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            items[index].$1,
+                            size: 22,
                             color: selected
                                 ? const Color(0xFF18A99A)
                                 : const Color(0xFF8B94A3),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 3),
+                          Text(
+                            items[index].$2,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: selected
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
+                              color: selected
+                                  ? const Color(0xFF18A99A)
+                                  : const Color(0xFF8B94A3),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              },
+            ),
           ),
         ),
       ),

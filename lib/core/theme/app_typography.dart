@@ -4,7 +4,7 @@ import 'app_colors.dart';
 
 abstract final class AppTypography {
   // نستخدم خط النظام مؤقتًا حتى نضيف خط WAYN لاحقًا.
-  static const String fontFamily = 'sans';
+  static const String fontFamily = 'IBMPlexSansArabic';
 
   // =========================
   // Light Theme

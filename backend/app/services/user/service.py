@@ -10,7 +10,10 @@ from app.services.wallet.service import WalletService
 
 
 class UserService:
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self,
+        session: AsyncSession,
+    ) -> None:
         self.session = session
         self.repository = UserRepository(session)
         self.wallet_service = WalletService(session)
@@ -62,7 +65,9 @@ class UserService:
         phone: str | None = None,
         avatar_id: str | None = None,
     ) -> User:
-        existing_email = await self.repository.get_by_email(email)
+        existing_email = await self.repository.get_by_email(
+            email
+        )
 
         if existing_email is not None:
             raise ValueError(
@@ -70,7 +75,9 @@ class UserService:
             )
 
         existing_username = (
-            await self.repository.get_by_username(username)
+            await self.repository.get_by_username(
+                username
+            )
         )
 
         if existing_username is not None:
@@ -80,7 +87,9 @@ class UserService:
 
         if phone:
             existing_phone = (
-                await self.repository.get_by_phone(phone)
+                await self.repository.get_by_phone(
+                    phone
+                )
             )
 
             if existing_phone is not None:
@@ -95,6 +104,7 @@ class UserService:
             username=username,
             phone=phone,
             avatar_id=avatar_id,
+            is_verified=False,
         )
 
         try:
@@ -109,14 +119,12 @@ class UserService:
             # Commit User + Wallet atomically.
             await self.session.commit()
 
-            # Refresh after the transaction is committed.
+            # Refresh after commit.
             await self.session.refresh(user)
 
             return user
 
         except Exception:
-            # If User or Wallet creation fails,
-            # rollback the entire registration transaction.
             await self.session.rollback()
             raise
 
@@ -129,7 +137,9 @@ class UserService:
         email: str,
         password: str,
     ) -> User | None:
-        user = await self.repository.get_by_email(email)
+        user = await self.repository.get_by_email(
+            email
+        )
 
         if user is None:
             return None
@@ -147,6 +157,49 @@ class UserService:
             return None
 
         return user
+
+    # ============================================================
+    # Email verification
+    # ============================================================
+
+    async def verify_email(
+        self,
+        user: User,
+    ) -> User:
+        if not user.is_active:
+            raise ValueError(
+                "User account is not active"
+            )
+
+        if user.is_verified:
+            return user
+
+        user.is_verified = True
+
+        return await self.repository.save(user)
+
+    # ============================================================
+    # Password reset
+    # ============================================================
+
+    async def reset_password(
+        self,
+        user: User,
+        new_password: str,
+    ) -> User:
+        if not user.is_active:
+            raise ValueError(
+                "User account is not active"
+            )
+
+        user.password_hash = hash_password(
+            new_password
+        )
+
+        # Invalidate all existing JWT sessions.
+        user.token_version += 1
+
+        return await self.repository.save(user)
 
     # ============================================================
     # Location
@@ -183,9 +236,14 @@ class UserService:
         avatar_id: str | None = None,
         bio: str | None = None,
     ) -> User:
-        if username is not None and username != user.username:
+        if (
+            username is not None
+            and username != user.username
+        ):
             existing_username = (
-                await self.repository.get_by_username(username)
+                await self.repository.get_by_username(
+                    username
+                )
             )
 
             if (
@@ -198,9 +256,14 @@ class UserService:
 
             user.username = username
 
-        if phone is not None and phone != user.phone:
+        if (
+            phone is not None
+            and phone != user.phone
+        ):
             existing_phone = (
-                await self.repository.get_by_phone(phone)
+                await self.repository.get_by_phone(
+                    phone
+                )
             )
 
             if (
@@ -249,10 +312,15 @@ class UserService:
 
         if current_password == new_password:
             raise ValueError(
-                "New password must be different from current password"
+                "New password must be different "
+                "from current password"
             )
 
-        user.password_hash = hash_password(new_password)
+        user.password_hash = hash_password(
+            new_password
+        )
 
         # Invalidate all existing JWT sessions.
-        await self.repository.increment_token_version(user)
+        await self.repository.increment_token_version(
+            user
+        )

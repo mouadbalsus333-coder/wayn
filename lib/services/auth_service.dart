@@ -14,7 +14,7 @@ class AuthService {
   // Register
   // ============================================================
 
-  Future<User?> register({
+  Future<RegistrationResult?> register({
     required String email,
     required String password,
     required String fullName,
@@ -92,6 +92,52 @@ class AuthService {
   }) async {
     await _authRepository.changePassword(
       currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+  }
+
+  // ============================================================
+  // Email verification
+  // ============================================================
+
+  Future<VerificationResult?> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    return _authRepository.verifyEmail(
+      email: email,
+      code: code,
+    );
+  }
+
+  Future<void> resendVerificationCode({
+    required String email,
+  }) async {
+    await _authRepository.resendVerificationCode(
+      email: email,
+    );
+  }
+
+  // ============================================================
+  // Password reset
+  // ============================================================
+
+  Future<void> forgotPassword({
+    required String email,
+  }) async {
+    await _authRepository.forgotPassword(
+      email: email,
+    );
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await _authRepository.resetPassword(
+      email: email,
+      code: code,
       newPassword: newPassword,
     );
   }

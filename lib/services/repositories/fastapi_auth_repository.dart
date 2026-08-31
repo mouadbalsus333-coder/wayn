@@ -1,4 +1,3 @@
-
 import '../../core/network/api_client.dart';
 import '../../core/network/dart_http_api_client.dart';
 import '../../models/user.dart';
@@ -14,7 +13,7 @@ class FastApiAuthRepository implements AuthRepository {
   // ============================================================
 
   @override
-  Future<User?> register({
+  Future<RegistrationResult?> register({
     required String email,
     required String password,
     required String fullName,
@@ -36,7 +35,36 @@ class FastApiAuthRepository implements AuthRepository {
       },
     );
 
-    return _handleAuthResponse(response);
+    if (response == null) {
+      return null;
+    }
+
+    if (response is! Map) {
+      throw ApiClientException(
+        'Invalid registration response',
+      );
+    }
+
+    final data = Map<String, dynamic>.from(response);
+
+    final userData = data['user'];
+
+    if (userData is! Map) {
+      throw ApiClientException(
+        'Registration response does not contain a valid user',
+      );
+    }
+
+    final user = User.fromMap(
+      Map<String, dynamic>.from(userData),
+    );
+
+    return RegistrationResult(
+      user: user,
+      verificationRequired:
+          data['verification_required'] == true,
+      message: data['message']?.toString() ?? '',
+    );
   }
 
   // ============================================================
@@ -192,6 +220,116 @@ class FastApiAuthRepository implements AuthRepository {
   }
 
   // ============================================================
+  // Email verification
+  // ============================================================
+
+  @override
+  Future<VerificationResult?> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    final response = await _api.post(
+      '/api/v1/auth/verify-email',
+      body: {
+        'email': email,
+        'code': code,
+      },
+    );
+
+    if (response == null) {
+      return null;
+    }
+
+    if (response is! Map) {
+      throw ApiClientException(
+        'Invalid email verification response',
+      );
+    }
+
+    final data = Map<String, dynamic>.from(response);
+
+    final accessToken = data['access_token']?.toString();
+
+    if (accessToken == null || accessToken.trim().isEmpty) {
+      throw ApiClientException(
+        'Email verification response does not contain an access token',
+      );
+    }
+
+    final userData = data['user'];
+
+    if (userData is! Map) {
+      throw ApiClientException(
+        'Email verification response does not contain a valid user',
+      );
+    }
+
+    final user = User.fromMap(
+      Map<String, dynamic>.from(userData),
+    );
+
+    await _api.setAuthToken(accessToken);
+
+    return VerificationResult(
+      user: user,
+      accessToken: accessToken,
+      tokenType: data['token_type']?.toString() ?? 'bearer',
+    );
+  }
+
+  // ============================================================
+  // Resend verification code
+  // ============================================================
+
+  @override
+  Future<void> resendVerificationCode({
+    required String email,
+  }) async {
+    await _api.post(
+      '/api/v1/auth/resend-verification',
+      body: {
+        'email': email,
+      },
+    );
+  }
+
+  // ============================================================
+  // Forgot password
+  // ============================================================
+
+  @override
+  Future<void> forgotPassword({
+    required String email,
+  }) async {
+    await _api.post(
+      '/api/v1/auth/forgot-password',
+      body: {
+        'email': email,
+      },
+    );
+  }
+
+  // ============================================================
+  // Reset password
+  // ============================================================
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await _api.post(
+      '/api/v1/auth/reset-password',
+      body: {
+        'email': email,
+        'code': code,
+        'new_password': newPassword,
+      },
+    );
+  }
+
+  // ============================================================
   // Authentication response
   // ============================================================
 
@@ -200,7 +338,10 @@ class FastApiAuthRepository implements AuthRepository {
   ) async {
     try {
       print('WAYN AUTH: received response');
-      print('WAYN AUTH: response type = ${response.runtimeType}');
+      print(
+        'WAYN AUTH: response type = '
+        '${response.runtimeType}',
+      );
 
       if (response == null) {
         print('WAYN AUTH ERROR: response is null');
@@ -220,7 +361,10 @@ class FastApiAuthRepository implements AuthRepository {
 
       final data = Map<String, dynamic>.from(response);
 
-      print('WAYN AUTH: response keys = ${data.keys.toList()}');
+      print(
+        'WAYN AUTH: response keys = '
+        '${data.keys.toList()}',
+      );
 
       // ----------------------------------------------------------
       // Access token
@@ -229,14 +373,14 @@ class FastApiAuthRepository implements AuthRepository {
       final accessToken = data['access_token']?.toString();
 
       if (accessToken == null || accessToken.trim().isEmpty) {
-        print('WAYN AUTH ERROR: access_token is missing');
+        print(
+          'WAYN AUTH ERROR: access_token is missing',
+        );
 
         throw ApiClientException(
           'Authentication response does not contain an access token',
         );
       }
-
-      print('WAYN AUTH: access_token received');
 
       // ----------------------------------------------------------
       // User
@@ -244,13 +388,7 @@ class FastApiAuthRepository implements AuthRepository {
 
       final userData = data['user'];
 
-      print(
-        'WAYN AUTH: user type = ${userData.runtimeType}',
-      );
-
       if (userData is! Map) {
-        print('WAYN AUTH ERROR: user is not a Map');
-
         throw ApiClientException(
           'Authentication response does not contain a valid user',
         );
@@ -258,41 +396,17 @@ class FastApiAuthRepository implements AuthRepository {
 
       final userMap = Map<String, dynamic>.from(userData);
 
-      print(
-        'WAYN AUTH: user keys = ${userMap.keys.toList()}',
-      );
-
-      print(
-        'WAYN AUTH: user id = ${userMap['id']}',
-      );
-
-      print(
-        'WAYN AUTH: user email = ${userMap['email']}',
-      );
-
       // ----------------------------------------------------------
       // Save token
       // ----------------------------------------------------------
 
-      print('WAYN AUTH: saving access token...');
-
       await _api.setAuthToken(accessToken);
 
-      print('WAYN AUTH: access token saved');
-
       // ----------------------------------------------------------
-      // Convert API user to Flutter User
+      // Convert API user
       // ----------------------------------------------------------
 
-      print('WAYN AUTH: converting user...');
-
-      final user = User.fromMap(userMap);
-
-      print(
-        'WAYN AUTH: User.fromMap succeeded: ${user.id}',
-      );
-
-      return user;
+      return User.fromMap(userMap);
     } catch (error, stackTrace) {
       print('WAYN AUTH FAILED: $error');
       print('WAYN AUTH STACKTRACE: $stackTrace');
