@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
 import '../../core/network/api_client.dart';
+import '../../core/navigation/wayn_actions.dart';
+import '../../core/theme/wayn_colors.dart';
+import '../../features/notifications/notifications_page.dart';
 import '../../services/repositories/repository_factory.dart';
-import 'community_page.dart';
 import 'models/community_post.dart';
 import 'services/community_service.dart';
+import 'widgets/community_post_card.dart';
 
 class SavedPostsPage extends StatefulWidget {
   const SavedPostsPage({super.key});
@@ -95,12 +98,14 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: DefaultTabController(
         length: 1, // Extensible to more tabs in future (e.g. Places, Products)
         child: Scaffold(
-          backgroundColor: const Color(0xFFF7F9FC),
+          backgroundColor: colors.background,
           body: SafeArea(
             bottom: false,
             child: Column(
@@ -109,11 +114,11 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
                   onMenuPressed: _onMenuPressed,
                   onNotificationsPressed: _onNotificationsPressed,
                 ),
-                const TabBar(
-                  labelColor: Color(0xFF18A99A),
-                  unselectedLabelColor: Color(0xFF8B94A3),
-                  indicatorColor: Color(0xFF18A99A),
-                  tabs: [
+                TabBar(
+                  labelColor: colors.brand,
+                  unselectedLabelColor: colors.textMuted,
+                  indicatorColor: colors.brand,
+                  tabs: const [
                     Tab(text: 'المنشورات'),
                   ],
                 ),
@@ -137,14 +142,16 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
   }
 
   void _onNotificationsPressed() {
-    debugPrint('Saved posts notifications pressed');
+    openNotifications(context);
   }
 
   Widget _buildPostsBody() {
+    final colors = context.waynColors;
+
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(
-          color: Color(0xFF18A99A),
+          color: colors.brand,
         ),
       );
     }
@@ -154,11 +161,11 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bookmark_border_rounded, size: 54, color: Colors.grey.shade400),
+            Icon(Icons.bookmark_border_rounded, size: 54, color: colors.textMuted),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
-              style: const TextStyle(color: Color(0xFF667085), fontSize: 15),
+              style: TextStyle(color: colors.textSecondary, fontSize: 15),
             ),
             const SizedBox(height: 16),
             TextButton(
@@ -178,22 +185,22 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
             Icon(
               Icons.bookmark_border_rounded,
               size: 64,
-              color: const Color(0xFF18A99A).withValues(alpha: 0.35),
+              color: colors.brand.withValues(alpha: 0.35),
             ),
             const SizedBox(height: 18),
-            const Text(
+            Text(
               'لا توجد منشورات محفوظة',
               style: TextStyle(
-                color: Color(0xFF172033),
+                color: colors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'أضف منشورات إلى المحفوظات لرؤيتها هنا',
               style: TextStyle(
-                color: Color(0xFF667085),
+                color: colors.textSecondary,
                 fontSize: 14,
               ),
             ),
@@ -203,7 +210,7 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
     }
 
     return RefreshIndicator(
-      color: const Color(0xFF18A99A),
+      color: colors.brand,
       onRefresh: _loadSavedPosts,
       child: ListView.builder(
         padding: const EdgeInsets.all(14),
@@ -212,11 +219,18 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
           final post = _savedPosts[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: CommunityPostCardWidget(
+            child: CommunityPostCard(
               post: post,
               onLike: () {},
               onSave: () => _unsavePost(post),
               onComments: () {},
+              onAuthorTap: (authorId) => openUserProfile(
+                context,
+                userId: authorId,
+                isOwner: post.isOwner,
+              ),
+              onPlaceTap: (placeId) =>
+                  openPlaceFromId(context, placeId),
             ),
           );
         },

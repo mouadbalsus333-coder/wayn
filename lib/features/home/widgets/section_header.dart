@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/wayn_colors.dart';
+
 class SectionHeader extends StatelessWidget {
   final String title;
   final String action;
@@ -14,6 +16,8 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 10),
       child: Row(
@@ -21,10 +25,10 @@ class SectionHeader extends StatelessWidget {
           Text(
             title,
             textDirection: TextDirection.rtl,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF172033),
+              color: colors.textPrimary,
             ),
           ),
 

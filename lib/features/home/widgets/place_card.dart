@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/wayn_colors.dart';
 import '../models/place.dart';
 
 class PlaceCard extends StatelessWidget {
@@ -16,6 +17,8 @@ class PlaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return GestureDetector(
       onTap: onPressed,
       behavior: HitTestBehavior.opaque,
@@ -23,11 +26,11 @@ class PlaceCard extends StatelessWidget {
         height: 240,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: const Color(0xFFEFF2F5),
+          color: colors.surfaceAlt,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: colors.shadow,
               blurRadius: 18,
               offset: const Offset(0, 7),
             ),
@@ -336,14 +339,16 @@ class _QuietPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFFF1F4F6),
-            Color(0xFFE9EEF1),
+            colors.surfaceAlt,
+            colors.surface,
           ],
         ),
       ),
@@ -367,10 +372,10 @@ class _QuietPlaceholder extends StatelessWidget {
               child: child,
             );
           },
-          child: const Icon(
+          child: Icon(
             Icons.location_on_rounded,
             size: 34,
-            color: Color(0xFFB8C2CC),
+            color: colors.textMuted.withValues(alpha: 0.8),
           ),
         ),
       ),
@@ -387,13 +392,15 @@ class _ImagePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Container(
-      color: const Color(0xFFE8EDF2),
-      child: const Center(
+      color: colors.surfaceAlt,
+      child: Center(
         child: Icon(
           Icons.image_not_supported_outlined,
           size: 40,
-          color: Color(0xFF9AA3B1),
+          color: colors.textMuted,
         ),
       ),
     );

@@ -12,6 +12,11 @@ class CommunityPost {
   final String? authorAvatar;
   final String? placeName;
 
+  final int authorPoints;
+  final int authorFollowersCount;
+  final bool isFollowingAuthor;
+  final bool isOwner;
+
   final bool isVisible;
 
   final DateTime createdAt;
@@ -35,6 +40,10 @@ class CommunityPost {
     this.authorUsername,
     this.authorAvatar,
     this.placeName,
+    this.authorPoints = 0,
+    this.authorFollowersCount = 0,
+    this.isFollowingAuthor = false,
+    this.isOwner = false,
     required this.isVisible,
     required this.createdAt,
     required this.updatedAt,
@@ -77,6 +86,18 @@ class CommunityPost {
       placeName: _nullableString(
         json['place_name'] ?? json['place']?['name'],
       ),
+      authorPoints: _intValue(
+        json['author_points'],
+      ),
+      authorFollowersCount: _intValue(
+        json['author_followers_count'],
+      ),
+      isFollowingAuthor: _boolValue(
+        json['is_following_author'],
+      ),
+      isOwner: _boolValue(
+        json['is_owner'],
+      ),
       isVisible: _boolValue(
         json['is_visible'],
         defaultValue: true,
@@ -118,6 +139,10 @@ class CommunityPost {
     String? authorUsername,
     String? authorAvatar,
     String? placeName,
+    int? authorPoints,
+    int? authorFollowersCount,
+    bool? isFollowingAuthor,
+    bool? isOwner,
     bool? isVisible,
     DateTime? updatedAt,
     int? likesCount,
@@ -137,6 +162,12 @@ class CommunityPost {
       authorUsername: authorUsername ?? this.authorUsername,
       authorAvatar: authorAvatar ?? this.authorAvatar,
       placeName: placeName ?? this.placeName,
+      authorPoints: authorPoints ?? this.authorPoints,
+      authorFollowersCount:
+          authorFollowersCount ?? this.authorFollowersCount,
+      isFollowingAuthor:
+          isFollowingAuthor ?? this.isFollowingAuthor,
+      isOwner: isOwner ?? this.isOwner,
       isVisible: isVisible ?? this.isVisible,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

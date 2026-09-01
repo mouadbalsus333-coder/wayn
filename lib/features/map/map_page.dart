@@ -13,13 +13,15 @@ import '../community/models/community_post.dart';
 import '../community/repositories/community_repository.dart';
 import '../../../services/place_service.dart';
 import '../../../services/repositories/repository_factory.dart';
-import '../../../services/auth_service.dart';
 import '../../../core/config/backend_config.dart';
-import '../community/community_page.dart';
+import '../../../core/theme/wayn_colors.dart';
 import '../community/services/community_service.dart';
 import '../community/widgets/comments_sheet.dart';
 import '../../../core/widgets/wayn_header.dart';
 import '../../../core/widgets/wayn_menu_drawer.dart';
+import '../../../core/navigation/wayn_actions.dart';
+import '../../../features/notifications/notifications_page.dart';
+import '../community/widgets/community_post_card.dart';
 import '../../../features/location/saved_locations_store.dart';
 
 enum _MapStatusFilter { all, open, closed, near }
@@ -38,7 +40,6 @@ class _MapPageState extends State<MapPage> {
 
   static const Color _waynTeal = Color(0xFF18A99A);
   static const Color _waynTealLight = Color(0xFFE8F8F6);
-  static const Color _waynBackground = Color(0xFFF7F9FC);
   static const Color _waynText = Color(0xFF172033);
   static const Color _waynMuted = Color(0xFF697386);
 
@@ -59,7 +60,6 @@ class _MapPageState extends State<MapPage> {
   late final CommunityService _communityService =
       CommunityService(_communityRepository);
 
-  final AuthService _authService = AuthService();
 
   Timer? _searchDebounce;
 
@@ -69,7 +69,6 @@ class _MapPageState extends State<MapPage> {
 
   int _placeCarouselIndex = 0;
 
-  String? _currentUserId;
 
   Position? _currentPosition;
 
@@ -123,7 +122,6 @@ class _MapPageState extends State<MapPage> {
     super.initState();
 
     _initializeMap();
-    _loadCurrentUser();
 
     SavedLocationsStore.instance.ensureLoaded();
     SavedLocationsStore.instance.addListener(_onSavedLocationsChanged);
@@ -144,19 +142,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onNotificationsPressed() {
-    debugPrint('Map notifications pressed');
-  }
-
-  Future<void> _loadCurrentUser() async {
-    final user = await _authService.getCurrentUser();
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _currentUserId = user?.id;
-    });
+    openNotifications(context);
   }
 
   // ===============================================================
@@ -1436,12 +1422,14 @@ class _MapPageState extends State<MapPage> {
   Widget build(
     BuildContext context,
   ) {
+    final colors = context.waynColors;
+
     return Directionality(
       textDirection:
           TextDirection.rtl,
       child: Scaffold(
         backgroundColor:
-            _waynBackground,
+            colors.background,
         // نبقي جسم الخريطة ثابت الحجم عند ظهور/إخفاء الكيبورد حتى لا تهتز.
         resizeToAvoidBottomInset: false,
         body: Column(
@@ -2640,11 +2628,9 @@ Widget _buildFilterOption({
                 bottom: 10,
               ),
               child:
-                  CommunityPostCardWidget(
+                  CommunityPostCard(
                 post: _selectedPlacePosts[
                     index],
-                currentUserId:
-                    _currentUserId,
                 onLike: () =>
                     _togglePostLike(
                   index,
@@ -2657,17 +2643,21 @@ Widget _buildFilterOption({
                     _showPostComments(
                   index,
                 ),
-                onDelete:
-                    _currentUserId !=
-                                null &&
-                            _selectedPlacePosts[index]
-                                    .userId ==
-                                _currentUserId
-                        ? () =>
-                            _deleteVisitorPost(
-                              index,
-                            )
-                        : null,
+                onDelete: () => _deleteVisitorPost(index),
+                onAuthorTap: (authorId) =>
+                    openUserProfile(
+                  context,
+                  userId: authorId,
+                  isOwner:
+                      _selectedPlacePosts[
+                              index]
+                          .isOwner,
+                ),
+                onPlaceTap: (placeId) =>
+                    openPlaceFromId(
+                  context,
+                  placeId,
+                ),
               ),
             ),
         ],

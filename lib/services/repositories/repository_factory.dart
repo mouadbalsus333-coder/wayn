@@ -8,6 +8,7 @@ import 'category_repository.dart';
 import 'contribution_repository.dart';
 import 'place_repository.dart';
 import 'point_transaction_repository.dart';
+import 'social_repository.dart';
 import 'task_repository.dart';
 import 'user_repository.dart';
 
@@ -15,6 +16,7 @@ import 'fastapi_auth_repository.dart';
 import 'fastapi_category_repository.dart';
 import 'fastapi_contribution_repository.dart';
 import 'fastapi_place_repository.dart';
+import 'fastapi_social_repository.dart';
 import 'fastapi_user_repository.dart';
 
 final DartHttpApiClient _fastApiClient = DartHttpApiClient(
@@ -29,6 +31,23 @@ AuthRepository createAuthRepository() {
   switch (BackendConfig.backendType) {
     case 'fastapi':
       return FastApiAuthRepository(_fastApiClient);
+
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
+}
+
+// ============================================================
+// SocialRepository (follows + notifications)
+// ============================================================
+
+SocialRepository createSocialRepository() {
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return FastApiSocialRepository(_fastApiClient);
 
     default:
       throw UnsupportedError(

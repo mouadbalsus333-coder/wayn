@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../home/models/place.dart';
 import '../../services/favorite_service.dart';
 import '../../services/review_service.dart';
+import '../../core/theme/wayn_colors.dart';
 
 class PlaceDetailsPage extends StatefulWidget {
   final Place place;
@@ -38,10 +39,12 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F9FC),
+        backgroundColor: colors.background,
         body: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [

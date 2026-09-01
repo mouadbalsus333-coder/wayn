@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/theme/wayn_colors.dart';
 import '../../features/home/models/place.dart';
 import '../map/place_picker_page.dart';
 import 'services/community_service.dart';
@@ -22,8 +23,6 @@ class CreatePostPage extends StatefulWidget {
 
 class _CreatePostPageState extends State<CreatePostPage> {
   static const Color _waynTeal = Color(0xFF18A99A);
-  static const Color _waynText = Color(0xFF172033);
-  static const Color _waynBackground = Color(0xFFF7F9FC);
 
   late final TextEditingController _textController;
 
@@ -145,6 +144,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
           textDirection: TextDirection.rtl,
           child: StatefulBuilder(
             builder: (context, setModalState) {
+              final colors = context.waynColors;
+
               return Container(
                 padding: const EdgeInsets.fromLTRB(
                   20,
@@ -152,9 +153,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
                   20,
                   24,
                 ),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(28),
                   ),
                 ),
@@ -165,15 +166,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
                       width: 42,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD0D5DD),
+                        color: colors.divider,
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     const SizedBox(height: 18),
-                    const Text(
+                    Text(
                       'قيّم المكان',
                       style: TextStyle(
-                        color: _waynText,
+                        color: colors.textPrimary,
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
                       ),
@@ -183,8 +184,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
                       selectedRating == 0
                           ? 'اختر تقييمك من نجمة إلى خمس نجوم'
                           : 'تقييمك ${selectedRating.toInt()} من 5',
-                      style: const TextStyle(
-                        color: Color(0xFF667085),
+                      style: TextStyle(
+                        color: colors.textSecondary,
                         fontSize: 13,
                       ),
                     ),
@@ -357,13 +358,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: _waynBackground,
+        backgroundColor: colors.background,
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: colors.surfaceElevated,
           elevation: 0,
           centerTitle: false,
           leading: IconButton(
@@ -371,15 +374,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
             onPressed: _isPublishing
                 ? null
                 : () => Navigator.of(context).pop(false),
-            icon: const Icon(
+            icon: Icon(
               Icons.close_rounded,
-              color: _waynText,
+              color: colors.textPrimary,
             ),
           ),
-          title: const Text(
+          title: Text(
             'منشور جديد',
             style: TextStyle(
-              color: _waynText,
+              color: colors.textPrimary,
               fontSize: 20,
               fontWeight: FontWeight.w800,
             ),
@@ -450,10 +453,10 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colors.surface,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: const Color(0xFFE9EDF2),
+                      color: colors.divider,
                     ),
                   ),
                   child: TextField(
@@ -465,15 +468,15 @@ class _CreatePostPageState extends State<CreatePostPage> {
                     textDirection: TextDirection.rtl,
                     textAlign: TextAlign.right,
                     textInputAction: TextInputAction.newline,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'شارك تجربتك مع مجتمع وين...',
                       hintTextDirection: TextDirection.rtl,
                       hintStyle: TextStyle(
-                        color: Color(0xFF98A2B3),
+                        color: colors.textMuted,
                         fontSize: 15,
                       ),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(17),
+                      contentPadding: const EdgeInsets.all(17),
                     ),
                   ),
                 ),
@@ -490,10 +493,10 @@ class _CreatePostPageState extends State<CreatePostPage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colors.surface,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: const Color(0xFFE9EDF2),
+                      color: colors.divider,
                     ),
                   ),
                   child: Row(
@@ -553,8 +556,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
                                     _selectedPlace!.name,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: _waynText,
+                                    style: TextStyle(
+                                      color: colors.textPrimary,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -698,6 +701,8 @@ class _SelectedImagePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Stack(
       children: [
         ClipRRect(
@@ -714,11 +719,11 @@ class _SelectedImagePreview extends StatelessWidget {
               return Container(
                 width: double.infinity,
                 height: 220,
-                color: const Color(0xFFF1F3F6),
+                color: colors.surfaceAlt,
                 alignment: Alignment.center,
-                child: const Icon(
+                child: Icon(
                   Icons.image_not_supported_outlined,
-                  color: Color(0xFF8B94A3),
+                  color: colors.textMuted,
                   size: 40,
                 ),
               );
@@ -753,17 +758,15 @@ class _SelectedPlaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF18A99A).withValues(
-          alpha: 0.07,
-        ),
+        color: colors.surfaceAlt,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF18A99A).withValues(
-            alpha: 0.18,
-          ),
+          color: colors.brand.withValues(alpha: 0.35),
         ),
       ),
       child: Row(
@@ -772,9 +775,7 @@ class _SelectedPlaceCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFF18A99A).withValues(
-                alpha: 0.12,
-              ),
+              color: colors.brand.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -787,10 +788,10 @@ class _SelectedPlaceCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'المكان المختار',
                   style: TextStyle(
-                    color: Color(0xFF8B94A3),
+                    color: colors.textMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -800,8 +801,8 @@ class _SelectedPlaceCard extends StatelessWidget {
                   place.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF172033),
+                  style: TextStyle(
+                    color: colors.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
@@ -811,8 +812,8 @@ class _SelectedPlaceCard extends StatelessWidget {
                     place.city,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF667085),
+                    style: TextStyle(
+                      color: colors.textSecondary,
                       fontSize: 11,
                     ),
                   ),
@@ -823,10 +824,10 @@ class _SelectedPlaceCard extends StatelessWidget {
             IconButton(
               onPressed: onRemove,
               tooltip: 'إزالة المكان',
-              icon: const Icon(
+              icon: Icon(
                 Icons.close_rounded,
                 size: 19,
-                color: Color(0xFF667085),
+                color: colors.textSecondary,
               ),
             ),
         ],

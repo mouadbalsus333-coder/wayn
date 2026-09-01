@@ -1,4 +1,5 @@
 import '../../models/user.dart';
+import '../../models/user_profile.dart';
 
 abstract class UserRepository {
   Future<User?> getCurrentUser();
@@ -11,4 +12,7 @@ abstract class UserRepository {
 
   /// Returns the authenticated user's points balance.
   Future<int> getMyPoints();
+
+  /// Public profile of another user.
+  Future<UserProfile?> getUserProfile(String id);
 }

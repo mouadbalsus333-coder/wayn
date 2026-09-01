@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/wayn_colors.dart';
+
 class HomeFilters extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onFilterSelected;
@@ -12,6 +14,8 @@ class HomeFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     final filters = [
       ('كل الأماكن', Icons.apps_rounded),
       ('مفتوح الآن', Icons.access_time_rounded),
@@ -38,14 +42,10 @@ class HomeFilters extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: selected
-                    ? const Color(0xFFE8F8F6)
-                    : Colors.white,
+                color: selected ? colors.surfaceAlt : colors.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: selected
-                      ? const Color(0xFF36B7A6)
-                      : const Color(0xFFE8EBF0),
+                  color: selected ? colors.brand : colors.divider,
                 ),
               ),
               child: Row(
@@ -53,9 +53,7 @@ class HomeFilters extends StatelessWidget {
                   Icon(
                     filter.$2,
                     size: 17,
-                    color: selected
-                        ? const Color(0xFF16A899)
-                        : const Color(0xFF707B8C),
+                    color: selected ? colors.brand : colors.textMuted,
                   ),
 
                   const SizedBox(width: 6),
@@ -66,9 +64,7 @@ class HomeFilters extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: selected
-                          ? const Color(0xFF168F83)
-                          : const Color(0xFF5F6979),
+                      color: selected ? colors.brand : colors.textSecondary,
                     ),
                   ),
                 ],

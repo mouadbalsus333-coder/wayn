@@ -15,6 +15,7 @@ from app.api.dependencies.auth import get_current_user
 from app.core.config import settings
 from app.core.database import get_session
 from app.models.user import User
+from app.repositories.social_repository import SocialRepository
 from app.schemas.community import (
     CommunityCommentCreate,
     CommunityCommentRead,
@@ -48,6 +49,7 @@ async def _build_post_response(
     service: CommunityService,
     post,
     user_id: UUID,
+    session,
 ) -> CommunityPostRead:
     state = await service.get_post_state(
         post=post,
@@ -56,6 +58,22 @@ async def _build_post_response(
 
     author = await service.repository.get_user(post.user_id)
     place = await service.repository.get_place(post.place_id)
+
+    author_points = 0
+    author_followers_count = 0
+    is_following_author = False
+
+    if author is not None:
+        author_points = int(author.points) if author.points else 0
+
+        social = SocialRepository(session)
+        author_followers_count = await social.count_followers(
+            author.id
+        )
+        is_following_author = await social.is_following(
+            user_id,
+            author.id,
+        )
 
     return CommunityPostRead(
         id=post.id,
@@ -71,6 +89,10 @@ async def _build_post_response(
         author_username=author.username if author else None,
         author_avatar=author.avatar_id if author else None,
         place_name=place.name if place else None,
+        author_points=author_points,
+        author_followers_count=author_followers_count,
+        is_following_author=is_following_author,
+        is_owner=(post.user_id == user_id),
         likes_count=state["likes_count"],
         saves_count=state["saves_count"],
         comments_count=state["comments_count"],
@@ -214,7 +236,7 @@ async def create_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id,
+        current_user.id, session,
     )
 
 
@@ -250,7 +272,7 @@ async def list_posts(
         await _build_post_response(
             service,
             post,
-            current_user.id,
+            current_user.id, session,
         )
         for post in posts
     ]
@@ -285,7 +307,7 @@ async def list_saved_posts(
         await _build_post_response(
             service,
             post,
-            current_user.id,
+            current_user.id, session,
         )
         for post in posts
     ]
@@ -310,7 +332,7 @@ async def get_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id,
+        current_user.id, session,
     )
 
 
@@ -352,7 +374,7 @@ async def update_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id,
+        current_user.id, session,
     )
 
 
@@ -413,7 +435,7 @@ async def like_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id,
+        current_user.id, session,
     )
 
 
@@ -441,7 +463,7 @@ async def unlike_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id,
+        current_user.id, session,
     )
 
 
@@ -474,7 +496,7 @@ async def save_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id,
+        current_user.id, session,
     )
 
 
@@ -502,7 +524,7 @@ async def unsave_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id,
+        current_user.id, session,
     )
 
 

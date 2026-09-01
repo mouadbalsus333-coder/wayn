@@ -27,6 +27,12 @@ from app.models.user_verification_code import UserVerificationCode
 from app.models import admin_associations
 
 # ============================================================
+# Social (follows + notifications)
+# ============================================================
+
+from app.models.social import UserFollow, UserNotification
+
+# ============================================================
 # Community
 # ============================================================
 
@@ -99,6 +105,13 @@ __all__ = [
     "UserFavorite",
     "PlaceReview",
     "UserVerificationCode",
+
+    # ========================================================
+    # Social (follows + notifications)
+    # ========================================================
+
+    "UserFollow",
+    "UserNotification",
 
     # ========================================================
     # Community

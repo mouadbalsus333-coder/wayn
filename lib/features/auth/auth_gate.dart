@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
 import '../../core/navigation/wayn_shell.dart';
-import 'login_page.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -48,13 +47,10 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
-  void _onAuthenticated(User user) {
-    if (!mounted) {
-      return;
-    }
-
+  void _onLogout() {
+    if (!mounted) return;
     setState(() {
-      _user = user;
+      _user = null;
     });
   }
 
@@ -68,12 +64,9 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    if (_user != null) {
-      return WaynShell(user: _user!);
-    }
-
-    return LoginPage(
-      onAuthenticated: _onAuthenticated,
+    return WaynShell(
+      user: _user,
+      onLogout: _onLogout,
     );
   }
 }

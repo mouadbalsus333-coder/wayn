@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
-import '../../core/config/backend_config.dart';
+import '../../core/navigation/wayn_actions.dart';
 import '../../core/network/api_client.dart';
-import '../../services/auth_service.dart';
-import '../../services/repositories/repository_factory.dart';
+import '../../core/theme/wayn_colors.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
+import '../../features/notifications/notifications_page.dart';
+import '../../models/user.dart';
+import '../../services/auth_service.dart';
+import '../../services/repositories/repository_factory.dart';
 import 'create_post_page.dart';
 import 'models/community_post.dart';
 import 'services/community_service.dart';
 import 'widgets/comments_sheet.dart';
+import 'widgets/community_post_card.dart';
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
@@ -20,14 +24,15 @@ class CommunityPage extends StatefulWidget {
 
 class _CommunityPageState extends State<CommunityPage> {
   late final CommunityService _communityService;
-  final _authService = AuthService();
 
   final List<CommunityPost> _posts = [];
 
   bool _isLoading = true;
-  bool _isRefreshing = false;
   String? _errorMessage;
-  String? _currentUserId;
+
+  bool get _isGuest => _currentUser == null;
+
+  User? _currentUser;
 
   @override
   void initState() {
@@ -37,18 +42,59 @@ class _CommunityPageState extends State<CommunityPage> {
       createCommunityRepository(),
     );
 
-    _loadCurrentUser();
     _loadPosts();
+    _loadCurrentUser();
   }
 
   Future<void> _loadCurrentUser() async {
-    final user = await _authService.getCurrentUser();
-
-    if (mounted) {
-      setState(() {
-        _currentUserId = user?.id;
-      });
+    try {
+      final auth = AuthService();
+      final user = await auth.getCurrentUser();
+      if (mounted) {
+        setState(() => _currentUser = user);
+      }
+    } catch (_) {
+      // Ignore
     }
+  }
+
+  void _showLoginPrompt() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Row(
+            children: [
+              Icon(Icons.login_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'يرجى تسجيل الدخول للتفاعل مع المنشورات',
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  openLoginAndRebuild(context);
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('تسجيل الدخول', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF18A99A),
+          duration: const Duration(seconds: 4),
+        ),
+      );
   }
 
   // ===========================================================================
@@ -60,7 +106,6 @@ class _CommunityPageState extends State<CommunityPage> {
   }) async {
     if (refresh) {
       setState(() {
-        _isRefreshing = true;
         _errorMessage = null;
       });
     } else {
@@ -84,14 +129,12 @@ class _CommunityPageState extends State<CommunityPage> {
           ..addAll(posts);
 
         _isLoading = false;
-        _isRefreshing = false;
       });
     } on ApiClientException catch (e) {
       if (!mounted) return;
 
       setState(() {
         _isLoading = false;
-        _isRefreshing = false;
         _errorMessage = e.message;
       });
     } catch (_) {
@@ -99,7 +142,6 @@ class _CommunityPageState extends State<CommunityPage> {
 
       setState(() {
         _isLoading = false;
-        _isRefreshing = false;
         _errorMessage = 'تعذر تحميل المجتمع حاليًا';
       });
     }
@@ -110,6 +152,11 @@ class _CommunityPageState extends State<CommunityPage> {
   // ===========================================================================
 
   Future<void> _toggleLike(CommunityPost post) async {
+    if (_isGuest) {
+      _showLoginPrompt();
+      return;
+    }
+
     final index = _posts.indexWhere(
       (item) => item.id == post.id,
     );
@@ -155,6 +202,11 @@ class _CommunityPageState extends State<CommunityPage> {
   // ===========================================================================
 
   Future<void> _toggleSave(CommunityPost post) async {
+    if (_isGuest) {
+      _showLoginPrompt();
+      return;
+    }
+
     final index = _posts.indexWhere(
       (item) => item.id == post.id,
     );
@@ -241,6 +293,11 @@ class _CommunityPageState extends State<CommunityPage> {
     CommunityPost post,
     int index,
   ) {
+    if (_isGuest) {
+      _showLoginPrompt();
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -329,24 +386,15 @@ class _CommunityPageState extends State<CommunityPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
+    final showCreateButton = !_isGuest;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F9FC),
+        backgroundColor: colors.background,
         resizeToAvoidBottomInset: false,
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _openCreatePostPage,
-          backgroundColor: const Color(0xFF18A99A),
-          foregroundColor: Colors.white,
-          elevation: 3,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text(
-            'منشور',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -359,6 +407,10 @@ class _CommunityPageState extends State<CommunityPage> {
             ],
           ),
         ),
+        bottomNavigationBar: _AddPostBar(
+          visible: showCreateButton,
+          onPressed: _openCreatePostPage,
+        ),
       ),
     );
   }
@@ -368,7 +420,7 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   void _onNotificationsPressed() {
-    debugPrint('Community notifications pressed');
+    openNotifications(context);
   }
 
   // ===========================================================================
@@ -376,17 +428,19 @@ class _CommunityPageState extends State<CommunityPage> {
   // ===========================================================================
 
   Widget _buildBody() {
+    final colors = context.waynColors;
+
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(
-          color: Color(0xFF18A99A),
+          color: colors.brand,
         ),
       );
     }
 
     if (_errorMessage != null && _posts.isEmpty) {
       return RefreshIndicator(
-        color: const Color(0xFF18A99A),
+        color: colors.brand,
         onRefresh: () => _loadPosts(
           refresh: true,
         ),
@@ -397,14 +451,14 @@ class _CommunityPageState extends State<CommunityPage> {
             Icon(
               Icons.cloud_off_rounded,
               size: 54,
-              color: Colors.grey.shade400,
+              color: colors.textMuted.withValues(alpha: 0.7),
             ),
             const SizedBox(height: 16),
             Center(
               child: Text(
                 _errorMessage!,
-                style: const TextStyle(
-                  color: Color(0xFF667085),
+                style: TextStyle(
+                  color: colors.textSecondary,
                   fontSize: 15,
                 ),
               ),
@@ -425,38 +479,41 @@ class _CommunityPageState extends State<CommunityPage> {
 
     if (_posts.isEmpty) {
       return RefreshIndicator(
-        color: const Color(0xFF18A99A),
+        color: colors.brand,
         onRefresh: () => _loadPosts(
           refresh: true,
         ),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
+            if (_isGuest)
+              const Padding(
+                padding: EdgeInsets.only(top: 12, bottom: 12),
+                child: _GuestLoginNotice(),
+              ),
             const SizedBox(height: 150),
             Icon(
               Icons.groups_rounded,
               size: 64,
-              color: const Color(0xFF18A99A).withValues(
-                alpha: 0.35,
-              ),
+              color: colors.brand.withValues(alpha: 0.35),
             ),
             const SizedBox(height: 18),
-            const Center(
+            Center(
               child: Text(
                 'لا توجد منشورات حتى الآن',
                 style: TextStyle(
-                  color: Color(0xFF172033),
+                  color: colors.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            const Center(
+            Center(
               child: Text(
                 'كن أول من يشارك تجربته مع مجتمع وين',
                 style: TextStyle(
-                  color: Color(0xFF667085),
+                  color: colors.textSecondary,
                   fontSize: 14,
                 ),
               ),
@@ -467,7 +524,7 @@ class _CommunityPageState extends State<CommunityPage> {
     }
 
     return RefreshIndicator(
-      color: const Color(0xFF18A99A),
+      color: colors.brand,
       onRefresh: () => _loadPosts(
         refresh: true,
       ),
@@ -475,28 +532,46 @@ class _CommunityPageState extends State<CommunityPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(
           14,
+          0,
           14,
-          14,
-          100,
+          20,
         ),
-        itemCount: _posts.length,
-        itemBuilder: (context, index) {
-          final post = _posts[index];
+        itemCount: _posts.length + (_isGuest ? 1 : 0),
+        itemBuilder: (context, rawIndex) {
+          // إشعار تسجيل الدخول كأول عنصر في القائمة أسفل الهيدر مباشرة،
+          // ويختفي تلقائيًا عند سحب الصفحة أو رفعها أثناء التصفح.
+          if (_isGuest && rawIndex == 0) {
+            return const Padding(
+              padding: EdgeInsets.only(top: 12, bottom: 12),
+              child: _GuestLoginNotice(),
+            );
+          }
+
+          final postIndex = rawIndex - (_isGuest ? 1 : 0);
+          final post = _posts[postIndex];
 
           return Padding(
             padding: const EdgeInsets.only(
               bottom: 12,
             ),
-            child: CommunityPostCardWidget(
+            child: CommunityPostCard(
               post: post,
-              currentUserId: _currentUserId,
               onLike: () => _toggleLike(post),
               onSave: () => _toggleSave(post),
               onComments: () => _showComments(
                 post,
-                index,
+                postIndex,
               ),
               onDelete: () => _deletePost(post),
+              onAuthorTap: (authorId) => openUserProfile(
+                context,
+                userId: authorId,
+                isOwner: post.isOwner,
+              ),
+              onPlaceTap: (placeId) => openPlaceFromId(
+                context,
+                placeId,
+              ),
             ),
           );
         },
@@ -506,603 +581,163 @@ class _CommunityPageState extends State<CommunityPage> {
 }
 
 // ============================================================================
-// COMMUNITY POST CARD WIDGET
+// إشعار تسجيل الدخول للزائر (الجزء العلوي من قائمة المنشورات)
 // ============================================================================
 
-class CommunityPostCardWidget extends StatelessWidget {
-  final CommunityPost post;
-  final VoidCallback onLike;
-  final VoidCallback onSave;
-  final VoidCallback onComments;
-  final VoidCallback? onDelete;
-  final String? currentUserId;
-
-  const CommunityPostCardWidget({
-    super.key,
-    required this.post,
-    required this.onLike,
-    required this.onSave,
-    required this.onComments,
-    this.onDelete,
-    this.currentUserId,
-  });
-
-  // ===========================================================================
-  // FULL IMAGE VIEWER
-  // ===========================================================================
-
-  void _openFullImage(
-    BuildContext context,
-    String imageUrl,
-  ) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(
-        alpha: 0.94,
-      ),
-      builder: (dialogContext) {
-        return Scaffold(
-          backgroundColor: Colors.transparent,
-          body: SafeArea(
-            child: Stack(
-              children: [
-                Center(
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    panEnabled: true,
-                    scaleEnabled: true,
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (
-                        context,
-                        child,
-                        loadingProgress,
-                      ) {
-                        if (loadingProgress == null) {
-                          return child;
-                        }
-
-                        return const SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                      errorBuilder: (
-                        context,
-                        error,
-                        stackTrace,
-                      ) {
-                        return const Icon(
-                          Icons.image_not_supported_outlined,
-                          color: Colors.white70,
-                          size: 56,
-                        );
-                      },
-                    ),
-                  ),
-                ),
-
-                // -----------------------------------------------------------------
-                // CLOSE
-                // -----------------------------------------------------------------
-
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Material(
-                    color: Colors.black.withValues(
-                      alpha: 0.55,
-                    ),
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () {
-                        Navigator.pop(
-                          dialogContext,
-                        );
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.all(9),
-                        child: Icon(
-                          Icons.close_rounded,
-                          color: Colors.white,
-                          size: 25,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // -----------------------------------------------------------------
-                // HINT
-                // -----------------------------------------------------------------
-
-                const Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 18,
-                  child: IgnorePointer(
-                    child: Center(
-                      child: Text(
-                        'اسحب للتنقل • قرّب بإصبعين للتكبير',
-                        textDirection: TextDirection.rtl,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ===========================================================================
-  // BUILD
-  // ===========================================================================
+class _GuestLoginNotice extends StatelessWidget {
+  const _GuestLoginNotice();
 
   @override
   Widget build(BuildContext context) {
-    final authorName =
-        post.authorName?.trim().isNotEmpty == true
-        ? post.authorName!.trim()
-        : 'مستخدم وين';
-
-    final avatarLetter = authorName.isNotEmpty
-        ? authorName.substring(0, 1)
-        : 'و';
-
-    final isOwner =
-        currentUserId != null &&
-        post.userId == currentUserId;
-
-    // =========================================================================
-    // IMAGE URL
-    // =========================================================================
-
-    final fullImageUrl =
-        BackendConfig.resolveMediaUrl(
-      post.imageUrl,
-    );
+    final colors = context.waynColors;
 
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(
-              alpha: 0.04,
+        gradient: LinearGradient(
+          colors: [
+            colors.brand.withValues(alpha: 0.12),
+            colors.brand.withValues(alpha: 0.06),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.brand.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colors.brand.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
             ),
-            blurRadius: 16,
-            offset: const Offset(0, 5),
+            child: Icon(
+              Icons.person_add_alt_1_rounded,
+              color: colors.brand,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'سجّل دخولك لتتمكن من الإعجاب والمشاركة في المجتمع',
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => openLoginAndRebuild(context),
+            style: TextButton.styleFrom(
+              foregroundColor: colors.brand,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'دخول',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // =================================================================
-            // USER HEADER
-            // =================================================================
-
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor:
-                      const Color(0xFF18A99A).withValues(
-                    alpha: 0.12,
-                  ),
-                  child: Text(
-                    avatarLetter,
-                    style: const TextStyle(
-                      color: Color(0xFF18A99A),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        authorName,
-                        style: const TextStyle(
-                          color: Color(0xFF172033),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _formatDate(post.createdAt),
-                        style: const TextStyle(
-                          color: Color(0xFF8B94A3),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (post.rating != null)
-                  Container(
-                    margin: const EdgeInsets.only(
-                      left: 4,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF7E6),
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          size: 16,
-                          color: Color(0xFFF5A623),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          post.rating!.toStringAsFixed(1),
-                          style: const TextStyle(
-                            color: Color(0xFF172033),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (isOwner && onDelete != null)
-                  PopupMenuButton<String>(
-                    icon: const Icon(
-                      Icons.more_vert_rounded,
-                      color: Color(0xFF8B94A3),
-                      size: 20,
-                    ),
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        onDelete?.call();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.delete_outline_rounded,
-                              color: Colors.redAccent,
-                              size: 18,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'حذف المنشور',
-                              style: TextStyle(
-                                color: Colors.redAccent,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-
-            // =================================================================
-            // TEXT
-            // =================================================================
-
-            if (post.text != null &&
-                post.text!.trim().isNotEmpty) ...[
-              const SizedBox(height: 14),
-              _ExpandablePostText(
-                text: post.text!,
-              ),
-            ],
-
-            // =================================================================
-            // IMAGE
-            //
-            // IMPORTANT:
-            // No fixed height is used here.
-            // Image.network preserves the original image aspect ratio.
-            // =================================================================
-
-            if (fullImageUrl != null &&
-                fullImageUrl.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Material(
-                  color: const Color(0xFFF1F3F6),
-                  child: InkWell(
-                    onTap: () {
-                      _openFullImage(
-                        context,
-                        fullImageUrl,
-                      );
-                    },
-                    child: Image.network(
-                      fullImageUrl,
-                      width: double.infinity,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (
-                        context,
-                        child,
-                        loadingProgress,
-                      ) {
-                        if (loadingProgress == null) {
-                          return child;
-                        }
-
-                        return const SizedBox(
-                          height: 180,
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Color(0xFF18A99A),
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (
-                        context,
-                        error,
-                        stackTrace,
-                      ) {
-                        return const SizedBox(
-                          height: 180,
-                          child: Center(
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              color: Color(0xFF8B94A3),
-                              size: 40,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 14),
-
-            const Divider(
-              height: 1,
-              color: Color(0xFFEAECEF),
-            ),
-
-            const SizedBox(height: 8),
-
-            // =================================================================
-            // ACTIONS
-            // =================================================================
-
-            Row(
-              children: [
-                Expanded(
-                  child: _ActionButton(
-                    icon: post.isLiked
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    label: post.likesCount.toString(),
-                    active: post.isLiked,
-                    onTap: onLike,
-                  ),
-                ),
-                Expanded(
-                  child: _ActionButton(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    label: post.commentsCount.toString(),
-                    onTap: onComments,
-                  ),
-                ),
-                Expanded(
-                  child: _ActionButton(
-                    icon: post.isSaved
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                    label: post.savesCount.toString(),
-                    active: post.isSaved,
-                    onTap: onSave,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static String _formatDate(DateTime date) {
-    final localDate = date.toLocal();
-
-    return '${localDate.day.toString().padLeft(2, '0')}/'
-        '${localDate.month.toString().padLeft(2, '0')}/'
-        '${localDate.year}';
-  }
-}
-
-// ============================================================================
-// EXPANDABLE POST TEXT
-// ============================================================================
-
-class _ExpandablePostText extends StatefulWidget {
-  final String text;
-
-  const _ExpandablePostText({required this.text});
-
-  @override
-  State<_ExpandablePostText> createState() => _ExpandablePostTextState();
-}
-
-class _ExpandablePostTextState extends State<_ExpandablePostText> {
-  static const int _collapsedMaxLines = 4;
-  static const String _moreLabel = 'قراءة المزيد';
-  static const String _lessLabel = 'عرض أقل';
-  static const Color _waynColor = Color(0xFF18A99A);
-
-  bool _expanded = false;
-
-  static const TextStyle _textStyle = TextStyle(
-    color: Color(0xFF172033),
-    fontSize: 15,
-    height: 1.6,
-  );
-
-  static const TextStyle _linkStyle = TextStyle(
-    color: _waynColor,
-    fontSize: 13,
-    fontWeight: FontWeight.w700,
-  );
-
-  @override
-  void didUpdateWidget(covariant _ExpandablePostText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text) {
-      _expanded = false;
-    }
-  }
-
-  bool _overflows(double maxWidth) {
-    if (_expanded) return false;
-
-    final painter = TextPainter(
-      text: TextSpan(
-        text: widget.text,
-        style: _textStyle,
-      ),
-      textDirection: TextDirection.rtl,
-      textAlign: TextAlign.right,
-      maxLines: _collapsedMaxLines,
-      ellipsis: '…',
-    )..layout(maxWidth: maxWidth);
-
-    return painter.didExceedMaxLines;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final overflows = _overflows(constraints.maxWidth);
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.text,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              maxLines: _expanded ? null : _collapsedMaxLines,
-              overflow: _expanded ? null : TextOverflow.ellipsis,
-              style: _textStyle,
-            ),
-            if (overflows)
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _expanded = !_expanded;
-                  });
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      _expanded ? _lessLabel : _moreLabel,
-                      textDirection: TextDirection.rtl,
-                      style: _linkStyle,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
     );
   }
 }
 
 // ============================================================================
-// ACTION BUTTON
+// شريط إنشاء المنشور أسفل الشاشة
 // ============================================================================
 
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
+class _AddPostBar extends StatelessWidget {
+  final bool visible;
+  final VoidCallback onPressed;
 
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.active = false,
+  const _AddPostBar({
+    required this.visible,
+    required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = active
-        ? const Color(0xFF18A99A)
-        : const Color(0xFF667085);
+    if (!visible) {
+      return const SizedBox.shrink();
+    }
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: color,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+    final colors = context.waynColors;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow,
+            blurRadius: 18,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Material(
+            color: Colors.transparent,
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onPressed,
+              child: Ink(
+                height: 54,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF18A99A),
+                      Color(0xFF087F78),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.brand.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'إضافة منشور جديد',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

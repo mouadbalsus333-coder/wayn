@@ -7,6 +7,8 @@ import '../places/place_details_page.dart';
 import '../home/models/place.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
+import '../../core/theme/wayn_colors.dart';
+import '../../features/notifications/notifications_page.dart';
 import '../home/widgets/home_filters.dart';
 import '../home/widgets/home_search_bar.dart';
 import '../home/widgets/place_card.dart';
@@ -675,10 +677,12 @@ class _ExplorePageState extends State<ExplorePage> {
 
     @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F9FC),
+        backgroundColor: colors.background,
         resizeToAvoidBottomInset: false,
         body: SafeArea(
           child: Column(
@@ -701,7 +705,7 @@ class _ExplorePageState extends State<ExplorePage> {
                     ]);
                     await _loadPlaces();
                   },
-                  color: const Color(0xFF18A99A),
+                  color: colors.brand,
                   child: ListView(
                     physics: const BouncingScrollPhysics(
                       parent: AlwaysScrollableScrollPhysics(),
@@ -767,10 +771,10 @@ class _ExplorePageState extends State<ExplorePage> {
                                           _formatDistance(distance),
                                           textDirection:
                                               TextDirection.rtl,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xFF697386),
+                                            color: colors.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -828,6 +832,8 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildExploreCategoriesSection() {
+    final colors = context.waynColors;
+
     if (_categories.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -835,8 +841,8 @@ class _ExplorePageState extends State<ExplorePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
             20,
             24,
             20,
@@ -848,7 +854,7 @@ class _ExplorePageState extends State<ExplorePage> {
             style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF172033),
+              color: colors.textPrimary,
             ),
           ),
         ),
@@ -882,19 +888,17 @@ class _ExplorePageState extends State<ExplorePage> {
                   width: 82,
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFFE8F8F6)
-                        : Colors.white,
+                        ? colors.surfaceAlt
+                        : colors.surface,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF18A99A)
-                          : const Color(0xFFE8EBF0),
+                          ? colors.brand
+                          : colors.divider,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: 0.025,
-                        ),
+                        color: colors.shadow,
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -908,13 +912,13 @@ class _ExplorePageState extends State<ExplorePage> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE8F8F6),
+                          color: colors.surfaceAlt,
                           borderRadius:
                               BorderRadius.circular(15),
                         ),
                         child: Icon(
                           _iconFromName(category.icon),
-                          color: const Color(0xFF18A99A),
+                          color: colors.brand,
                           size: 24,
                         ),
                       ),
@@ -929,10 +933,10 @@ class _ExplorePageState extends State<ExplorePage> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF4E596B),
+                            color: colors.textSecondary,
                           ),
                         ),
                       ),
@@ -1003,11 +1007,13 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildSuggestionsSection() {
+    final colors = context.waynColors;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
             20,
             28,
             20,
@@ -1019,7 +1025,7 @@ class _ExplorePageState extends State<ExplorePage> {
             style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF172033),
+              color: colors.textPrimary,
             ),
           ),
         ),
@@ -1053,8 +1059,8 @@ class _ExplorePageState extends State<ExplorePage> {
         ),
 
         if (_isLoadingLocation)
-          const Padding(
-            padding: EdgeInsets.only(
+          Padding(
+            padding: const EdgeInsets.only(
               top: 6,
             ),
             child: Center(
@@ -1063,7 +1069,7 @@ class _ExplorePageState extends State<ExplorePage> {
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Color(0xFF18A99A),
+                  color: colors.brand,
                 ),
               ),
             ),
@@ -1083,6 +1089,8 @@ class _ExplorePageState extends State<ExplorePage> {
     required Color iconColor,
     required VoidCallback onPressed,
   }) {
+    final colors = context.waynColors;
+
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: 20,
@@ -1094,13 +1102,11 @@ class _ExplorePageState extends State<ExplorePage> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: colors.surface,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: 0.04,
-                ),
+                color: colors.shadow,
                 blurRadius: 14,
                 offset: const Offset(0, 5),
               ),
@@ -1132,30 +1138,30 @@ class _ExplorePageState extends State<ExplorePage> {
                     Text(
                       title,
                       textDirection: TextDirection.rtl,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF172033),
+                        color: colors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
                       textDirection: TextDirection.rtl,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF8993A3),
+                        color: colors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 10),
-              const Icon(
+              Icon(
                 Icons.arrow_back_ios_new_rounded,
                 size: 15,
-                color: Color(0xFF9AA3B1),
+                color: colors.textMuted,
               ),
             ],
           ),
@@ -1169,6 +1175,8 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildErrorState() {
+    final colors = context.waynColors;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         20,
@@ -1180,44 +1188,44 @@ class _ExplorePageState extends State<ExplorePage> {
         width: double.infinity,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: const Color(0xFFE8EBF0),
+            color: colors.divider,
           ),
         ),
         child: Column(
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
               size: 42,
-              color: Color(0xFF9AA3B1),
+              color: colors.textMuted,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'تعذر تحميل الأماكن',
               textDirection: TextDirection.rtl,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF172033),
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'تحقق من اتصال الإنترنت وحاول مرة أخرى.',
               textDirection: TextDirection.rtl,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: Color(0xFF8993A3),
+                color: colors.textSecondary,
               ),
             ),
             const SizedBox(height: 15),
             ElevatedButton(
               onPressed: _loadPlaces,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF18A99A),
+                backgroundColor: colors.brand,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -1256,6 +1264,8 @@ class _ExplorePageState extends State<ExplorePage> {
       message = 'لا توجد أماكن قريبة منك حاليًا';
     }
 
+    final colors = context.waynColors;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         20,
@@ -1267,28 +1277,28 @@ class _ExplorePageState extends State<ExplorePage> {
         width: double.infinity,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: const Color(0xFFE8EBF0),
+            color: colors.divider,
           ),
         ),
         child: Column(
           children: [
-            const Icon(
+            Icon(
               Icons.location_off_rounded,
               size: 42,
-              color: Color(0xFF9AA3B1),
+              color: colors.textMuted,
             ),
             const SizedBox(height: 12),
             Text(
               message,
               textDirection: TextDirection.rtl,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF172033),
+                color: colors.textPrimary,
               ),
             ),
           ],
@@ -1306,7 +1316,7 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   void _onNotificationsPressed() {
-    debugPrint('Notifications pressed');
+    openNotifications(context);
   }
 
   // ================================================================

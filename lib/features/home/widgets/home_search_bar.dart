@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/wayn_colors.dart';
+
 class HomeSearchBar extends StatefulWidget {
   final VoidCallback? onCategoryPressed;
   final ValueChanged<String>? onSearchChanged;
@@ -57,6 +59,7 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
   Widget build(BuildContext context) {
     final hasText =
         _controller.text.trim().isNotEmpty;
+    final colors = context.waynColors;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -68,11 +71,11 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
       child: Container(
         height: 58,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colors.surfaceElevated,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: colors.shadow,
               blurRadius: 20,
               offset: const Offset(0, 6),
             ),
@@ -82,10 +85,10 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
           children: [
             const SizedBox(width: 16),
 
-            const Icon(
+            Icon(
               Icons.search_rounded,
               size: 25,
-              color: Color(0xFF7C8798),
+              color: colors.textMuted,
             ),
 
             const SizedBox(width: 10),
@@ -97,10 +100,10 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
                 textAlign: TextAlign.right,
                 textInputAction: TextInputAction.search,
                 onChanged: _onTextChanged,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'شن ادور؟',
                   hintStyle: TextStyle(
-                    color: Color(0xFF9AA3B1),
+                    color: colors.textMuted,
                     fontSize: 15,
                   ),
                   border: InputBorder.none,
@@ -113,12 +116,12 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
               GestureDetector(
                 onTap: _clearSearch,
                 behavior: HitTestBehavior.opaque,
-                child: const Padding(
-                  padding: EdgeInsets.all(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
                   child: Icon(
                     Icons.close_rounded,
                     size: 20,
-                    color: Color(0xFF8B94A3),
+                    color: colors.textMuted,
                   ),
                 ),
               ),
@@ -126,7 +129,7 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
             Container(
               height: 38,
               width: 1,
-              color: const Color(0xFFE8EBF0),
+              color: colors.divider,
             ),
 
             InkWell(
@@ -148,10 +151,10 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
                         textDirection: TextDirection.rtl,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF283247),
+                          color: colors.textPrimary,
                         ),
                       ),
                     ),
@@ -160,7 +163,7 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
 
                     Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      color: Colors.grey.shade600,
+                      color: colors.textMuted,
                     ),
                   ],
                 ),

@@ -1,6 +1,7 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/dart_http_api_client.dart';
 import '../../models/user.dart' as app_user;
+import '../../models/user_profile.dart';
 import 'user_repository.dart';
 
 class FastApiUserRepository implements UserRepository {
@@ -157,6 +158,50 @@ class FastApiUserRepository implements UserRepository {
     } on ApiClientException catch (error) {
       if (error.statusCode == 401) {
         await _api.clearAuthToken();
+        return null;
+      }
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // Public user profile
+  // ============================================================
+
+  @override
+  Future<UserProfile?> getUserProfile(String id) async {
+    final userId = id.trim();
+
+    if (userId.isEmpty) {
+      return null;
+    }
+
+    try {
+      final response = await _api.get(
+        '/api/v1/users/$userId',
+      );
+
+      if (response == null) {
+        return null;
+      }
+
+      if (response is! Map) {
+        throw ApiClientException(
+          'Invalid response received from /api/v1/users/$userId',
+        );
+      }
+
+      return UserProfile.fromMap(
+        Map<String, dynamic>.from(response),
+      );
+    } on ApiClientException catch (error) {
+      if (error.statusCode == 401) {
+        await _api.clearAuthToken();
+        return null;
+      }
+
+      if (error.statusCode == 404) {
         return null;
       }
 

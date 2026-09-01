@@ -1,4 +1,5 @@
 import '../models/user.dart';
+import '../models/user_profile.dart';
 import 'repositories/repository_factory.dart';
 import 'repositories/user_repository.dart';
 
@@ -26,5 +27,9 @@ class UserService {
 
   Future<int> getMyPoints() async {
     return _userRepository.getMyPoints();
+  }
+
+  Future<UserProfile?> getUserProfile(String id) async {
+    return _userRepository.getUserProfile(id);
   }
 }

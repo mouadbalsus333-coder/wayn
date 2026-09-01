@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/wayn_colors.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
+import '../../features/notifications/notifications_page.dart';
 import '../../models/store.dart';
 import '../../services/store_service.dart';
 
@@ -55,10 +57,12 @@ class _StorePageState extends State<StorePage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F9FC),
+        backgroundColor: colors.background,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -69,19 +73,25 @@ class _StorePageState extends State<StorePage> {
               ),
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          color: colors.brand,
+                        ),
+                      )
                     : RefreshIndicator(
+                        color: colors.brand,
                         onRefresh: _load,
                         child: ListView(
                           padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
                           children: [
                     if (_banners.isNotEmpty) _banner(_banners.first),
                     if (_banners.isNotEmpty) const SizedBox(height: 20),
-                    const Text(
+                    Text(
                       'الفئات',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -108,27 +118,31 @@ class _StorePageState extends State<StorePage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'المنتجات',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
+                            color: colors.textPrimary,
                           ),
                         ),
                         Text(
                           '${_visibleItems.length}',
-                          style: const TextStyle(
-                            color: Color(0xFF8B94A3),
+                          style: TextStyle(
+                            color: colors.textMuted,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     if (_visibleItems.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(35),
+                      Padding(
+                        padding: const EdgeInsets.all(35),
                         child: Center(
-                          child: Text('المتجر فارغ حالياً'),
+                          child: Text(
+                            'المتجر فارغ حالياً',
+                            style: TextStyle(color: colors.textMuted),
+                          ),
                         ),
                       )
                     else
@@ -162,10 +176,12 @@ class _StorePageState extends State<StorePage> {
   }
 
   void _onNotificationsPressed() {
-    debugPrint('Store notifications pressed');
+    openNotifications(context);
   }
 
   Widget _banner(StoreBanner banner) {
+    final colors = context.waynColors;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: AspectRatio(
@@ -175,7 +191,7 @@ class _StorePageState extends State<StorePage> {
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return Container(
-              color: const Color(0xFFE5F8F5),
+              color: colors.surfaceAlt,
               alignment: Alignment.center,
               child: const Text('WAYN Store'),
             );
@@ -186,6 +202,8 @@ class _StorePageState extends State<StorePage> {
   }
 
   Widget _categoryTile(String title, String? id) {
+    final colors = context.waynColors;
+
     final selected = _selectedCategory == id;
 
     return GestureDetector(
@@ -194,12 +212,10 @@ class _StorePageState extends State<StorePage> {
         width: 88,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF18A99A) : Colors.white,
+          color: selected ? colors.brand : colors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected
-                ? const Color(0xFF18A99A)
-                : const Color(0xFFE3E8ED),
+            color: selected ? colors.brand : colors.divider,
           ),
         ),
         child: Center(
@@ -208,9 +224,7 @@ class _StorePageState extends State<StorePage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              color: selected
-                  ? Colors.white
-                  : const Color(0xFF30394A),
+              color: selected ? colors.onBrand : colors.textPrimary,
             ),
           ),
         ),
@@ -219,10 +233,12 @@ class _StorePageState extends State<StorePage> {
   }
 
   Widget _item(StoreItem item) {
+    final colors = context.waynColors;
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -233,7 +249,7 @@ class _StorePageState extends State<StorePage> {
               borderRadius: BorderRadius.circular(15),
               child: item.imageUrl == null
                   ? Container(
-                      color: const Color(0xFFEAF4F3),
+                      color: colors.surfaceAlt,
                       alignment: Alignment.center,
                       child: const Icon(
                         Icons.storefront_rounded,
@@ -247,7 +263,7 @@ class _StorePageState extends State<StorePage> {
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
-                          color: const Color(0xFFEAF4F3),
+                          color: colors.surfaceAlt,
                           alignment: Alignment.center,
                           child: const Icon(
                             Icons.storefront_rounded,
@@ -263,7 +279,10 @@ class _StorePageState extends State<StorePage> {
             item.nameAr,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: colors.textPrimary,
+            ),
           ),
           const SizedBox(height: 4),
           Text(

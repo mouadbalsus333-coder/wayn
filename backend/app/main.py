@@ -17,10 +17,12 @@ from app.api.routers import (
     community,
     favorites,
     health,
+    notifications,
     places,
     reviews,
     store,
     user_point,
+    users,
     wallet,
     place_contributions,
     media,
@@ -198,6 +200,26 @@ app.include_router(
 
 app.include_router(
     user_point.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
+# Users (public profiles + follows)
+# ============================================================
+
+app.include_router(
+    users.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
+# Notifications
+# ============================================================
+
+app.include_router(
+    notifications.router,
     prefix="/api/v1",
 )
 

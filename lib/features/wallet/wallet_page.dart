@@ -4,6 +4,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/wayn_colors.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
+import '../../features/notifications/notifications_page.dart';
 import '../../models/wallet.dart';
 import '../../services/wallet_service.dart';
 
@@ -83,6 +84,8 @@ class _WalletPageState extends State<WalletPage> {
                               padding: const EdgeInsets.all(20),
                               children: [
                                 _balanceCard(colors),
+                                const SizedBox(height: 16),
+                                _transferButtonCard(colors),
                                 const SizedBox(height: 22),
                                 Row(
                                   mainAxisAlignment:
@@ -95,10 +98,6 @@ class _WalletPageState extends State<WalletPage> {
                                         fontWeight: FontWeight.w800,
                                         color: colors.textPrimary,
                                       ),
-                                    ),
-                                    TextButton(
-                                      onPressed: _transfer,
-                                      child: const Text('تحويل'),
                                     ),
                                   ],
                                 ),
@@ -128,7 +127,7 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   void _onNotificationsPressed() {
-    debugPrint('Wallet notifications pressed');
+    openNotifications(context);
   }
 
   Widget _errorState(WaynColors colors) {
@@ -186,15 +185,17 @@ class _WalletPageState extends State<WalletPage> {
         : '—';
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(20, 22, 22, 22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
             Color(0xFF18A99A),
             Color(0xFF087F78),
           ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: const [
           BoxShadow(
             color: Color(0x3318A99A),
@@ -203,79 +204,165 @@ class _WalletPageState extends State<WalletPage> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          const Text(
-            'رقم المحفظة',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.center,
-              child: Text(
-                walletNumber,
-                textDirection: TextDirection.ltr,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.4,
+          // الجهة اليمنى (في RTL): رقم المحفظة + الرصيد
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'رقم المحفظة',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    walletNumber,
+                    textDirection: TextDirection.ltr,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.monetization_on_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${wallet?.coinsBalance ?? 0}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'عملة',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          _money(
-            'العملات',
-            wallet?.coinsBalance ?? 0,
-            Icons.monetization_on_rounded,
+          const SizedBox(width: 16),
+          // الجهة اليسرى (في RTL): زر الشحن
+          _CardActionButton(
+            label: 'شحن',
+            icon: Icons.add_card_rounded,
+            filled: false,
+            onPressed: _recharge,
           ),
         ],
       ),
     );
   }
 
-  Widget _money(
-    String title,
-    int amount,
-    IconData icon,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            color: Colors.white,
-            size: 22,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '$amount',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white70,
-            ),
+  Widget _transferButtonCard(WaynColors colors) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _transfer,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colors.brand.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.swap_horiz_rounded,
+                    size: 22,
+                    color: colors.brand,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'تحويل رصيد',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'أرسل عملات إلى محفظة أخرى',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_left_rounded,
+                  size: 22,
+                  color: colors.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
+  }
+
+  void _recharge() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'ميزة شحن المحفظة ستتاح قريبًا',
+            textDirection: TextDirection.rtl,
+          ),
+        ),
+      );
   }
 
   Widget _transactionTile(
@@ -401,6 +488,65 @@ class _WalletPageState extends State<WalletPage> {
       );
 
     await _load();
+  }
+}
+
+class _CardActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool filled;
+  final VoidCallback onPressed;
+
+  const _CardActionButton({
+    required this.label,
+    required this.icon,
+    required this.filled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: filled
+              ? Colors.white
+              : Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(12),
+          border: filled
+              ? null
+              : Border.all(
+                  color: Colors.white.withValues(alpha: 0.5),
+                ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: filled
+                  ? const Color(0xFF087F78)
+                  : Colors.white,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: filled
+                    ? const Color(0xFF087F78)
+                    : Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
