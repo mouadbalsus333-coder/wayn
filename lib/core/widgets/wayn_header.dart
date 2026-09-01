@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/wayn_colors.dart';
 import '../../features/location/saved_locations_store.dart';
 import '../../features/location/widgets/location_selector_sheet.dart';
 import '../../features/map/location_picker_page.dart';
@@ -176,6 +177,7 @@ class _LocationPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = SavedLocationsStore.instance;
+    final colors = context.waynColors;
 
     return InkWell(
       onTap: onTap,
@@ -189,11 +191,11 @@ class _LocationPill extends StatelessWidget {
             height: 46,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colors.surfaceElevated,
               borderRadius: BorderRadius.circular(15),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: colors.shadow,
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -213,17 +215,17 @@ class _LocationPill extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textDirection: TextDirection.rtl,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF263247),
+                      color: colors.textPrimary,
                     ),
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(
+                Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  color: Color(0xFF9AA3B1),
+                  color: colors.textMuted,
                   size: 18,
                 ),
               ],
@@ -248,6 +250,8 @@ class _HeaderIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return GestureDetector(
       onTap: onPressed,
       child: Stack(
@@ -257,11 +261,11 @@ class _HeaderIconButton extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colors.surfaceElevated,
               borderRadius: BorderRadius.circular(15),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: colors.shadow,
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -269,7 +273,7 @@ class _HeaderIconButton extends StatelessWidget {
             ),
             child: Icon(
               icon,
-              color: const Color(0xFF263247),
+              color: colors.textPrimary,
               size: 23,
             ),
           ),

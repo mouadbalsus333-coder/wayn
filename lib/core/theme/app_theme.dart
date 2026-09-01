@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 import 'app_typography.dart';
+import 'wayn_colors.dart';
 
 abstract final class AppTheme {
   static ThemeData get light {
@@ -10,6 +11,10 @@ abstract final class AppTheme {
       brightness: Brightness.light,
       fontFamily: AppTypography.fontFamily,
       scaffoldBackgroundColor: AppColors.lightBackground,
+
+      extensions: const [
+        WaynColors.light,
+      ],
 
       colorScheme: const ColorScheme.light(
         primary: AppColors.waynTurquoise,
@@ -83,6 +88,10 @@ abstract final class AppTheme {
       brightness: Brightness.dark,
       fontFamily: AppTypography.fontFamily,
       scaffoldBackgroundColor: AppColors.darkBackground,
+
+      extensions: const [
+        WaynColors.dark,
+      ],
 
       colorScheme: const ColorScheme.dark(
         primary: AppColors.waynTurquoise,

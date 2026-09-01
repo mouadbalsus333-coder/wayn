@@ -13,6 +13,7 @@ class CommunityRepository {
 
   Future<List<CommunityPost>> getPosts({
     String? placeId,
+    String? userId,
     int page = 1,
     int limit = 20,
   }) async {
@@ -23,6 +24,10 @@ class CommunityRepository {
 
     if (placeId != null && placeId.trim().isNotEmpty) {
       queryParams['place_id'] = placeId;
+    }
+
+    if (userId != null && userId.trim().isNotEmpty) {
+      queryParams['user_id'] = userId;
     }
 
     final response = await _apiClient.get(

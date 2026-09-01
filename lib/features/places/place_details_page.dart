@@ -1128,61 +1128,19 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   }
 
   Future<void> _writeReview() async {
-    double rating = 5;
-    final comment = TextEditingController();
-    await showDialog(
+    final submitted = await showDialog<bool>(
       context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('قيّم المكان'),
-          content: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Slider(
-                  value: rating,
-                  min: 1,
-                  max: 5,
-                  divisions: 8,
-                  label: rating.toStringAsFixed(1),
-                  onChanged: (v) => setDialogState(() => rating = v),
-                ),
-                TextField(
-                  controller: comment,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText: 'اكتب تجربتك...',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
-            FilledButton(
-              onPressed: () async {
-                try {
-                  await _reviews.create(place.id, rating, comment.text.trim());
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم إرسال تقييمك')),
-                    );
-                  }
-                } catch (error) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(error.toString())),
-                  );
-                }
-              },
-              child: const Text('إرسال'),
-            ),
-          ],
-        ),
+      builder: (_) => _PlaceReviewDialog(
+        onCreate: (rating, text) =>
+            _reviews.create(place.id, rating, text),
       ),
     );
-    comment.dispose();
+
+    if (submitted == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إرسال تقييمك')),
+      );
+    }
   }
 
   // ===============================================================
@@ -1292,6 +1250,93 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// حوار تقييم المكان.
+///
+/// يمتلك الـ TextEditingController داخل الـ State ليفسر في الوقت
+/// الصحيح بعد اكتمال خروج الحوار (تجنبًا لشاشة الخطأ الحمراء).
+class _PlaceReviewDialog extends StatefulWidget {
+  final Future<void> Function(double rating, String text) onCreate;
+
+  const _PlaceReviewDialog({
+    required this.onCreate,
+  });
+
+  @override
+  State<_PlaceReviewDialog> createState() =>
+      _PlaceReviewDialogState();
+}
+
+class _PlaceReviewDialogState extends State<_PlaceReviewDialog> {
+  double _rating = 5;
+  late final TextEditingController _commentController =
+      TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    try {
+      await widget.onCreate(
+        _rating,
+        _commentController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('قيّم المكان'),
+      content: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Slider(
+              value: _rating,
+              min: 1,
+              max: 5,
+              divisions: 8,
+              label: _rating.toStringAsFixed(1),
+              onChanged: (v) => setState(() => _rating = v),
+            ),
+            TextField(
+              controller: _commentController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: 'اكتب تجربتك...',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('إرسال'),
+        ),
+      ],
     );
   }
 }

@@ -13,11 +13,13 @@ class CommunityService {
 
   Future<List<CommunityPost>> getPosts({
     String? placeId,
+    String? userId,
     int page = 1,
     int limit = 20,
   }) {
     return _repository.getPosts(
       placeId: placeId,
+      userId: userId,
       page: page,
       limit: limit,
     );

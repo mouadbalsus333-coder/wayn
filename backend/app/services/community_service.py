@@ -59,11 +59,13 @@ class CommunityService:
         self,
         *,
         place_id: UUID | None = None,
+        user_id: UUID | None = None,
         offset: int = 0,
         limit: int = 20,
     ) -> list[CommunityPost]:
         return await self.repository.list_posts(
             place_id=place_id,
+            user_id=user_id,
             offset=offset,
             limit=limit,
         )

@@ -224,6 +224,7 @@ async def create_post(
 )
 async def list_posts(
     place_id: UUID | None = Query(default=None),
+    user_id: UUID | None = Query(default=None),
     offset: int = Query(
         default=0,
         ge=0,
@@ -240,6 +241,7 @@ async def list_posts(
 
     posts = await service.list_posts(
         place_id=place_id,
+        user_id=user_id,
         offset=offset,
         limit=limit,
     )

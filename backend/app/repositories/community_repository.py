@@ -47,6 +47,7 @@ class CommunityRepository:
         self,
         *,
         place_id: UUID | str | None = None,
+        user_id: UUID | str | None = None,
         offset: int = 0,
         limit: int = 20,
     ) -> list[CommunityPost]:
@@ -57,6 +58,11 @@ class CommunityRepository:
         if place_id is not None:
             query = query.where(
                 CommunityPost.place_id == place_id,
+            )
+
+        if user_id is not None:
+            query = query.where(
+                CommunityPost.user_id == user_id,
             )
 
         query = (

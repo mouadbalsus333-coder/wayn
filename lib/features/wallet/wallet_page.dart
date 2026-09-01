@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/theme/wayn_colors.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
 import '../../models/wallet.dart';
@@ -52,10 +53,12 @@ class _WalletPageState extends State<WalletPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F9FC),
+        backgroundColor: colors.background,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -67,26 +70,30 @@ class _WalletPageState extends State<WalletPage> {
               Expanded(
                 child: _loading
                     ? const Center(
-                        child: CircularProgressIndicator(),
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF18A99A),
+                        ),
                       )
                     : _error != null && _wallet == null
-                        ? _errorState()
+                        ? _errorState(colors)
                         : RefreshIndicator(
+                            color: colors.brand,
                             onRefresh: _load,
                             child: ListView(
                               padding: const EdgeInsets.all(20),
                               children: [
-                                _balanceCard(),
+                                _balanceCard(colors),
                                 const SizedBox(height: 22),
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'آخر العمليات',
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w800,
+                                        color: colors.textPrimary,
                                       ),
                                     ),
                                     TextButton(
@@ -96,9 +103,14 @@ class _WalletPageState extends State<WalletPage> {
                                   ],
                                 ),
                                 if (_transactions.isEmpty)
-                                  _empty()
+                                  _empty(colors)
                                 else
-                                  ..._transactions.map(_transactionTile),
+                                  ..._transactions.map(
+                                    (transaction) => _transactionTile(
+                                      colors,
+                                      transaction,
+                                    ),
+                                  ),
                                 const SizedBox(height: 30),
                               ],
                             ),
@@ -119,34 +131,34 @@ class _WalletPageState extends State<WalletPage> {
     debugPrint('Wallet notifications pressed');
   }
 
-  Widget _errorState() {
+  Widget _errorState(WaynColors colors) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
               size: 54,
-              color: Color(0xFF9AA3B1),
+              color: colors.textMuted,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'تعذر تحميل المحفظة',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF172033),
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               _error ?? '',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: Color(0xFF8993A3),
+                color: colors.textSecondary,
               ),
             ),
             const SizedBox(height: 16),
@@ -166,8 +178,12 @@ class _WalletPageState extends State<WalletPage> {
     );
   }
 
-  Widget _balanceCard() {
+  Widget _balanceCard(WaynColors colors) {
     final wallet = _wallet;
+
+    final walletNumber = (wallet?.walletNumber ?? '').trim().isNotEmpty
+        ? wallet!.walletNumber
+        : '—';
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -188,24 +204,35 @@ class _WalletPageState extends State<WalletPage> {
         ],
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'رقم المحفظة',
             style: TextStyle(
               color: Colors.white70,
+              fontSize: 13,
             ),
           ),
-          const SizedBox(height: 7),
-          Text(
-            wallet?.walletNumber ?? '',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                walletNumber,
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.4,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 24),
           _money(
             'العملات',
             wallet?.coinsBalance ?? 0,
@@ -222,12 +249,9 @@ class _WalletPageState extends State<WalletPage> {
     IconData icon,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             icon,
@@ -255,17 +279,16 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Widget _transactionTile(
+    WaynColors colors,
     WalletTransaction transaction,
   ) {
     final positive = transaction.amount >= 0;
 
     return Container(
-      margin: const EdgeInsets.only(
-        bottom: 10,
-      ),
+      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -274,51 +297,43 @@ class _WalletPageState extends State<WalletPage> {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F8F6),
-              borderRadius:
-                  BorderRadius.circular(13),
+              color: colors.surfaceAlt,
+              borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(
               positive
                   ? Icons.arrow_downward_rounded
                   : Icons.arrow_upward_rounded,
-              color: const Color(0xFF18A99A),
+              color: colors.brand,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  transaction.description ??
-                      _type(transaction.type),
-                  style: const TextStyle(
+                  transaction.description ?? _type(transaction.type),
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
                   ),
                 ),
                 Text(
-                  transaction.createdAt
-                      .toLocal()
-                      .toString()
-                      .substring(0, 16),
-                  style: const TextStyle(
+                  _formatDate(transaction.createdAt),
+                  style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF8B94A3),
+                    color: colors.textMuted,
                   ),
                 ),
               ],
             ),
           ),
           Text(
-            '${transaction.amount > 0 ? '+' : ''}'
-            '${transaction.amount}',
+            '${transaction.amount > 0 ? '+' : ''}${transaction.amount}',
             style: TextStyle(
               fontWeight: FontWeight.w900,
-              color: positive
-                  ? const Color(0xFF18A99A)
-                  : const Color(0xFFD95757),
+              color: positive ? colors.brand : colors.danger,
             ),
           ),
         ],
@@ -326,27 +341,107 @@ class _WalletPageState extends State<WalletPage> {
     );
   }
 
-  String _type(String value) {
-    return value
-        .replaceAll('_', ' ')
-        .toLowerCase();
+  String _formatDate(DateTime date) {
+    final localDate = date.toLocal();
+
+    return '${localDate.year}-'
+        '${localDate.month.toString().padLeft(2, '0')}-'
+        '${localDate.day.toString().padLeft(2, '0')} '
+        '${localDate.hour.toString().padLeft(2, '0')}:'
+        '${localDate.minute.toString().padLeft(2, '0')}';
   }
 
-  Widget _empty() {
-    return const Padding(
-      padding: EdgeInsets.all(35),
+  String _type(String value) {
+    return value.replaceAll('_', ' ').toLowerCase();
+  }
+
+  Widget _empty(WaynColors colors) {
+    return Padding(
+      padding: const EdgeInsets.all(35),
       child: Center(
         child: Text(
           'لا توجد عمليات بعد',
           style: TextStyle(
-            color: Color(0xFF8B94A3),
+            color: colors.textMuted,
           ),
         ),
       ),
     );
   }
 
-  String _transferError(Object error) {
+  // ============================================================
+  // Transfer
+  // ============================================================
+
+  Future<void> _transfer() async {
+    final wallet = _wallet;
+
+    if (wallet == null) return;
+
+    final success = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _WalletTransferDialog(
+        wallet: wallet,
+        service: _service,
+      ),
+    );
+
+    if (success != true || !mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تم تنفيذ التحويل',
+            textDirection: TextDirection.rtl,
+          ),
+        ),
+      );
+
+    await _load();
+  }
+}
+
+/// حوار التحويل.
+///
+/// StatefulWidget يمتلك الـ TextEditingControllers داخل الـ State حتى
+/// لا يتم التخلص منها قبل اكتمال خروج الحوار (كان ذلك سبب شاشة الخطأ
+/// الحمراء عند إغلاق التحويل في النسخة السابقة).
+class _WalletTransferDialog extends StatefulWidget {
+  final Wallet wallet;
+  final WalletService service;
+
+  const _WalletTransferDialog({
+    required this.wallet,
+    required this.service,
+  });
+
+  @override
+  State<_WalletTransferDialog> createState() => _WalletTransferDialogState();
+}
+
+class _WalletTransferDialogState extends State<_WalletTransferDialog> {
+  late final TextEditingController _numberController =
+      TextEditingController();
+  late final TextEditingController _amountController =
+      TextEditingController();
+  late final TextEditingController _descriptionController =
+      TextEditingController();
+
+  String? _error;
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _numberController.dispose();
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  String _friendlyError(Object error) {
     if (error is ApiClientException) {
       return error.message;
     }
@@ -354,164 +449,127 @@ class _WalletPageState extends State<WalletPage> {
     return error.toString().replaceFirst('Exception: ', '');
   }
 
-  Future<void> _transfer() async {
-    final wallet = _wallet;
+  Future<void> _submit() async {
+    FocusManager.instance.primaryFocus?.unfocus();
 
-    if (wallet == null) return;
+    final receiverNumber = _numberController.text.trim();
 
-    final numberController = TextEditingController();
-    final amountController = TextEditingController();
-    final descriptionController = TextEditingController();
+    if (receiverNumber.isEmpty) {
+      setState(() => _error = 'أدخل رقم محفظة المستلم');
+      return;
+    }
 
-    String? error;
-    var sending = false;
+    final amount = int.tryParse(_amountController.text.trim());
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: const Text('تحويل من المحفظة'),
-              content: Directionality(
-                textDirection: TextDirection.rtl,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                        controller: numberController,
-                        maxLength: 12,
-                        textAlign: TextAlign.right,
-                        decoration: const InputDecoration(
-                          labelText: 'رقم محفظة المستلم',
-                          hintText: 'مثال: W12345678901',
-                        ),
-                      ),
-                      TextField(
-                        controller: amountController,
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.right,
-                        decoration: InputDecoration(
-                          labelText: 'مبلغ العملات',
-                          helperText:
-                              'الرصيد المتاح: ${wallet.coinsBalance}',
-                        ),
-                      ),
-                      TextField(
-                        controller: descriptionController,
-                        textAlign: TextAlign.right,
-                        decoration: const InputDecoration(
-                          labelText: 'وصف اختياري',
-                        ),
-                      ),
-                      if (error != null) ...[
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            error!,
-                            style: const TextStyle(
-                              color: Color(0xFFD95757),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'أدخل مبلغًا صحيحًا أكبر من صفر');
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _sending = true;
+    });
+
+    try {
+      await widget.service.transfer(
+        receiverWalletNumber: receiverNumber,
+        amount: amount,
+        description: _descriptionController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _sending = false;
+        _error = _friendlyError(error);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
+    return AlertDialog(
+      title: const Text('تحويل من المحفظة'),
+      content: Directionality(
+        textDirection: TextDirection.rtl,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _numberController,
+                maxLength: 12,
+                textAlign: TextAlign.right,
+                decoration: const InputDecoration(
+                  labelText: 'رقم محفظة المستلم',
+                  hintText: 'مثال: W12345678901',
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: sending
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('إلغاء'),
+              TextField(
+                controller: _amountController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.right,
+                decoration: InputDecoration(
+                  labelText: 'مبلغ العملات',
+                  helperText:
+                      'الرصيد المتاح: ${widget.wallet.coinsBalance}',
                 ),
-                FilledButton(
-                  onPressed: sending
-                      ? null
-                      : () async {
-                          FocusManager.instance.primaryFocus?.unfocus();
-
-                          final receiverNumber =
-                              numberController.text.trim();
-
-                          if (receiverNumber.isEmpty) {
-                            setDialogState(
-                              () => error = 'أدخل رقم محفظة المستلم',
-                            );
-                            return;
-                          }
-
-                          final amount =
-                              int.tryParse(amountController.text.trim());
-
-                          if (amount == null || amount <= 0) {
-                            setDialogState(
-                              () => error = 'أدخل مبلغًا صحيحًا أكبر من صفر',
-                            );
-                            return;
-                          }
-
-                          setDialogState(() {
-                            error = null;
-                            sending = true;
-                          });
-
-                          try {
-                            await _service.transfer(
-                              receiverWalletNumber: receiverNumber,
-                              amount: amount,
-                              description: descriptionController.text.trim(),
-                            );
-
-                            if (!dialogContext.mounted) return;
-
-                            Navigator.of(dialogContext).pop();
-
-                            if (!mounted) return;
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('تم تنفيذ التحويل'),
-                              ),
-                            );
-
-                            await _load();
-                          } catch (transferError) {
-                            if (!dialogContext.mounted) return;
-
-                            setDialogState(() {
-                              sending = false;
-                              error = _transferError(transferError);
-                            });
-                          }
-                        },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF18A99A),
+              ),
+              TextField(
+                controller: _descriptionController,
+                textAlign: TextAlign.right,
+                decoration: const InputDecoration(
+                  labelText: 'وصف اختياري',
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: colors.danger,
+                      fontSize: 12,
+                    ),
                   ),
-                  child: sending
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('تحويل'),
                 ),
               ],
-            );
-          },
-        );
-      },
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _sending
+              ? null
+              : () => Navigator.of(context).pop(false),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          onPressed: _sending ? null : _submit,
+          style: FilledButton.styleFrom(
+            backgroundColor: colors.brand,
+          ),
+          child: _sending
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('تحويل'),
+        ),
+      ],
     );
-
-    numberController.dispose();
-    amountController.dispose();
-    descriptionController.dispose();
   }
 }

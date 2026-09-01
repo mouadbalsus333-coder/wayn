@@ -43,6 +43,41 @@ class FastApiUserRepository implements UserRepository {
   }
 
   // ============================================================
+  // My points balance
+  // ============================================================
+
+  @override
+  Future<int> getMyPoints() async {
+    try {
+      final response = await _api.get(
+        '/api/v1/points',
+      );
+
+      if (response is! Map) {
+        return 0;
+      }
+
+      final points = response['points'];
+
+      if (points is int) {
+        return points;
+      }
+
+      if (points is num) {
+        return points.toInt();
+      }
+
+      return int.tryParse(points?.toString() ?? '') ?? 0;
+    } on ApiClientException catch (error) {
+      if (error.statusCode == 401) {
+        await _api.clearAuthToken();
+      }
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
   // User by ID
   // ============================================================
 

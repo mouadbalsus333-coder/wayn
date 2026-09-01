@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../navigation/wayn_shell.dart';
+import '../theme/wayn_colors.dart';
 import '../../features/auth/login_page.dart';
 import '../../features/community/saved_posts_page.dart';
 import '../../features/settings/settings_page.dart';
@@ -112,6 +113,8 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
     final width = (MediaQuery.sizeOf(context).width * 0.76)
         .clamp(250.0, 320.0);
 
+    final colors = context.waynColors;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
@@ -144,7 +147,7 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
               width: width,
               height: double.infinity,
               child: Material(
-                color: Colors.white,
+                color: colors.surface,
                 elevation: 16,
                 child: SafeArea(
                   child: Column(
@@ -180,10 +183,11 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
                               onTap: () =>
                                   _showMessage('سجل النشاط'),
                             ),
-                            const Divider(
+                            Divider(
                               height: 24,
                               indent: 14,
                               endIndent: 14,
+                              color: colors.divider,
                             ),
                             _MenuTile(
                               icon: Icons.settings_outlined,
@@ -194,10 +198,11 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            const Divider(
+                            Divider(
                               height: 1,
                               indent: 14,
                               endIndent: 14,
+                              color: colors.divider,
                             ),
                             _MenuTile(
                               icon: Icons.logout_rounded,
@@ -296,13 +301,15 @@ class _MenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
     final tint = destructive
-        ? const Color(0xFFD95757)
-        : const Color(0xFF18A99A);
+        ? colors.danger
+        : colors.brand;
 
     final background = destructive
-        ? const Color(0xFFFFEEEE)
-        : const Color(0xFFE8F8F6);
+        ? colors.danger.withValues(alpha: 0.12)
+        : colors.surfaceAlt;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -342,16 +349,16 @@ class _MenuTile extends StatelessWidget {
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: destructive
-                              ? const Color(0xFFD95757)
-                              : const Color(0xFF172033),
+                              ? colors.danger
+                              : colors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFF8B94A3),
+                          color: colors.textMuted,
                         ),
                       ),
                     ],
@@ -361,8 +368,8 @@ class _MenuTile extends StatelessWidget {
                   Icons.chevron_left_rounded,
                   size: 22,
                   color: destructive
-                      ? const Color(0xFFE5BABA)
-                      : const Color(0xFFB0B7C2),
+                      ? colors.danger.withValues(alpha: 0.5)
+                      : colors.textMuted,
                 ),
               ],
             ),

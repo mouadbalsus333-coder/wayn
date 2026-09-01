@@ -8,4 +8,7 @@ abstract class UserRepository {
   Future<List<User>> searchUsers(String query);
 
   Future<User?> createOrUpdateUser(User user);
+
+  /// Returns the authenticated user's points balance.
+  Future<int> getMyPoints();
 }

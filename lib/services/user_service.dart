@@ -23,4 +23,8 @@ class UserService {
   Future<User?> createOrUpdateUser(User user) async {
     return _userRepository.createOrUpdateUser(user);
   }
+
+  Future<int> getMyPoints() async {
+    return _userRepository.getMyPoints();
+  }
 }
