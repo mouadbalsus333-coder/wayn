@@ -184,96 +184,195 @@ class _WalletPageState extends State<WalletPage> {
         ? wallet!.walletNumber
         : '—';
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 22, 22, 22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF18A99A),
-            Color(0xFF087F78),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x3318A99A),
-            blurRadius: 25,
-            offset: Offset(0, 10),
+    return AspectRatio(
+      aspectRatio: 1.586,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF18A99A),
+              Color(0xFF087F78),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // الجهة اليمنى (في RTL): رقم المحفظة + الرصيد
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'رقم المحفظة',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x3318A99A),
+              blurRadius: 25,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            children: [
+              // Decorative background circles.
+              Positioned(
+                left: -45,
+                bottom: -65,
+                child: Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.06),
                   ),
                 ),
-                const SizedBox(height: 6),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    walletNumber,
-                    textDirection: TextDirection.ltr,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                    ),
+              ),
+              Positioned(
+                right: -40,
+                top: -55,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.06),
                   ),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 17),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(
-                      Icons.monetization_on_rounded,
-                      color: Colors.white,
-                      size: 20,
+                    // Top section.
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 27,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(7),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.contactless_rounded,
+                                color: Colors.white,
+                                size: 19,
+                              ),
+                            ),
+                            const SizedBox(width: 9),
+                            const Text(
+                              'WAYN',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Icon(
+                          Icons.account_balance_wallet_rounded,
+                          color: Colors.white70,
+                          size: 24,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${wallet?.coinsBalance ?? 0}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
+
+                    const Spacer(),
+
+                    // Balance section.
                     const Text(
-                      'عملة',
+                      'الرصيد',
                       style: TextStyle(
                         color: Colors.white70,
-                        fontSize: 12,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${wallet?.coinsBalance ?? 0}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 27,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            'عملة',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(),
+
+                    // Bottom section.
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'رقم المحفظة',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  walletNumber,
+                                  textDirection: TextDirection.ltr,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.15,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _CardActionButton(
+                          label: 'شحن',
+                          icon: Icons.add_card_rounded,
+                          onPressed: _recharge,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          // الجهة اليسرى (في RTL): زر الشحن
-          _CardActionButton(
-            label: 'شحن',
-            icon: Icons.add_card_rounded,
-            filled: false,
-            onPressed: _recharge,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -298,7 +397,10 @@ class _WalletPageState extends State<WalletPage> {
           onTap: _transfer,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
             child: Row(
               children: [
                 Container(
@@ -494,13 +596,11 @@ class _WalletPageState extends State<WalletPage> {
 class _CardActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
-  final bool filled;
   final VoidCallback onPressed;
 
   const _CardActionButton({
     required this.label,
     required this.icon,
-    required this.filled,
     required this.onPressed,
   });
 
@@ -509,38 +609,30 @@ class _CardActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onPressed,
       child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 11),
         decoration: BoxDecoration(
-          color: filled
-              ? Colors.white
-              : Colors.white.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(12),
-          border: filled
-              ? null
-              : Border.all(
-                  color: Colors.white.withValues(alpha: 0.5),
-                ),
+          color: Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.45),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 16,
-              color: filled
-                  ? const Color(0xFF087F78)
-                  : Colors.white,
+              size: 14,
+              color: Colors.white,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 12,
+              style: const TextStyle(
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
-                color: filled
-                    ? const Color(0xFF087F78)
-                    : Colors.white,
+                color: Colors.white,
               ),
             ),
           ],
@@ -553,8 +645,7 @@ class _CardActionButton extends StatelessWidget {
 /// حوار التحويل.
 ///
 /// StatefulWidget يمتلك الـ TextEditingControllers داخل الـ State حتى
-/// لا يتم التخلص منها قبل اكتمال خروج الحوار (كان ذلك سبب شاشة الخطأ
-/// الحمراء عند إغلاق التحويل في النسخة السابقة).
+/// لا يتم التخلص منها قبل اكتمال خروج الحوار.
 class _WalletTransferDialog extends StatefulWidget {
   final Wallet wallet;
   final WalletService service;
