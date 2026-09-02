@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/wayn_api.dart';
 import '../../../models/contribution.dart';
 
+import '../wallet/admin_wallet_recharge_page.dart';
 import 'place_edit_screen.dart';
 
 /// Real WAYN admin dashboard.
@@ -58,7 +59,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _loadAll();
   }
 
@@ -116,7 +117,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     required Object error,
   }) {
     final message = switch (error) {
-      ApiClientException api => 'HTTP ${api.statusCode ?? '؟'} — ${api.message}',
+      ApiClientException api =>
+        'HTTP ${api.statusCode ?? '؟'} — ${api.message}',
       _ => '$error',
     };
     apply(message);
@@ -235,7 +237,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
       );
     }
   }
-// ================================================================
+
+  // ================================================================
   // Contribution actions
   // ================================================================
 
@@ -770,7 +773,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
             const SizedBox(height: 12),
             const Text(
               'لا توجد أماكن بعد',
-              style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF596273)),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF596273),
+              ),
             ),
             const SizedBox(height: 6),
             const Text(
@@ -896,13 +902,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                     children: [
                       _placeChip(
                         isOpen ? 'مفتوح' : 'مغلق',
-                        isOpen ? const Color(0xFF18A99A) : const Color(0xFF596273),
-                        isOpen ? const Color(0xFFE8F8F6) : const Color(0xFFECEEF2),
+                        isOpen
+                            ? const Color(0xFF18A99A)
+                            : const Color(0xFF596273),
+                        isOpen
+                            ? const Color(0xFFE8F8F6)
+                            : const Color(0xFFECEEF2),
                       ),
                       _placeChip(
                         isActive ? 'مفعّل' : 'غير مفعّل',
-                        isActive ? const Color(0xFF18A99A) : const Color(0xFFD95757),
-                        isActive ? const Color(0xFFE8F8F6) : const Color(0xFFFFECEC),
+                        isActive
+                            ? const Color(0xFF18A99A)
+                            : const Color(0xFFD95757),
+                        isActive
+                            ? const Color(0xFFE8F8F6)
+                            : const Color(0xFFFFECEC),
                       ),
                       if (verification != null && verification.isNotEmpty)
                         _placeChip(
@@ -986,7 +1000,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: fg),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: fg,
+        ),
       ),
     );
   }
@@ -1004,6 +1022,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
         return value;
     }
   }
+
   // ================================================================
   // Place actions
   // ================================================================
@@ -1067,7 +1086,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
             _contributions[index] as Map,
           );
           final contribution = Contribution.fromMap(map);
-          final pending = contribution.status == ContributionStatus.pending;
+          final pending =
+              contribution.status == ContributionStatus.pending;
 
           return Card(
             elevation: 0,
@@ -1215,7 +1235,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                 item['name_ar']?.toString() ?? '—',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
-              subtitle: Text('${item['price'] ?? ''} ${item['currency'] ?? ''}'),
+              subtitle: Text(
+                '${item['price'] ?? ''} ${item['currency'] ?? ''}',
+              ),
               trailing: Icon(
                 item['is_active'] == true
                     ? Icons.visibility_rounded
@@ -1319,6 +1341,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
               Tab(text: 'المساهمات'),
               Tab(text: 'المتجر'),
               Tab(text: 'الصلاحيات'),
+              Tab(text: 'المحافظ'),
             ],
           ),
         ),
@@ -1331,6 +1354,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
             _contributionsSection(),
             _storeSection(),
             _permissionsSection(),
+            const AdminWalletRechargePage(),
           ],
         ),
       ),

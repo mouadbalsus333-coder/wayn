@@ -4,6 +4,8 @@ import '../theme/wayn_colors.dart';
 import '../../features/location/saved_locations_store.dart';
 import '../../features/location/widgets/location_selector_sheet.dart';
 import '../../features/map/location_picker_page.dart';
+import '../../models/user_notification.dart';
+import '../../services/social_service.dart';
 
 /// الهيدر الموحّد لصفحات WAYN.
 ///
@@ -12,7 +14,9 @@ import '../../features/map/location_picker_page.dart';
 ///
 /// عند الضغط على الموقع يفتح [showLocationSelectorSheet] لعرض المواقع
 /// المحفوظة واختيار/إضافة موقع.
-class WaynHeader extends StatelessWidget {
+///
+/// نقطة الإشعار تظهر فقط عند وجود إشعار حقيقي غير مقروء.
+class WaynHeader extends StatefulWidget {
   final VoidCallback onMenuPressed;
   final VoidCallback onNotificationsPressed;
 
@@ -27,6 +31,61 @@ class WaynHeader extends StatelessWidget {
   });
 
   @override
+  State<WaynHeader> createState() => _WaynHeaderState();
+}
+
+class _WaynHeaderState extends State<WaynHeader> {
+  final SocialService _socialService = SocialService();
+
+  bool _hasUnreadNotifications = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationStatus();
+  }
+
+  Future<void> _loadNotificationStatus() async {
+    try {
+      final List<UserNotification> notifications =
+          await _socialService.getNotifications(limit: 100);
+
+      if (!mounted) return;
+
+      final hasUnread = notifications.any(
+        (notification) => !notification.isRead,
+      );
+
+      if (hasUnread == _hasUnreadNotifications) return;
+
+      setState(() {
+        _hasUnreadNotifications = hasUnread;
+      });
+    } catch (_) {
+      // إذا تعذر تحميل الإشعارات، لا نظهر النقطة.
+      if (!mounted) return;
+
+      if (_hasUnreadNotifications) {
+        setState(() {
+          _hasUnreadNotifications = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openNotifications() async {
+    widget.onNotificationsPressed();
+
+    // عند العودة من صفحة الإشعارات نعيد الفحص،
+    // لأن المستخدم قد يكون علّم الإشعارات كمقروءة.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    if (!mounted) return;
+
+    await _loadNotificationStatus();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
@@ -34,7 +93,7 @@ class WaynHeader extends StatelessWidget {
         children: [
           _HeaderIconButton(
             icon: Icons.menu_rounded,
-            onPressed: onMenuPressed,
+            onPressed: widget.onMenuPressed,
           ),
 
           const SizedBox(width: 10),
@@ -49,11 +108,11 @@ class WaynHeader extends StatelessWidget {
 
           _HeaderIconButton(
             icon: Icons.notifications_none_rounded,
-            onPressed: onNotificationsPressed,
-            showBadge: true,
+            onPressed: _openNotifications,
+            showBadge: _hasUnreadNotifications,
           ),
 
-          ...?trailing,
+          ...?widget.trailing,
         ],
       ),
     );
@@ -167,7 +226,7 @@ Future<void> openAddLocationFlow(BuildContext context) async {
 }
 
 /// كبسولة تعرض الموقع الحالي وتفتح ورقة المواقع عند الضغط عليها.
-
+///
 /// ورقة المواقع هي المكان الوحيد لتغيير الموقع الحالي.
 class _LocationPill extends StatelessWidget {
   final VoidCallback onTap;
@@ -277,7 +336,6 @@ class _HeaderIconButton extends StatelessWidget {
               size: 23,
             ),
           ),
-
           if (showBadge)
             Positioned(
               top: -2,

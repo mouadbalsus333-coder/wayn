@@ -30,6 +30,9 @@ PERMISSIONS = [
     ("contributions.read", "View place contributions"),
     ("contributions.approve", "Approve place contributions"),
     ("contributions.reject", "Reject place contributions"),
+
+    # Wallet
+    ("wallet.recharge", "Recharge user wallets"),
 ]
 
 
@@ -70,6 +73,9 @@ ROLE_PERMISSIONS = {
         "contributions.read",
         "contributions.approve",
         "contributions.reject",
+
+        # Wallet
+        "wallet.recharge",
     ],
 
     "admin": [

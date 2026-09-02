@@ -23,6 +23,7 @@ class WalletTransactionType(str, enum.Enum):
     REFUND = "REFUND"
     PENALTY = "PENALTY"
     ADJUSTMENT = "ADJUSTMENT"
+    ADMIN_RECHARGE = "ADMIN_RECHARGE"
 
 
 class WalletTransactionStatus(str, enum.Enum):

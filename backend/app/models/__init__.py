@@ -68,6 +68,10 @@ from app.models.wallet_transfer import (
     WalletTransfer,
     WalletTransferStatus,
 )
+from app.models.wallet_admin_recharge import (
+    WalletAdminRecharge,
+    WalletAdminRechargeStatus,
+)
 
 # ============================================================
 # Store
@@ -141,6 +145,8 @@ __all__ = [
     "WalletTransactionType",
     "WalletTransfer",
     "WalletTransferStatus",
+    "WalletAdminRecharge",
+    "WalletAdminRechargeStatus",
 
     # ========================================================
     # Store

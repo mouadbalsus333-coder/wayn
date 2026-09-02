@@ -1,9 +1,13 @@
 import logging
 
 from fastapi import FastAPI, Request
+
 from fastapi.exceptions import RequestValidationError
+
 from fastapi.middleware.cors import CORSMiddleware
+
 from fastapi.responses import JSONResponse
+
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.routers import (
@@ -12,6 +16,7 @@ from app.api.routers import (
     admin_places,
     admin_user_permissions,
     admin_users,
+    admin_wallet,
     auth,
     categories,
     community,
@@ -27,6 +32,7 @@ from app.api.routers import (
     place_contributions,
     media,
 )
+
 from app.core.config import settings
 
 
@@ -41,7 +47,6 @@ app = FastAPI(
 # ============================================================
 # CORS
 # ============================================================
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -55,7 +60,6 @@ app.add_middleware(
 # ============================================================
 # Exception handlers
 # ============================================================
-
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
     request: Request,
@@ -65,7 +69,6 @@ async def validation_exception_handler(
         "Validation error: %s",
         exc.errors(),
     )
-
     return JSONResponse(
         status_code=422,
         content={
@@ -85,7 +88,6 @@ async def sqlalchemy_exception_handler(
         exc,
         exc_info=True,
     )
-
     return JSONResponse(
         status_code=500,
         content={
@@ -104,7 +106,6 @@ async def unhandled_exception_handler(
         exc,
         exc_info=True,
     )
-
     return JSONResponse(
         status_code=500,
         content={
@@ -116,7 +117,6 @@ async def unhandled_exception_handler(
 # ============================================================
 # Health
 # ============================================================
-
 app.include_router(
     health.router,
 )
@@ -125,7 +125,6 @@ app.include_router(
 # ============================================================
 # Authentication
 # ============================================================
-
 app.include_router(
     auth.router,
     prefix="/api/v1",
@@ -135,7 +134,6 @@ app.include_router(
 # ============================================================
 # Categories
 # ============================================================
-
 app.include_router(
     categories.router,
     prefix="/api/v1",
@@ -145,7 +143,6 @@ app.include_router(
 # ============================================================
 # Places
 # ============================================================
-
 app.include_router(
     places.router,
     prefix="/api/v1",
@@ -156,7 +153,6 @@ app.include_router(
 # Reviews
 # Nested under /places/{place_id}/reviews
 # ============================================================
-
 app.include_router(
     reviews.router,
     prefix="/api/v1",
@@ -166,7 +162,6 @@ app.include_router(
 # ============================================================
 # Favorites
 # ============================================================
-
 app.include_router(
     favorites.router,
     prefix="/api/v1",
@@ -177,7 +172,6 @@ app.include_router(
 # Community
 # User-generated posts, likes, saves, and comments
 # ============================================================
-
 app.include_router(
     community.router,
     prefix="/api/v1",
@@ -187,7 +181,6 @@ app.include_router(
 # ============================================================
 # Wallet
 # ============================================================
-
 app.include_router(
     wallet.router,
     prefix="/api/v1",
@@ -197,7 +190,6 @@ app.include_router(
 # ============================================================
 # User Points
 # ============================================================
-
 app.include_router(
     user_point.router,
     prefix="/api/v1",
@@ -207,7 +199,6 @@ app.include_router(
 # ============================================================
 # Users (public profiles + follows)
 # ============================================================
-
 app.include_router(
     users.router,
     prefix="/api/v1",
@@ -217,7 +208,6 @@ app.include_router(
 # ============================================================
 # Notifications
 # ============================================================
-
 app.include_router(
     notifications.router,
     prefix="/api/v1",
@@ -227,7 +217,6 @@ app.include_router(
 # ============================================================
 # Store
 # ============================================================
-
 app.include_router(
     store.router,
     prefix="/api/v1",
@@ -237,7 +226,6 @@ app.include_router(
 # ============================================================
 # Place Contributions
 # ============================================================
-
 app.include_router(
     place_contributions.router,
     prefix="/api/v1",
@@ -247,7 +235,6 @@ app.include_router(
 # ============================================================
 # Admin Authentication
 # ============================================================
-
 app.include_router(
     admin_auth.router,
     prefix="/api/v1",
@@ -257,7 +244,6 @@ app.include_router(
 # ============================================================
 # Admin Permissions
 # ============================================================
-
 app.include_router(
     admin_permissions.router,
     prefix="/api/v1",
@@ -267,7 +253,6 @@ app.include_router(
 # ============================================================
 # Admin User Permissions
 # ============================================================
-
 app.include_router(
     admin_user_permissions.router,
     prefix="/api/v1",
@@ -277,7 +262,6 @@ app.include_router(
 # ============================================================
 # Admin Places
 # ============================================================
-
 app.include_router(
     admin_places.router,
     prefix="/api/v1",
@@ -287,11 +271,20 @@ app.include_router(
 # ============================================================
 # Admin Users
 # ============================================================
-
 app.include_router(
     admin_users.router,
     prefix="/api/v1",
 )
+
+
+# ============================================================
+# Admin Wallet
+# ============================================================
+app.include_router(
+    admin_wallet.router,
+    prefix="/api/v1",
+)
+
 
 app.include_router(
     media.router,
