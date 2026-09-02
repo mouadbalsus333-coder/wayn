@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../navigation/wayn_actions.dart';
 import '../navigation/wayn_shell.dart';
 import '../theme/wayn_colors.dart';
-import '../../features/auth/login_page.dart';
 import '../../features/community/saved_posts_page.dart';
 import '../../features/settings/settings_page.dart';
 import '../../features/wallet/wallet_page.dart';
@@ -116,30 +115,24 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
       );
   }
 
+  /// يسجل الخروج ثم يفتح مسار تسجيل الدخول الموحد.
+  ///
+  /// استخدام [openLoginAndRebuild] هنا مهم حتى يحصل المستخدم
+  /// على نفس خيارات LoginPage، بما فيها "الاستمرار كزائر".
   Future<void> _handleLogout() async {
-    final navigator = Navigator.of(context);
+    await _auth.logout();
 
-    await AuthService().logout();
+    if (!mounted) {
+      return;
+    }
 
-    navigator.pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => LoginPage(
-          onAuthenticated: (user) {
-            navigator.pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (_) => WaynShell(
-                  user: user,
-                ),
-              ),
-              (_) => false,
-            );
-          },
-        ),
-      ),
-      (_) => false,
-    );
+    openLoginAndRebuild(context);
   }
 
+  /// يفتح صفحة تسجيل الدخول من وضع الزائر.
+  ///
+  /// [openLoginAndRebuild] يتولى بعد ذلك الانتقال إلى WaynShell
+  /// سواء نجح تسجيل الدخول أو اختار المستخدم الاستمرار كزائر.
   void _navigateToLogin() {
     openLoginAndRebuild(context);
   }
@@ -246,6 +239,7 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
                           ],
                         ),
                       ),
+
                       // زر تسجيل الخروج مثبت أسفل القائمة تمامًا
                       // ولا يتحرك مع Scroll مهما زادت عناصر القائمة.
                       if (!isGuest) ...[
@@ -284,7 +278,6 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
             : 'مستخدم WAYN');
 
     // يُعرض اسم الحساب فقط مع الـ ID تحته، بدون الـ Username.
-
     final avatarLetter = displayName.isEmpty
         ? 'و'
         : displayName.substring(0, 1);
