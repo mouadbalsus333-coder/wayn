@@ -11,7 +11,10 @@ from fastapi import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies.auth import get_current_user
+from app.api.dependencies.auth import (
+    get_current_user,
+    get_optional_current_user,
+)
 from app.core.config import settings
 from app.core.database import get_session
 from app.models.user import User
@@ -48,13 +51,25 @@ def _format_image_url(image_url: str | None) -> str | None:
 async def _build_post_response(
     service: CommunityService,
     post,
-    user_id: UUID,
+    user_id: UUID | None,
     session,
 ) -> CommunityPostRead:
-    state = await service.get_post_state(
-        post=post,
-        user_id=user_id,
-    )
+    if user_id is not None:
+        state = await service.get_post_state(
+            post=post,
+            user_id=user_id,
+        )
+    else:
+        likes_count, saves_count, comments_count = (
+            await service.repository.get_post_counts(post.id)
+        )
+        state = {
+            "likes_count": likes_count,
+            "saves_count": saves_count,
+            "comments_count": comments_count,
+            "is_liked": False,
+            "is_saved": False,
+        }
 
     author = await service.repository.get_user(post.user_id)
     place = await service.repository.get_place(post.place_id)
@@ -70,10 +85,12 @@ async def _build_post_response(
         author_followers_count = await social.count_followers(
             author.id
         )
-        is_following_author = await social.is_following(
-            user_id,
-            author.id,
-        )
+
+        if user_id is not None:
+            is_following_author = await social.is_following(
+                user_id,
+                author.id,
+            )
 
     return CommunityPostRead(
         id=post.id,
@@ -92,7 +109,10 @@ async def _build_post_response(
         author_points=author_points,
         author_followers_count=author_followers_count,
         is_following_author=is_following_author,
-        is_owner=(post.user_id == user_id),
+        is_owner=(
+            user_id is not None
+            and post.user_id == user_id
+        ),
         likes_count=state["likes_count"],
         saves_count=state["saves_count"],
         comments_count=state["comments_count"],
@@ -236,7 +256,8 @@ async def create_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id, session,
+        current_user.id,
+        session,
     )
 
 
@@ -256,9 +277,17 @@ async def list_posts(
         ge=1,
         le=100,
     ),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[CommunityPostRead]:
+    """
+    Public Community feed.
+
+    Guests can read posts and paginate normally.
+    Authenticated users additionally receive their personal
+    interaction state such as like/save/follow/owner.
+    """
+
     service = CommunityService(session)
 
     posts = await service.list_posts(
@@ -268,11 +297,18 @@ async def list_posts(
         limit=limit,
     )
 
+    current_user_id = (
+        current_user.id
+        if current_user is not None
+        else None
+    )
+
     return [
         await _build_post_response(
             service,
             post,
-            current_user.id, session,
+            current_user_id,
+            session,
         )
         for post in posts
     ]
@@ -307,7 +343,8 @@ async def list_saved_posts(
         await _build_post_response(
             service,
             post,
-            current_user.id, session,
+            current_user.id,
+            session,
         )
         for post in posts
     ]
@@ -332,7 +369,8 @@ async def get_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id, session,
+        current_user.id,
+        session,
     )
 
 
@@ -374,7 +412,8 @@ async def update_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id, session,
+        current_user.id,
+        session,
     )
 
 
@@ -435,7 +474,8 @@ async def like_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id, session,
+        current_user.id,
+        session,
     )
 
 
@@ -463,7 +503,8 @@ async def unlike_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id, session,
+        current_user.id,
+        session,
     )
 
 
@@ -496,7 +537,8 @@ async def save_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id, session,
+        current_user.id,
+        session,
     )
 
 
@@ -524,7 +566,8 @@ async def unsave_post(
     return await _build_post_response(
         service,
         post,
-        current_user.id, session,
+        current_user.id,
+        session,
     )
 
 

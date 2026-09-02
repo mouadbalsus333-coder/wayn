@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/navigation/wayn_actions.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/wayn_colors.dart';
 import '../../core/widgets/wayn_header.dart';
+import '../../core/widgets/wayn_guest_banner.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
 import '../../features/notifications/notifications_page.dart';
 import '../../models/user.dart';
@@ -25,9 +26,18 @@ class CommunityPage extends StatefulWidget {
 class _CommunityPageState extends State<CommunityPage> {
   late final CommunityService _communityService;
 
+  static const int _pageSize = 20;
+
   final List<CommunityPost> _posts = [];
+  final ScrollController _scrollController = ScrollController();
 
   bool _isLoading = true;
+
+  // حالة الـ Pagination.
+  int _currentPage = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+
   String? _errorMessage;
 
   bool get _isGuest => _currentUser == null;
@@ -42,8 +52,26 @@ class _CommunityPageState extends State<CommunityPage> {
       createCommunityRepository(),
     );
 
+    // Infinite scroll: حمّل الصفحة التالية عند اقتراب المستخدم من النهاية.
+    _scrollController.addListener(_onScroll);
+
     _loadPosts();
     _loadCurrentUser();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_hasMore || _isLoadingMore || _isLoading) return;
+
+    if (_scrollController.position.extentAfter < 480) {
+      _loadPosts(loadMore: true);
+    }
   }
 
   Future<void> _loadCurrentUser() async {
@@ -57,6 +85,7 @@ class _CommunityPageState extends State<CommunityPage> {
       // Ignore
     }
   }
+
 
   void _showLoginPrompt() {
     if (!mounted) return;
@@ -103,10 +132,13 @@ class _CommunityPageState extends State<CommunityPage> {
 
   Future<void> _loadPosts({
     bool refresh = false,
+    bool loadMore = false,
   }) async {
-    if (refresh) {
+    // منع الطلبات المتزامنة المكررة.
+    if (loadMore) {
+      if (_isLoadingMore || !_hasMore) return;
       setState(() {
-        _errorMessage = null;
+        _isLoadingMore = true;
       });
     } else {
       setState(() {
@@ -115,34 +147,48 @@ class _CommunityPageState extends State<CommunityPage> {
       });
     }
 
+    final requestPage = loadMore ? _currentPage + 1 : 1;
+
     try {
       final posts = await _communityService.getPosts(
-        page: 1,
-        limit: 20,
+        page: requestPage,
+        limit: _pageSize,
       );
 
       if (!mounted) return;
 
       setState(() {
-        _posts
-          ..clear()
-          ..addAll(posts);
-
-        _isLoading = false;
+        if (loadMore) {
+          _posts.addAll(posts);
+          _currentPage = requestPage;
+          _isLoadingMore = false;
+          // إذا أعادت الصفحة أقل من الحد الأقصى فلا توجد صفحات أخرى.
+          _hasMore = posts.length >= _pageSize;
+        } else {
+          _posts
+            ..clear()
+            ..addAll(posts);
+          _currentPage = 1;
+          _hasMore = posts.length >= _pageSize;
+          _isLoading = false;
+        }
       });
     } on ApiClientException catch (e) {
       if (!mounted) return;
 
       setState(() {
         _isLoading = false;
-        _errorMessage = e.message;
+        _isLoadingMore = false;
+        // عند فشل تحميل صفحة إضافية نحتفظ بالمنشورات القديمة.
+        if (!loadMore) _errorMessage = e.message;
       });
     } catch (_) {
       if (!mounted) return;
 
       setState(() {
         _isLoading = false;
-        _errorMessage = 'تعذر تحميل المجتمع حاليًا';
+        _isLoadingMore = false;
+        if (!loadMore) _errorMessage = 'تعذر تحميل المجتمع حاليًا';
       });
     }
   }
@@ -489,7 +535,9 @@ class _CommunityPageState extends State<CommunityPage> {
             if (_isGuest)
               const Padding(
                 padding: EdgeInsets.only(top: 12, bottom: 12),
-                child: _GuestLoginNotice(),
+                child: WaynGuestBanner(
+                  placement: WaynGuestBannerPlacement.inline,
+                ),
               ),
             const SizedBox(height: 150),
             Icon(
@@ -529,6 +577,7 @@ class _CommunityPageState extends State<CommunityPage> {
         refresh: true,
       ),
       child: ListView.builder(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(
           14,
@@ -536,18 +585,40 @@ class _CommunityPageState extends State<CommunityPage> {
           14,
           20,
         ),
-        itemCount: _posts.length + (_isGuest ? 1 : 0),
+        // عنصر إضافي في النهاية: إشعار الزائر + مؤشر تحميل الصفحة التالية.
+        itemCount:
+            _posts.length + (_isGuest ? 1 : 0) + (_hasMore ? 1 : 0),
         itemBuilder: (context, rawIndex) {
           // إشعار تسجيل الدخول كأول عنصر في القائمة أسفل الهيدر مباشرة،
-          // ويختفي تلقائيًا عند سحب الصفحة أو رفعها أثناء التصفح.
+          // ويختفي عند السحب للأعلى أو زر X أو التمرير بعيدًا.
           if (_isGuest && rawIndex == 0) {
-            return const Padding(
-              padding: EdgeInsets.only(top: 12, bottom: 12),
-              child: _GuestLoginNotice(),
+            return const WaynGuestBanner(
+              placement: WaynGuestBannerPlacement.inline,
             );
           }
 
-          final postIndex = rawIndex - (_isGuest ? 1 : 0);
+          final guestOffset = _isGuest ? 1 : 0;
+
+          // مؤشر تحميل الصفحة التالية في نهاية القائمة.
+          if (rawIndex == _posts.length + guestOffset) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: _isLoadingMore
+                    ? SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: colors.brand,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            );
+          }
+
+          final postIndex = rawIndex - guestOffset;
           final post = _posts[postIndex];
 
           return Padding(
@@ -575,80 +646,6 @@ class _CommunityPageState extends State<CommunityPage> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// إشعار تسجيل الدخول للزائر (الجزء العلوي من قائمة المنشورات)
-// ============================================================================
-
-class _GuestLoginNotice extends StatelessWidget {
-  const _GuestLoginNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.waynColors;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colors.brand.withValues(alpha: 0.12),
-            colors.brand.withValues(alpha: 0.06),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colors.brand.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: colors.brand.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.person_add_alt_1_rounded,
-              color: colors.brand,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'سجّل دخولك لتتمكن من الإعجاب والمشاركة في المجتمع',
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: () => openLoginAndRebuild(context),
-            style: TextButton.styleFrom(
-              foregroundColor: colors.brand,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text(
-              'دخول',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -243,25 +243,26 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
                                 const SettingsPage(),
                               ),
                             ),
-                            if (!isGuest) ...[
-                              const SizedBox(height: 10),
-                              Divider(
-                                height: 1,
-                                indent: 14,
-                                endIndent: 14,
-                                color: colors.divider,
-                              ),
-                              _MenuTile(
-                                icon: Icons.logout_rounded,
-                                title: 'تسجيل الخروج',
-                                subtitle: 'الخروج من الحساب',
-                                destructive: true,
-                                onTap: _handleLogout,
-                              ),
-                            ],
                           ],
                         ),
                       ),
+                      // زر تسجيل الخروج مثبت أسفل القائمة تمامًا
+                      // ولا يتحرك مع Scroll مهما زادت عناصر القائمة.
+                      if (!isGuest) ...[
+                        Divider(
+                          height: 1,
+                          indent: 14,
+                          endIndent: 14,
+                          color: colors.divider,
+                        ),
+                        _MenuTile(
+                          icon: Icons.logout_rounded,
+                          title: 'تسجيل الخروج',
+                          subtitle: 'الخروج من الحساب',
+                          destructive: true,
+                          onTap: _handleLogout,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -282,9 +283,7 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
             ? _user!.displayName!.trim()
             : 'مستخدم WAYN');
 
-    final username = _user?.username?.trim().isNotEmpty == true
-        ? _user!.username!.trim()
-        : '';
+    // يُعرض اسم الحساب فقط مع الـ ID تحته، بدون الـ Username.
 
     final avatarLetter = displayName.isEmpty
         ? 'و'
@@ -351,7 +350,7 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
                             ? 'سجّل دخولك لمزايا وين الكاملة'
                             : (shortId.isEmpty
                                 ? 'العودة لحسابي'
-                                : '@$username · ID: $shortId'),
+                                : 'ID: $shortId'),
                         overflow: TextOverflow.ellipsis,
                         textDirection: TextDirection.rtl,
                         style: const TextStyle(

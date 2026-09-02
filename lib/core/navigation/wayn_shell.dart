@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../theme/wayn_colors.dart';
+import '../widgets/wayn_guest_banner.dart';
 import '../../features/community/community_page.dart';
 import '../../features/explore/explore_page.dart';
 import '../../features/map/map_page.dart';
@@ -76,16 +77,38 @@ class _WaynShellState extends State<WaynShell> {
         resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            IndexedStack(
-              index: _currentIndex,
-              children: _pages,
+            // نستمع للتمرير فقط لإخفاء إشعار الزائر تلقائيًا
+            // عند سحب الصفحة للأعلى أثناء التصفح.
+            NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is ScrollUpdateNotification &&
+                    notification.dragDetails != null &&
+                    (notification.scrollDelta ?? 0) > 0 &&
+                    WaynGuestBannerDismissed.instance.value == false) {
+                  WaynGuestBannerDismissed.instance.value = true;
+                }
+                return false;
+              },
+              child: IndexedStack(
+                index: _currentIndex,
+                children: _pages,
+              ),
             ),
             // في تبويب المجتمع يعرض الصفحة إشعارها الخاص أسفل الهيدر،
             // لذا لا نظهر البنر العام هنا لتجنب التكرار.
             if (isGuest && _currentIndex != _communityTabIndex)
-              _GuestLoginBanner(onLoginPressed: () {
-                openLoginAndRebuild(context);
-              }),
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: WaynGuestBanner(),
+                  ),
+                ),
+              ),
           ],
         ),
         bottomNavigationBar: _buildBottomNavigation(colors),
@@ -133,7 +156,7 @@ class _WaynShellState extends State<WaynShell> {
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: 7,
-            vertical: 7,
+            vertical: 9,
           ),
           child: Row(
             children: List.generate(
@@ -163,16 +186,17 @@ class _WaynShellState extends State<WaynShell> {
                         children: [
                           Icon(
                             items[index].$1,
-                            size: 22,
+                            size: 24,
                             color: selected
                                 ? colors.brand
                                 : colors.textMuted,
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
                           Text(
                             items[index].$2,
+                            textDirection: TextDirection.rtl,
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               fontWeight: selected
                                   ? FontWeight.w800
                                   : FontWeight.w500,
@@ -188,111 +212,6 @@ class _WaynShellState extends State<WaynShell> {
                 );
               },
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GuestLoginBanner extends StatelessWidget {
-  final VoidCallback onLoginPressed;
-
-  const _GuestLoginBanner({required this.onLoginPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.waynColors;
-
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: SafeArea(
-        bottom: false,
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                colors.brand.withValues(alpha: 0.12),
-                colors.brand.withValues(alpha: 0.08),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colors.brand.withValues(alpha: 0.2),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.brand.withValues(alpha: 0.1),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colors.brand.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.person_add_alt_1_rounded,
-                  color: colors.brand,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'مرحباً بك في وين!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'سجّل دخولك للاستمتاع بجميع الميزات',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: onLoginPressed,
-                style: TextButton.styleFrom(
-                  backgroundColor: colors.brand,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'تسجيل الدخول',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),

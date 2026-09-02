@@ -28,9 +28,18 @@ class ThemeController extends ValueNotifier<ThemeMode> {
     loaded = true;
   }
 
-  /// تفعيل/تعطيل الوضع المظلم مع حفظ الاختيار.
+    /// تفعيل/تعطيل الوضع المظلم مع حفظ الاختيار.
+  ///
+  /// يُنبّه المستمعين فقط عندما يتغيّر الوضع بالفعل لتجنب
+  /// إعادة بناء شجرة التطبيق بشكل غير ضروري.
   Future<void> setDarkMode(bool dark) async {
-    value = dark ? ThemeMode.dark : ThemeMode.light;
+    final newMode = dark ? ThemeMode.dark : ThemeMode.light;
+
+    // لا تُعيد الإشعار إذا لم يتغيّر الوضع — يمنع هذا
+    // إعادة بناء كل الصفحات عند الضغط المتكرر على الزر.
+    if (value == newMode) return;
+
+    value = newMode;
 
     try {
       await _storage.write(

@@ -10,11 +10,11 @@ import 'wayn_shell.dart';
 final ValueNotifier<int> waynGoToProfileRequest = ValueNotifier(0);
 
 /// يفتح شاشة تسجيل الدخول، وبعد نجاحها يعيد بناء [WaynShell] بالكامل
-/// لتصبح كامل واجهة التطبيق في حالة المستخدم المسجّل (وليس الزائر).
+/// لتصبح كامل واجهة التطبيق في حالة المستخدم المسجّل.
 ///
-/// يُستخدم هذا المسار الوحيد من جميع نقاط دخول الزائر (البنر العلوي، تبويب
-/// حسابي، القائمة الجانبية، رسالة تفاعل المنشورات) لضمان تحديث حالة التطبيق
-/// بشكل متّسق وبدون أخطاء تنقّل أو تسريب حالة قديمة.
+/// كما يوفّر مسارًا واضحًا للاستمرار كزائر، بحيث يتم إعادة بناء
+/// [WaynShell] مع user = null بدل استخدام Navigator.pop() والاعتماد
+/// على حالة شاشة سابقة.
 void openLoginAndRebuild(BuildContext context) {
   final navigator = Navigator.of(context);
 
@@ -24,7 +24,19 @@ void openLoginAndRebuild(BuildContext context) {
         onAuthenticated: (user) {
           navigator.pushAndRemoveUntil(
             MaterialPageRoute(
-              builder: (_) => WaynShell(user: user),
+              builder: (_) => WaynShell(
+                user: user,
+              ),
+            ),
+            (_) => false,
+          );
+        },
+        onContinueAsGuest: () {
+          navigator.pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => const WaynShell(
+                user: null,
+              ),
             ),
             (_) => false,
           );
@@ -50,7 +62,9 @@ void openUserProfile(
 
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => PublicProfilePage(userId: userId),
+      builder: (_) => PublicProfilePage(
+        userId: userId,
+      ),
     ),
   );
 }
@@ -64,9 +78,11 @@ Future<void> openPlaceFromId(
     return;
   }
 
-  var place = await PlaceService().getPlaceById(placeId);
+  final place = await PlaceService().getPlaceById(placeId);
 
-  if (!context.mounted) return;
+  if (!context.mounted) {
+    return;
+  }
 
   if (place == null) {
     ScaffoldMessenger.of(context)
@@ -84,7 +100,9 @@ Future<void> openPlaceFromId(
 
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => PlaceDetailsPage(place: place),
+      builder: (_) => PlaceDetailsPage(
+        place: place,
+      ),
     ),
   );
 }

@@ -116,6 +116,91 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           duration: const Duration(seconds: 4),
         ),
       );
+    }
+
+  // ============================================================
+  // OPTIONS MENU (ثلاث نقاط — مثبت على اليسار، يظهر للكل)
+  // ============================================================
+
+  /// يبني زر الثلاث نقاط مع القائمة المنسدلة.
+  ///
+  /// - المالك: حذف المنشور.
+  /// - غير المالك: الإبلاغ عن المنشور.
+  ///
+  /// الزر ثابت على اليسار ولا يتأثر بطول الاسم أو المكان.
+  Widget _buildOptionsMenu(WaynColors colors) {
+    final isOwnerWithDelete =
+        post.isOwner && widget.onDelete != null;
+
+    final List<PopupMenuEntry<String>> items = [];
+
+    if (isOwnerWithDelete) {
+      items.add(
+        PopupMenuItem(
+          value: 'delete',
+          child: _buildMenuItem(
+            'حذف المنشور',
+            Icons.delete_outline_rounded,
+            Colors.redAccent,
+          ),
+        ),
+      );
+    } else if (!post.isOwner) {
+      items.add(
+        PopupMenuItem(
+          value: 'report',
+          child: _buildMenuItem(
+            'إبلاغ عن منشور',
+            Icons.report_rounded,
+            Colors.redAccent,
+          ),
+        ),
+      );
+    } else {
+      // المنشور الخاص بالمالك لكن بدون onDelete — لا نعرض شيئًا.
+      return const SizedBox.shrink();
+    }
+
+    return PopupMenuButton<String>(
+      icon: Icon(
+        Icons.more_vert_rounded,
+        color: colors.textMuted,
+        size: 20,
+      ),
+      onSelected: (value) {
+        if (value == 'delete') {
+          widget.onDelete?.call();
+        } else if (value == 'report') {
+          _showMessage('تم الإبلاغ عن المنشور');
+        }
+      },
+      itemBuilder: (context) => items,
+      constraints: const BoxConstraints(minWidth: 150),
+      padding: EdgeInsets.zero,
+      menuPadding: EdgeInsets.zero,
+    );
+  }
+
+  Widget _buildMenuItem(String label, IconData icon, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Icon(
+          icon,
+          color: color,
+          size: 18,
+        ),
+      ],
+    );
   }
 
   Future<void> _toggleFollow() async {
@@ -185,6 +270,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   child: Image.network(
                     imageUrl,
                     fit: BoxFit.contain,
+                    gaplessPlayback: true,
                     loadingBuilder: (context, child, progress) {
                       if (progress == null) return child;
                       return const SizedBox(
@@ -301,10 +387,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ----- name + follow / points + options -----
-                      Row(
-                        children: [
-                          if (!post.isOwner) ...[
+                                            // ----- name + follow / points -----
+                      if (!post.isOwner)
+                        Row(
+                          children: [
                             _AuthorPointsChip(
                               points: post.authorPoints,
                               colors: colors,
@@ -317,43 +403,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                               colors: colors,
                             ),
                           ],
-                          if (post.isOwner && widget.onDelete != null)
-                            PopupMenuButton<String>(
-                              icon: Icon(
-                                Icons.more_vert_rounded,
-                                color: colors.textMuted,
-                                size: 20,
-                              ),
-                              onSelected: (value) {
-                                if (value == 'delete') {
-                                  widget.onDelete?.call();
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.delete_outline_rounded,
-                                        color: Colors.redAccent,
-                                        size: 18,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'حذف المنشور',
-                                        style: TextStyle(
-                                          color: Colors.redAccent,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
+                        ),
 
                       // ----- "قام X بتقييم Y" -----
                       const SizedBox(height: 6),
@@ -430,9 +480,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                           colors: colors,
                         ),
                       ],
-                    ],
+                                                            ],
                   ),
                 ),
+                // ----- ثلاث نقاط على اليسار (مثبت، لا يتحرك) -----
+                const SizedBox(width: 8),
+                _buildOptionsMenu(colors),
               ],
             ),
 
@@ -459,6 +512,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                       fullImageUrl,
                       width: double.infinity,
                       fit: BoxFit.contain,
+                      cacheWidth: 800,
+                      cacheHeight: 800,
+                      gaplessPlayback: true,
                       loadingBuilder: (context, child, progress) {
                         if (progress == null) return child;
                         return const SizedBox(

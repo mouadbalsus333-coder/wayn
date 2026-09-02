@@ -7,10 +7,12 @@ import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   final ValueChanged<User> onAuthenticated;
+  final VoidCallback? onContinueAsGuest;
 
   const LoginPage({
     super.key,
     required this.onAuthenticated,
+    this.onContinueAsGuest,
   });
 
   @override
@@ -56,6 +58,8 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    FocusManager.instance.primaryFocus?.unfocus();
+
     if (!mounted) {
       return;
     }
@@ -99,6 +103,20 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // ============================================================
+  // Continue as guest
+  // ============================================================
+
+  void _continueAsGuest() {
+    if (_loading) {
+      return;
+    }
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    widget.onContinueAsGuest?.call();
+  }
+
+  // ============================================================
   // Register
   // ============================================================
 
@@ -106,6 +124,8 @@ class _LoginPageState extends State<LoginPage> {
     if (_loading) {
       return;
     }
+
+    FocusManager.instance.primaryFocus?.unfocus();
 
     final user = await Navigator.of(context).push<User>(
       MaterialPageRoute(
@@ -132,6 +152,8 @@ class _LoginPageState extends State<LoginPage> {
     if (_loading) {
       return;
     }
+
+    FocusManager.instance.primaryFocus?.unfocus();
 
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -226,30 +248,39 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF9FBFC),
+        backgroundColor: const Color(0xFFF7FAFB),
+        resizeToAvoidBottomInset: true,
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
               return SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 24,
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  20,
+                  24,
+                  24 + keyboardInset,
                 ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - 48,
-                    maxWidth: 520,
-                  ),
-                  child: Center(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 520,
+                    ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        SizedBox(
+                          height: constraints.maxHeight > 720 ? 22 : 8,
+                        ),
+
                         // ==================================================
                         // Logo
                         // ==================================================
@@ -257,13 +288,13 @@ class _LoginPageState extends State<LoginPage> {
                         Center(
                           child: Image.asset(
                             'assets/images/branding/wayn_logo.png',
-                            width: 150,
-                            height: 150,
+                            width: constraints.maxHeight > 650 ? 132 : 104,
+                            height: constraints.maxHeight > 650 ? 132 : 104,
                             fit: BoxFit.contain,
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 12),
 
                         // ==================================================
                         // Welcome title
@@ -273,27 +304,14 @@ class _LoginPageState extends State<LoginPage> {
                           'مرحباً بك في تطبيق WAYN',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 28,
+                            fontSize: 27,
                             height: 1.25,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF12677A),
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF087F78),
                           ),
                         ),
 
-                        const SizedBox(height: 10),
-
-                        const Text(
-                          'سجّل دخولك واستكشف الأماكن من حولك',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.5,
-                            color: Color(0xFF8A98A8),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-
-                        const SizedBox(height: 34),
+                        const SizedBox(height: 28),
 
                         // ==================================================
                         // Email
@@ -309,7 +327,7 @@ class _LoginPageState extends State<LoginPage> {
                           textDirection: TextDirection.ltr,
                         ),
 
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
 
                         // ==================================================
                         // Password
@@ -345,21 +363,20 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
 
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
 
                         // ==================================================
-                        // Forgot password
+                        // Forgot password - right side
                         // ==================================================
 
                         Align(
-                          alignment: Alignment.centerLeft,
+                          alignment: Alignment.centerRight,
                           child: TextButton(
                             onPressed: _loading
                                 ? null
                                 : _openForgotPasswordPage,
                             style: TextButton.styleFrom(
-                              foregroundColor:
-                                  const Color(0xFF168B98),
+                              foregroundColor: const Color(0xFF087F78),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 4,
                                 vertical: 6,
@@ -370,9 +387,10 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             child: const Text(
                               'هل نسيت كلمة المرور؟',
+                              textAlign: TextAlign.right,
                               style: TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
@@ -383,7 +401,7 @@ class _LoginPageState extends State<LoginPage> {
                         // ==================================================
 
                         if (_error != null) ...[
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(
@@ -391,10 +409,10 @@ class _LoginPageState extends State<LoginPage> {
                               vertical: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFF2F2),
+                              color: const Color(0xFFFFF3F3),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: const Color(0xFFF4D4D4),
+                                color: const Color(0xFFF0D1D1),
                               ),
                             ),
                             child: Text(
@@ -410,7 +428,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ],
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
                         // ==================================================
                         // Login button
@@ -418,40 +436,129 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(
                           height: 58,
-                          child: FilledButton(
-                            onPressed: _loading ? null : _login,
-                            style: FilledButton.styleFrom(
-                              backgroundColor:
-                                  const Color(0xFF18A99A),
-                              disabledBackgroundColor:
-                                  const Color(0xFF8DD5CD),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(30),
-                              ),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: _loading
+                                  ? const []
+                                  : [
+                                      BoxShadow(
+                                        color: const Color(0xFF18A99A)
+                                            .withValues(alpha: 0.22),
+                                        blurRadius: 18,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
                             ),
-                            child: _loading
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child:
-                                        CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.white,
+                            child: FilledButton(
+                              onPressed: _loading ? null : _login,
+                              style: FilledButton.styleFrom(
+                                backgroundColor:
+                                    const Color(0xFF18A99A),
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor:
+                                    const Color(0xFF8DD5CD),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(18),
+                                ),
+                              ),
+                              child: _loading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child:
+                                          CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Text(
+                                          'تسجيل الدخول',
+                                          style: TextStyle(
+                                            fontSize: 17,
+                                            fontWeight:
+                                                FontWeight.w900,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 9),
+                                        Container(
+                                          width: 30,
+                                          height: 30,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white
+                                                .withValues(
+                                              alpha: 0.16,
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.arrow_back_rounded,
+                                            size: 18,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  )
-                                : const Text(
-                                    'تسجيل الدخول',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
+                            ),
                           ),
                         ),
 
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 14),
+
+                        // ==================================================
+                        // Continue as guest
+                        // ==================================================
+
+                        SizedBox(
+                          height: 54,
+                          child: OutlinedButton(
+                            onPressed: _loading
+                                ? null
+                                : _continueAsGuest,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor:
+                                  const Color(0xFF087F78),
+                              disabledForegroundColor:
+                                  const Color(0xFF9BBAB7),
+                              side: BorderSide(
+                                color: _loading
+                                    ? const Color(0xFFD8E4E3)
+                                    : const Color(0xFFB9DCD8),
+                                width: 1.3,
+                              ),
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.explore_outlined,
+                                  size: 21,
+                                ),
+                                SizedBox(width: 9),
+                                Text(
+                                  'الاستمرار كزائر',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 22),
 
                         // ==================================================
                         // Register prompt
@@ -488,7 +595,7 @@ class _LoginPageState extends State<LoginPage> {
                                 'إنشاء حساب',
                                 style: TextStyle(
                                   fontSize: 15,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                             ),
@@ -544,7 +651,7 @@ class _AuthField extends StatelessWidget {
           textAlign: TextAlign.right,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             color: Color(0xFF34404D),
           ),
         ),
@@ -558,6 +665,9 @@ class _AuthField extends StatelessWidget {
           textAlign: textDirection == TextDirection.ltr
               ? TextAlign.left
               : TextAlign.right,
+          textInputAction: obscureText
+              ? TextInputAction.done
+              : TextInputAction.next,
           style: const TextStyle(
             fontSize: 15,
             color: Color(0xFF263442),
@@ -571,6 +681,9 @@ class _AuthField extends StatelessWidget {
               fontSize: 15,
               fontWeight: FontWeight.w400,
             ),
+
+            // في RTL نستخدم prefixIcon مع اتجاه الحقل لضمان
+            // بقاء أيقونة الحقل في الجهة اليسرى بصريًا.
             prefixIcon: Padding(
               padding: const EdgeInsetsDirectional.only(
                 start: 14,
@@ -582,17 +695,22 @@ class _AuthField extends StatelessWidget {
                 size: 23,
               ),
             ),
+
             prefixIconConstraints: const BoxConstraints(
               minWidth: 48,
               minHeight: 48,
             ),
+
             suffixIcon: suffixIcon,
+
             filled: true,
             fillColor: Colors.white,
+
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 17,
             ),
+
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(17),
               borderSide: const BorderSide(
@@ -600,6 +718,7 @@ class _AuthField extends StatelessWidget {
                 width: 1,
               ),
             ),
+
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(17),
               borderSide: const BorderSide(
@@ -607,13 +726,15 @@ class _AuthField extends StatelessWidget {
                 width: 1,
               ),
             ),
+
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(17),
               borderSide: const BorderSide(
                 color: Color(0xFF18A99A),
-                width: 1.5,
+                width: 1.6,
               ),
             ),
+
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(17),
               borderSide: const BorderSide(

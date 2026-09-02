@@ -36,7 +36,7 @@ class HomeBottomNavigation extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: 8,
-            vertical: 8,
+            vertical: 9,
           ),
           child: Row(
             children: List.generate(
@@ -70,20 +70,20 @@ class HomeBottomNavigation extends StatelessWidget {
                             ),
                             child: Icon(
                               items[index].$1,
-                              size: 22,
+                              size: 24,
                               color: selected
                                   ? const Color(0xFF16A899)
                                   : const Color(0xFF8B94A3),
                             ),
                           ),
 
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
 
                           Text(
                             items[index].$2,
                             textDirection: TextDirection.rtl,
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               fontWeight: selected
                                   ? FontWeight.w800
                                   : FontWeight.w500,
