@@ -19,6 +19,7 @@ import '../community/services/community_service.dart';
 import '../community/widgets/comments_sheet.dart';
 import '../../../core/widgets/wayn_header.dart';
 import '../../../core/widgets/wayn_menu_drawer.dart';
+import '../../core/widgets/wayn_network_image.dart';
 import '../../../core/navigation/wayn_actions.dart';
 import '../../../features/notifications/notifications_page.dart';
 import '../community/widgets/community_post_card.dart';
@@ -2976,8 +2977,8 @@ class _MapPageState extends State<MapPage> {
                 });
               },
               itemBuilder: (_, index) {
-                return Image.network(
-                  images[index],
+                return WaynNetworkImage(
+                  imageUrl: images[index],
                   fit: BoxFit.cover,
                   width: double.infinity,
                   errorBuilder:
@@ -3403,8 +3404,8 @@ class _MapPageState extends State<MapPage> {
           BorderRadius.circular(
         16,
       ),
-      child: Image.network(
-        imageUrl,
+      child: WaynNetworkImage(
+        imageUrl: imageUrl,
         width: 72,
         height: 72,
         fit: BoxFit.cover,

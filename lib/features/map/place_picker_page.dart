@@ -7,6 +7,7 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../services/place_service.dart';
 import '../home/models/place.dart';
+import '../../core/widgets/wayn_network_image.dart';
 
 /// Map-based WAYN place picker used by the community composer.
 ///
@@ -415,8 +416,8 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
                   size: 24,
                 ),
               )
-            : Image.network(
-                place.imageUrl,
+            : WaynNetworkImage(
+                imageUrl: place.imageUrl,
                 fit: BoxFit.cover,
                 errorBuilder:
                     (context, error, stackTrace) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/wayn_colors.dart';
+import '../../../core/widgets/wayn_network_image.dart';
 import '../models/place.dart';
 
 class PlaceCard extends StatelessWidget {
@@ -345,10 +346,9 @@ class _PlaceImage extends StatelessWidget {
       return const _ImagePlaceholder();
     }
 
-    return Image.network(
-      url,
+    return WaynNetworkImage(
+      imageUrl: url,
       fit: BoxFit.cover,
-      cacheWidth: 900,
       filterQuality: FilterQuality.low,
       frameBuilder: (
         context,

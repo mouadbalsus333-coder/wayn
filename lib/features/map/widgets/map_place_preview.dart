@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../home/models/place.dart';
 import '../../community/models/community_post.dart';
+import '../../../core/widgets/wayn_network_image.dart';
 
 class MapPlacePreview extends StatelessWidget {
   static const Color waynTeal = Color(0xFF18A99A);
@@ -508,8 +509,8 @@ class MapPlacePreview extends StatelessWidget {
                   BorderRadius.circular(
                 11,
               ),
-              child: Image.network(
-                imageUrl,
+              child: WaynNetworkImage(
+                imageUrl: imageUrl,
                 width: 76,
                 height: 76,
                 fit: BoxFit.cover,
@@ -945,8 +946,8 @@ class MapPlacePreview extends StatelessWidget {
           BorderRadius.circular(
         16,
       ),
-      child: Image.network(
-        imageUrl,
+      child: WaynNetworkImage(
+        imageUrl: imageUrl,
         width: 72,
         height: 72,
         fit: BoxFit.cover,

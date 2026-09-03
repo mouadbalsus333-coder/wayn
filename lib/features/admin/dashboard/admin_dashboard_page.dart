@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/wayn_api.dart';
 import '../../../models/contribution.dart';
+import '../../../core/widgets/wayn_network_image.dart';
 
 import '../wallet/admin_wallet_recharge_page.dart';
 import 'place_edit_screen.dart';
@@ -832,8 +833,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                           color: Color(0xFF18A99A),
                         ),
                       )
-                    : Image.network(
-                        imageUrl,
+                    : WaynNetworkImage(
+                        imageUrl: imageUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stack) => Container(
                           color: const Color(0xFFE8F8F6),

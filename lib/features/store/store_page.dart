@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/wayn_colors.dart';
+import '../../core/widgets/wayn_network_image.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
 import '../../features/notifications/notifications_page.dart';
@@ -186,8 +187,8 @@ class _StorePageState extends State<StorePage> {
       borderRadius: BorderRadius.circular(24),
       child: AspectRatio(
         aspectRatio: 2.15,
-        child: Image.network(
-          banner.imageUrl,
+        child: WaynNetworkImage(
+          imageUrl: banner.imageUrl,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return Container(
@@ -257,8 +258,8 @@ class _StorePageState extends State<StorePage> {
                         color: Color(0xFF18A99A),
                       ),
                     )
-                  : Image.network(
-                      item.imageUrl!,
+                  : WaynNetworkImage(
+                      imageUrl: item.imageUrl!,
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {

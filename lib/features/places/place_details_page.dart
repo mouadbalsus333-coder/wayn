@@ -4,6 +4,7 @@ import '../home/models/place.dart';
 import '../../services/favorite_service.dart';
 import '../../services/review_service.dart';
 import '../../core/theme/wayn_colors.dart';
+import '../../core/widgets/wayn_network_image.dart';
 
 class PlaceDetailsPage extends StatefulWidget {
   final Place place;
@@ -144,8 +145,8 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.network(
-              place.imageUrl,
+            child: WaynNetworkImage(
+              imageUrl: place.imageUrl,
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) {
                 return Container(

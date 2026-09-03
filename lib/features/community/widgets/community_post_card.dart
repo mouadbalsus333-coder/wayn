@@ -4,6 +4,7 @@ import '../../../core/config/backend_config.dart';
 import '../../../core/navigation/wayn_actions.dart';
 import '../../../core/theme/wayn_colors.dart';
 import '../../../core/utils/short_number.dart';
+import '../../../core/widgets/wayn_network_image.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/social_service.dart';
 import '../models/community_post.dart';
@@ -344,8 +345,8 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   maxScale: 4.0,
                   panEnabled: true,
                   scaleEnabled: true,
-                  child: Image.network(
-                    imageUrl,
+                  child: WaynNetworkImage(
+                    imageUrl: imageUrl,
                     fit: BoxFit.contain,
                     gaplessPlayback: true,
                     loadingBuilder: (
@@ -612,12 +613,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                       context,
                       fullImageUrl,
                     ),
-                    child: Image.network(
-                      fullImageUrl,
+                    child: WaynNetworkImage(
+                      imageUrl: fullImageUrl,
                       width: double.infinity,
                       fit: BoxFit.contain,
-                      cacheWidth: 800,
-                      cacheHeight: 800,
                       gaplessPlayback: true,
                       loadingBuilder: (
                         context,
