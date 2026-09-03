@@ -86,6 +86,20 @@ class InMemoryAuthTokenStorage implements AuthTokenStorage {
   }
 }
 
+class _CachedResponse {
+  final dynamic data;
+  final DateTime expiresAt;
+
+  const _CachedResponse({
+    required this.data,
+    required this.expiresAt,
+  });
+
+  bool get isValid {
+    return DateTime.now().isBefore(expiresAt);
+  }
+}
+
 class DartHttpApiClient implements ApiClient {
   @override
   final String baseUrl;
@@ -97,6 +111,19 @@ class DartHttpApiClient implements ApiClient {
   final AuthTokenStorage _secureStorage;
 
   final String tokenStorageKey;
+
+  // ============================================================
+  // GET Cache
+  // ============================================================
+
+  static const Duration _getCacheDuration = Duration(
+    seconds: 15,
+  );
+
+  static const int _maxCacheEntries = 50;
+
+  final Map<String, _CachedResponse> _getCache =
+      <String, _CachedResponse>{};
 
   DartHttpApiClient({
     required this.baseUrl,
@@ -131,6 +158,10 @@ class DartHttpApiClient implements ApiClient {
       value: trimmedToken,
     );
 
+    // Auth state changed, so user-specific GET cache must not
+    // survive the authentication transition.
+    _clearGetCache();
+
     print(
       'WAYN AUTH: access token saved successfully '
       '(length: ${trimmedToken.length})',
@@ -153,6 +184,10 @@ class DartHttpApiClient implements ApiClient {
     await _secureStorage.delete(
       key: tokenStorageKey,
     );
+
+    // Prevent cached authenticated data from being reused
+    // after logout.
+    _clearGetCache();
 
     print('WAYN AUTH: access token cleared');
   }
@@ -177,6 +212,24 @@ class DartHttpApiClient implements ApiClient {
       _buildUrl(path, queryParams),
     );
 
+    final cacheKey = uri.toString();
+
+    if (_isCacheableGet(path)) {
+      final cached = _getCache[cacheKey];
+
+      if (cached != null) {
+        if (cached.isValid) {
+          print(
+            'WAYN HTTP CACHE HIT: GET $uri',
+          );
+
+          return cached.data;
+        }
+
+        _getCache.remove(cacheKey);
+      }
+    }
+
     final requestHeaders = await _buildHeaders(headers);
 
     final response = await _client.get(
@@ -184,7 +237,16 @@ class DartHttpApiClient implements ApiClient {
       headers: requestHeaders,
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+
+    if (_isCacheableGet(path)) {
+      _storeGetCache(
+        cacheKey,
+        result,
+      );
+    }
+
+    return result;
   }
 
   // ============================================================
@@ -211,7 +273,11 @@ class DartHttpApiClient implements ApiClient {
       ),
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+
+    _invalidateCacheForPath(path);
+
+    return result;
   }
 
   // ============================================================
@@ -238,7 +304,11 @@ class DartHttpApiClient implements ApiClient {
       ),
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+
+    _invalidateCacheForPath(path);
+
+    return result;
   }
 
   // ============================================================
@@ -265,7 +335,11 @@ class DartHttpApiClient implements ApiClient {
       ),
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+
+    _invalidateCacheForPath(path);
+
+    return result;
   }
 
   // ============================================================
@@ -290,7 +364,11 @@ class DartHttpApiClient implements ApiClient {
       body: body == null ? null : jsonEncode(body),
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+
+    _invalidateCacheForPath(path);
+
+    return result;
   }
 
   // ============================================================
@@ -366,7 +444,134 @@ class DartHttpApiClient implements ApiClient {
       streamedResponse,
     );
 
-    return _handleResponse(response);
+    final result = _handleResponse(response);
+
+    _invalidateCacheForPath(path);
+
+    return result;
+  }
+
+  // ============================================================
+  // Cache
+  // ============================================================
+
+  bool _isCacheableGet(String path) {
+    final normalizedPath = path.startsWith('/')
+        ? path
+        : '/$path';
+
+    // Only cache public/read-heavy place and category data.
+    //
+    // We intentionally do NOT cache:
+    // - notifications
+    // - profile/user endpoints
+    // - community feeds
+    // - favorites
+    // - wallet
+    // - reviews
+    // - authentication endpoints
+    //
+    // This keeps user-specific and frequently changing data
+    // fresh while reducing repeated requests for directory data.
+    return normalizedPath == '/api/v1/categories' ||
+        normalizedPath.startsWith('/api/v1/categories/') ||
+        normalizedPath == '/api/v1/places' ||
+        normalizedPath.startsWith('/api/v1/places/');
+  }
+
+  void _storeGetCache(
+    String key,
+    dynamic data,
+  ) {
+    if (_getCache.length >= _maxCacheEntries) {
+      _removeOldestCacheEntry();
+    }
+
+    _getCache[key] = _CachedResponse(
+      data: data,
+      expiresAt: DateTime.now().add(
+        _getCacheDuration,
+      ),
+    );
+
+    print(
+      'WAYN HTTP CACHE STORE: $key '
+      '(TTL: ${_getCacheDuration.inSeconds}s)',
+    );
+  }
+
+  void _removeOldestCacheEntry() {
+    if (_getCache.isEmpty) {
+      return;
+    }
+
+    String? oldestKey;
+    DateTime? oldestExpiry;
+
+    for (final entry in _getCache.entries) {
+      if (oldestExpiry == null ||
+          entry.value.expiresAt.isBefore(oldestExpiry)) {
+        oldestKey = entry.key;
+        oldestExpiry = entry.value.expiresAt;
+      }
+    }
+
+    if (oldestKey != null) {
+      _getCache.remove(oldestKey);
+    }
+  }
+
+  void _clearGetCache() {
+    if (_getCache.isEmpty) {
+      return;
+    }
+
+    _getCache.clear();
+
+    print('WAYN HTTP CACHE: cleared');
+  }
+
+  void _invalidateCacheForPath(String path) {
+    if (!_isCacheableGet(path)) {
+      return;
+    }
+
+    final normalizedPath = path.startsWith('/')
+        ? path
+        : '/$path';
+
+    final keysToRemove = _getCache.keys.where((key) {
+      final uri = Uri.tryParse(key);
+
+      if (uri == null) {
+        return false;
+      }
+
+      final requestPath = uri.path;
+
+      if (normalizedPath == '/api/v1/places') {
+        return requestPath == '/api/v1/places' ||
+            requestPath.startsWith('/api/v1/places/');
+      }
+
+      if (normalizedPath.startsWith('/api/v1/categories')) {
+        return requestPath == '/api/v1/categories' ||
+            requestPath.startsWith('/api/v1/categories/');
+      }
+
+      return false;
+    }).toList();
+
+    for (final key in keysToRemove) {
+      _getCache.remove(key);
+    }
+
+    if (keysToRemove.isNotEmpty) {
+      print(
+        'WAYN HTTP CACHE: invalidated '
+        '${keysToRemove.length} entr${keysToRemove.length == 1 ? 'y' : 'ies'}',
+      );
+    }
   }
 
   // ============================================================
@@ -538,6 +743,7 @@ class DartHttpApiClient implements ApiClient {
   // ============================================================
 
   void dispose() {
+    _getCache.clear();
     _client.close();
   }
 }
