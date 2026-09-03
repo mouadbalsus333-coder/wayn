@@ -30,6 +30,13 @@ class CommunityPostCard extends StatefulWidget {
   /// يستقبل placeId المكان المرتبط.
   final ValueChanged<String>? onPlaceTap;
 
+  /// نص يصف نوع المنشور (مثل: "قام فلان بالنشر" أو "قام فلان بتقييم المكان").
+  /// يمكن تخصيصه حسب السياق.
+  final String? postDescriptionText;
+
+  ///  callback لإخفاء المنشور (السحب يمين).
+  final VoidCallback? onHide;
+
   const CommunityPostCard({
     super.key,
     required this.post,
@@ -39,6 +46,8 @@ class CommunityPostCard extends StatefulWidget {
     this.onDelete,
     this.onAuthorTap,
     this.onPlaceTap,
+    this.postDescriptionText,
+    this.onHide,
   });
 
   @override
@@ -150,7 +159,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         PopupMenuItem(
           value: 'report',
           child: _buildMenuItem(
-            'إبلاغ عن منشور',
+            'طعن في منشور',
             Icons.report_rounded,
             Colors.redAccent,
           ),
@@ -341,7 +350,8 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       post.imageUrl,
     );
 
-    return Container(
+    // المحتوى الداخلي للبطاقة
+    final cardContent = Container(
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(22),
@@ -359,11 +369,27 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // =========================================================
-            // USER HEADER
+            // RATING + PLACE + REPORT SECTION (TOP)
+            // =========================================================
+            _buildRatingAndPlaceSection(colors, placeName),
+
+            // =========================================================
+            // DIVIDER BETWEEN TOP SECTION AND USER INFO
+            // =========================================================
+            const SizedBox(height: 12),
+            Divider(
+              height: 1,
+              color: colors.divider,
+            ),
+            const SizedBox(height: 12),
+
+            // =========================================================
+            // USER HEADER (Avatar -> Name -> Points -> Follow -> Options)
             // =========================================================
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // صورة المستخدم
                 InkWell(
                   onTap: widget.onAuthorTap == null
                       ? null
@@ -383,107 +409,53 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   ),
                 ),
                 const SizedBox(width: 10),
+                // صيغة المنشور: "تقييم من (اسم الحساب)"
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                                            // ----- name + follow / points -----
-                      if (!post.isOwner)
-                        Row(
-                          children: [
-                            _AuthorPointsChip(
-                              points: post.authorPoints,
-                              colors: colors,
-                            ),
-                            const SizedBox(width: 8),
-                            _FollowButton(
-                              isFollowing: _isFollowing,
-                              busy: _followBusy,
-                              onPressed: _toggleFollow,
-                              colors: colors,
-                            ),
-                          ],
-                        ),
-
-                      // ----- "قام X بتقييم Y" -----
-                      const SizedBox(height: 6),
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 2,
+                  child: InkWell(
+                    onTap: widget.onAuthorTap == null
+                        ? null
+                        : () => widget.onAuthorTap!(post.userId),
+                    borderRadius: BorderRadius.circular(6),
+                    child: RichText(
+                      textDirection: TextDirection.rtl,
+                      text: TextSpan(
                         children: [
-                          Text(
-                            'قام ',
+                          TextSpan(
+                            text: 'تقييم من ',
                             style: TextStyle(
                               color: colors.textSecondary,
-                              fontSize: 13,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
-                          InkWell(
-                            onTap: widget.onAuthorTap == null
-                                ? null
-                                : () => widget.onAuthorTap!(post.userId),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Text(
-                              authorName,
-                              style: TextStyle(
-                                color: colors.brand,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            ' بتقييم ',
+                          TextSpan(
+                            text: authorName,
                             style: TextStyle(
-                              color: colors.textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                          InkWell(
-                            onTap: widget.onPlaceTap == null
-                                ? null
-                                : () => widget.onPlaceTap!(post.placeId),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 2,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.location_on_rounded,
-                                    size: 14,
-                                    color: colors.accentPurple,
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    placeName,
-                                    style: TextStyle(
-                                      color: colors.accentPurple,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              color: colors.brand,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ],
                       ),
-
-                      // ----- النجوم مباشرة تحت جملة التقييم -----
-                      if (post.rating != null) ...[
-                        const SizedBox(height: 6),
-                        _StarsRow(
-                          rating: post.rating!,
-                          colors: colors,
-                        ),
-                      ],
-                                                            ],
+                    ),
                   ),
                 ),
-                // ----- ثلاث نقاط على اليسار (مثبت، لا يتحرك) -----
+                // عدد النقاط
+                _AuthorPointsChip(
+                  points: post.authorPoints,
+                  colors: colors,
+                ),
+                const SizedBox(width: 8),
+                // زر متابعة (فقط للمستخدمين الاخرين)
+                if (!post.isOwner)
+                  _FollowButton(
+                    isFollowing: _isFollowing,
+                    busy: _followBusy,
+                    onPressed: _toggleFollow,
+                    colors: colors,
+                  ),
+                // ثلاث نقاط الخيارات
                 const SizedBox(width: 8),
                 _buildOptionsMenu(colors),
               ],
@@ -593,6 +565,265 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         ),
       ),
     );
+
+    // لف البطاقة بـ Dismissible للسحب يمين (إخفاء) ويسار (حذف)
+    return Dismissible(
+      key: Key(post.id),
+      // السحب من اليمين لليسار = حذف (فقط لصاحب المنشور)
+      direction: post.isOwner
+          ? DismissDirection.horizontal
+          : DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.endToStart) {
+          // سحب من اليمين لليسار = حذف أو إخفاء
+          if (post.isOwner) {
+            return await _showDeleteConfirmation(colors);
+          } else {
+            return false;
+          }
+        } else if (direction == DismissDirection.startToEnd) {
+          // سحب من اليسار لليمين = إخفاء (فقط لغير صاحب المنشور)
+          if (!post.isOwner) {
+            final result = await _showHideConfirmation(colors);
+            if (result && widget.onHide != null) {
+              widget.onHide!();
+            }
+            return false; // لا نريد إزالة البطاقة من القائمة لأننا نستدعي onHide
+          }
+        }
+        return false;
+      },
+      background: Container(
+        decoration: BoxDecoration(
+          color: colors.danger,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        child: Icon(
+          Icons.delete_outline_rounded,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+      secondaryBackground: Container(
+        decoration: BoxDecoration(
+          color: colors.textMuted,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: Icon(
+          Icons.visibility_off_outlined,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+      child: cardContent,
+    );
+  }
+
+  // ============================================================
+  // CONFIRMATION DIALOGS
+  // ============================================================
+
+  /// يعرض حوار تأكيد إخفاء المنشور.
+  Future<bool> _showHideConfirmation(WaynColors colors) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text(
+              'إخفاء المنشور',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            content: const Text(
+              'هل أنت متأكد أنك تريد إخفاء المنشور؟',
+              style: TextStyle(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(
+                  'إلغاء',
+                  style: TextStyle(color: colors.textSecondary),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(
+                  'تأكيد',
+                  style: TextStyle(color: colors.danger),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  /// يعرض حوار تأكيد حذف المنشور.
+  Future<bool> _showDeleteConfirmation(WaynColors colors) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text(
+              'حذف المنشور',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            content: const Text(
+              'هل أنت متأكد أنك تريد الحذف؟',
+              style: TextStyle(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(
+                  'إلغاء',
+                  style: TextStyle(color: colors.textSecondary),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text(
+                  'حذف',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (result == true) {
+      widget.onDelete?.call();
+    }
+    return result ?? false;
+  }
+
+  // ============================================================
+  // RATING + PLACE + REPORT SECTION
+  // ============================================================
+
+  /// يبني قسم التقييم والمكان والطعن في أعلى البطاقة.
+  /// الترتيب RTL: نجمة التقييم (يمين) → اسم المكان (منتصف) → طعن + خيارات (يسار)
+  Widget _buildRatingAndPlaceSection(WaynColors colors, String placeName) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // نجمة التقييم (أقصى اليمين في RTL)
+        if (post.rating != null)
+          _CompactRatingBadge(
+            rating: post.rating!,
+            colors: colors,
+          ),
+        const SizedBox(width: 8),
+        // اسم المكان مع دبوس الموقع (في المنتصف)
+        Expanded(
+          child: InkWell(
+            onTap: widget.onPlaceTap == null
+                ? null
+                : () => widget.onPlaceTap!(post.placeId),
+            borderRadius: BorderRadius.circular(6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.location_on_rounded,
+                  size: 14,
+                  color: colors.accentPurple,
+                ),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    placeName,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: colors.accentPurple,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // زر طعن فقط (بدون الثلاث نقاط) - أقصى اليسار في RTL
+        // زر طعن (فقط لغير صاحب المنشور)
+        if (!post.isOwner)
+          InkWell(
+            onTap: () => _showReportDialog(colors),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Text(
+                'طعن',
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // REPORT DIALOG - تم تغيير الاسم إلى "طعن"
+  // ============================================================
+
+  /// يعرض حوار الطعن البسيط.
+  void _showReportDialog(WaynColors colors) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text(
+              'طعن في المنشور',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            content: const Text(
+              'هل تريد الطعن في هذا المنشور؟',
+              style: TextStyle(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(
+                  'إلغاء',
+                  style: TextStyle(color: colors.textSecondary),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  _showMessage('تم الطعن في المنشور');
+                },
+                child: const Text(
+                  'طعن',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -696,6 +927,68 @@ class _FollowButton extends StatelessWidget {
                   ),
                 ),
         ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Compact Rating Badge (Star + Number) - تصميم محسّن
+// ============================================================
+
+class _CompactRatingBadge extends StatelessWidget {
+  final double rating;
+  final WaynColors colors;
+
+  const _CompactRatingBadge({
+    required this.rating,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ratingValue = rating.clamp(1.0, 5.0);
+    final ratingInt = ratingValue.round();
+
+    // اللون الأصفر/البرتقالي للنجمة - ثابت كما طلب المستخدم
+    const Color starColor = Color(0xFFF59E0B);
+
+    // حجم النجمة - مناسب وواضح
+    const double starSize = 20;
+
+    // تحديد نوع النجمة
+    IconData getStarIcon() {
+      if (ratingValue >= 4.5) return Icons.star_rounded;
+      if (ratingValue >= 3.5) return Icons.star_rounded;
+      if (ratingValue >= 2.5) return Icons.star_half_rounded;
+      if (ratingValue >= 1.5) return Icons.star_half_rounded;
+      return Icons.star_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: starColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            getStarIcon(),
+            size: starSize,
+            color: starColor,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            ratingInt.toString(),
+            style: const TextStyle(
+              color: starColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
