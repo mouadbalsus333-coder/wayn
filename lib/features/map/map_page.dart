@@ -60,7 +60,6 @@ class _MapPageState extends State<MapPage> {
   late final CommunityService _communityService =
       CommunityService(_communityRepository);
 
-
   Timer? _searchDebounce;
 
   Timer? _placeCarouselTimer;
@@ -68,7 +67,6 @@ class _MapPageState extends State<MapPage> {
   PageController? _placeCarouselController;
 
   int _placeCarouselIndex = 0;
-
 
   Position? _currentPosition;
 
@@ -95,6 +93,13 @@ class _MapPageState extends State<MapPage> {
   String _searchQuery = '';
 
   double _mapAreaHeight = 0;
+
+  /// رقم الجيل الحالي لطلبات البحث.
+  ///
+  /// كلما بدأ المستخدم بحثًا جديدًا أو مسح البحث،
+  /// يتم رفع الرقم حتى تصبح أي نتيجة قديمة غير صالحة
+  /// لتحديث الخريطة.
+  int _searchRequestId = 0;
 
   /// إحداثيات موقع محفوظ مختار يصبح مرجع الخريطة، أو null عندما يكون المرجع GPS.
   LatLng? _referenceLatLng;
@@ -1006,6 +1011,10 @@ class _MapPageState extends State<MapPage> {
   ) {
     _searchDebounce?.cancel();
 
+    // كل تغيير في نص البحث ينشئ جيلًا جديدًا.
+    // هذا يبطل أي طلب بحث سابق حتى لو عاد من السيرفر لاحقًا.
+    final requestId = ++_searchRequestId;
+
     final query =
         value.trim();
 
@@ -1026,15 +1035,20 @@ class _MapPageState extends State<MapPage> {
         milliseconds: 450,
       ),
       () {
-        _searchPlaces(query);
+        _searchPlaces(
+          query,
+          requestId,
+        );
       },
     );
   }
 
   Future<void> _searchPlaces(
     String query,
+    int requestId,
   ) async {
-    if (!mounted) {
+    if (!mounted ||
+        requestId != _searchRequestId) {
       return;
     }
 
@@ -1060,7 +1074,10 @@ class _MapPageState extends State<MapPage> {
         trimmedQuery,
       );
 
-      if (!mounted) {
+      // إذا بدأ المستخدم بحثًا جديدًا أثناء انتظار الطلب،
+      // نتجاهل هذه النتيجة بالكامل.
+      if (!mounted ||
+          requestId != _searchRequestId) {
         return;
       }
 
@@ -1073,6 +1090,13 @@ class _MapPageState extends State<MapPage> {
 
       await _addPlaceMarkers();
 
+      // قد يبدأ بحث جديد أثناء تحديث الـ markers،
+      // لذلك نتحقق مرة أخرى قبل تحريك الكاميرا.
+      if (!mounted ||
+          requestId != _searchRequestId) {
+        return;
+      }
+
       _fitPlacesOnMap(
         _places,
       );
@@ -1081,7 +1105,8 @@ class _MapPageState extends State<MapPage> {
         'Map search error: $e',
       );
 
-      if (!mounted) {
+      if (!mounted ||
+          requestId != _searchRequestId) {
         return;
       }
 
@@ -1256,7 +1281,7 @@ class _MapPageState extends State<MapPage> {
       return true;
     }).toList();
 
-        if (_statusFilter == _MapStatusFilter.near &&
+    if (_statusFilter == _MapStatusFilter.near &&
         _referenceOrGps != null) {
       result.sort(
         (a, b) =>
@@ -1285,13 +1310,13 @@ class _MapPageState extends State<MapPage> {
     return list;
   }
 
-    double _distanceToPlace(Place place) {
+  double _distanceToPlace(Place place) {
     final ref = _referenceOrGps;
 
     final latitude = place.latitude;
     final longitude = place.longitude;
 
-        if (ref == null ||
+    if (ref == null ||
         latitude == null ||
         longitude == null) {
       return double.infinity;
@@ -1449,69 +1474,72 @@ class _MapPageState extends State<MapPage> {
                     children: [
                       _buildMap(),
 
-            if (_isLoadingPlaces)
-              Positioned(
-                top:
-                    86,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration:
-                        BoxDecoration(
-                      color: Colors.white,
-                      borderRadius:
-                          BorderRadius.circular(
-                        14,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black
-                              .withValues(
-                            alpha: 0.10,
+                      if (_isLoadingPlaces)
+                        Positioned(
+                          top: 86,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              decoration:
+                                  BoxDecoration(
+                                color: Colors.white,
+                                borderRadius:
+                                    BorderRadius.circular(
+                                  14,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black
+                                        .withValues(
+                                      alpha: 0.10,
+                                    ),
+                                    blurRadius: 15,
+                                  ),
+                                ],
+                              ),
+                              padding:
+                                  const EdgeInsets.all(
+                                10,
+                              ),
+                              child:
+                                  const CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: _waynTeal,
+                              ),
+                            ),
                           ),
-                          blurRadius: 15,
                         ),
-                      ],
-                    ),
-                    padding:
-                        const EdgeInsets.all(
-                      10,
-                    ),
-                    child:
-                        const CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: _waynTeal,
-                    ),
-                  ),
-                ),
-              ),
 
-            if (_selectedPlace == null)
-              Positioned(
-                left: 18,
-                bottom: 84,
-                child:
-                    _buildLocationButton(),
-              ),
+                      if (_selectedPlace == null)
+                        Positioned(
+                          left: 18,
+                          bottom: 84,
+                          child:
+                              _buildLocationButton(),
+                        ),
 
-                        if (_selectedPlace != null)
-              AnimatedPositioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOut,
-                child: _buildPlacePreview(
-                  _selectedPlace!,
-                  _placeCardHeight,
-                ),
-              ),
+                      if (_selectedPlace != null)
+                        AnimatedPositioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          duration:
+                              const Duration(
+                            milliseconds: 260,
+                          ),
+                          curve: Curves.easeOut,
+                          child:
+                              _buildPlacePreview(
+                            _selectedPlace!,
+                            _placeCardHeight,
+                          ),
+                        ),
 
-            if (_selectedPlace == null)
-              _buildSearchBar(),
+                      if (_selectedPlace == null)
+                        _buildSearchBar(),
                     ],
                   );
                 },
@@ -1528,7 +1556,7 @@ class _MapPageState extends State<MapPage> {
   // ===============================================================
 
   Widget _buildMap() {
-        final initialCenter =
+    final initialCenter =
         _referenceOrGps ?? _defaultCenter;
 
     return Positioned.fill(
@@ -1644,8 +1672,12 @@ class _MapPageState extends State<MapPage> {
                     _searchDebounce
                         ?.cancel();
 
+                    final requestId =
+                        ++_searchRequestId;
+
                     _searchPlaces(
                       value,
+                      requestId,
                     );
                   },
                   decoration:
@@ -1690,9 +1722,16 @@ class _MapPageState extends State<MapPage> {
                     _searchDebounce
                         ?.cancel();
 
+                    // إبطال أي طلب بحث جارٍ قبل إعادة تحميل
+                    // الأماكن الأصلية.
+                    ++_searchRequestId;
+
                     setState(() {
                       _searchQuery =
                           '';
+
+                      _isSearching =
+                          false;
 
                       _selectedPlace =
                           null;
@@ -1944,8 +1983,7 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-
-Widget _buildFilterOption({
+  Widget _buildFilterOption({
     required String label,
     required bool selected,
     required VoidCallback onTap,
@@ -2009,6 +2047,7 @@ Widget _buildFilterOption({
       ),
     );
   }
+
   // ===============================================================
   // LOCATION BUTTON
   // ===============================================================
@@ -2100,7 +2139,7 @@ Widget _buildFilterOption({
     return (available * 0.62).clamp(lower, maxCard);
   }
 
-    Widget _buildPlacePreview(
+  Widget _buildPlacePreview(
     Place place,
     double height,
   ) {
@@ -2135,18 +2174,17 @@ Widget _buildFilterOption({
               _buildPlaceGallery(),
               _buildPlaceHeader(place),
               _buildPlaceTabs(),
-
-                        Flexible(
-              child:
-                  _showVisitorOpinions
-                      ? _buildVisitorOpinions()
-                      : _buildGeneralInformation(
-                          place,
-                        ),
-            ),
-          ],
+              Flexible(
+                child:
+                    _showVisitorOpinions
+                        ? _buildVisitorOpinions()
+                        : _buildGeneralInformation(
+                            place,
+                          ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -2165,7 +2203,6 @@ Widget _buildFilterOption({
     );
   }
 
-
   Widget _buildPlaceHeader(
     Place place,
   ) {
@@ -2180,11 +2217,9 @@ Widget _buildFilterOption({
       child: Row(
         children: [
           _buildPlaceImage(place),
-
           const SizedBox(
             width: 12,
           ),
-
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -2206,11 +2241,9 @@ Widget _buildFilterOption({
                         _waynText,
                   ),
                 ),
-
                 const SizedBox(
                   height: 5,
                 ),
-
                 Text(
                   '${place.category} • ${place.city}',
                   textDirection:
@@ -2229,11 +2262,9 @@ Widget _buildFilterOption({
                     ),
                   ),
                 ),
-
                 const SizedBox(
                   height: 7,
                 ),
-
                 Row(
                   children: [
                     const Icon(
@@ -2244,11 +2275,9 @@ Widget _buildFilterOption({
                         0xFFF5B942,
                       ),
                     ),
-
                     const SizedBox(
                       width: 4,
                     ),
-
                     Text(
                       place.rating
                           .toStringAsFixed(
@@ -2266,11 +2295,9 @@ Widget _buildFilterOption({
                         ),
                       ),
                     ),
-
                     const SizedBox(
                       width: 8,
                     ),
-
                     Text(
                       '${place.reviewsCount} تقييم',
                       style:
@@ -2283,11 +2310,9 @@ Widget _buildFilterOption({
                             _waynMuted,
                       ),
                     ),
-
                     const SizedBox(
                       width: 9,
                     ),
-
                     Icon(
                       Icons.circle,
                       size: 7,
@@ -2300,11 +2325,9 @@ Widget _buildFilterOption({
                                   0xFFD95353,
                                 ),
                     ),
-
                     const SizedBox(
                       width: 4,
                     ),
-
                     Text(
                       place.isOpen
                           ? 'مفتوح الآن'
@@ -2330,7 +2353,6 @@ Widget _buildFilterOption({
               ],
             ),
           ),
-
           GestureDetector(
             onTap: () {
               if (!mounted) {
@@ -2562,11 +2584,9 @@ Widget _buildFilterOption({
                 size: 27,
               ),
             ),
-
             const SizedBox(
               height: 11,
             ),
-
             const Text(
               'لا توجد آراء من الزوار بعد',
               textAlign:
@@ -2580,11 +2600,9 @@ Widget _buildFilterOption({
                     _waynText,
               ),
             ),
-
             const SizedBox(
               height: 5,
             ),
-
             const Text(
               'كن أول من يشارك تجربته مع هذا المكان.',
               textAlign:
@@ -2597,11 +2615,9 @@ Widget _buildFilterOption({
                     _waynMuted,
               ),
             ),
-
             const SizedBox(
               height: 13,
             ),
-
             _buildDirectionsButton(),
           ],
         ),
@@ -2779,7 +2795,6 @@ Widget _buildFilterOption({
       );
     }
   }
-
 
   void _showPostComments(int index) {
     if (!_isValidPostIndex(index)) {
@@ -2987,7 +3002,6 @@ Widget _buildFilterOption({
                 );
               },
             ),
-
             if (images.length > 1)
               Positioned(
                 bottom: 8,
@@ -3085,7 +3099,6 @@ Widget _buildFilterOption({
                 ),
               ),
             ),
-
           if (place.address != null &&
               place.address!
                   .trim()
@@ -3097,7 +3110,6 @@ Widget _buildFilterOption({
               value:
                   place.address!.trim(),
             ),
-
           if (place.phone != null &&
               place.phone!
                   .trim()
@@ -3109,7 +3121,6 @@ Widget _buildFilterOption({
               value:
                   place.phone!.trim(),
             ),
-
           if ((place.openingTime !=
                       null &&
                   place.openingTime!
@@ -3157,7 +3168,6 @@ Widget _buildFilterOption({
                 return '$opening - $closing';
               }(),
             ),
-
           if (place.website != null &&
               place.website!
                   .trim()
@@ -3169,7 +3179,6 @@ Widget _buildFilterOption({
               value:
                   place.website!.trim(),
             ),
-
           _buildInfoRow(
             icon:
                 Icons.people_outline_rounded,
@@ -3177,11 +3186,9 @@ Widget _buildFilterOption({
             value:
                 '${place.visitsCount}',
           ),
-
           const SizedBox(
             height: 4,
           ),
-
           _buildDirectionsButton(),
         ],
       ),

@@ -18,28 +18,38 @@ class WaynApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: waynThemeController,
-      builder: (context, themeMode, _) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'WAYN',
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: themeMode,
-          locale: const Locale('ar'),
-          supportedLocales: const [
-            Locale('ar'),
-            Locale('en'),
-          ],
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          home: const AuthGate(),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'WAYN',
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      locale: const Locale('ar'),
+      supportedLocales: const [
+        Locale('ar'),
+        Locale('en'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      builder: (context, child) {
+        if (child == null) {
+          return const SizedBox.shrink();
+        }
+
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: waynThemeController,
+          builder: (context, themeMode, _) {
+            return Theme(
+              data:
+                  themeMode == ThemeMode.dark ? AppTheme.dark : AppTheme.light,
+              child: child,
+            );
+          },
         );
       },
+      home: const AuthGate(),
     );
   }
 }
