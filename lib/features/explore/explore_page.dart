@@ -650,26 +650,6 @@ class _ExplorePageState extends State<ExplorePage> {
     return sorted;
   }
 
-  String _formatDistance(
-    double? meters,
-  ) {
-    if (meters == null) {
-      return '';
-    }
-
-    if (meters < 1000) {
-      return '${meters.round()} م';
-    }
-
-    final kilometers = meters / 1000;
-
-    if (kilometers < 10) {
-      return '${kilometers.toStringAsFixed(1)} كم';
-    }
-
-    return '${kilometers.round()} كم';
-  }
-
   // ================================================================
   // LOAD CATEGORIES
   // ================================================================
@@ -1024,14 +1004,6 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   // ================================================================
-  // OPEN PLACES
-  // ================================================================
-
-  Future<void> _openPlacesSuggestion() async {
-    await _onFilterSelected(1);
-  }
-
-  // ================================================================
   // BUILD
   // ================================================================
 
@@ -1094,8 +1066,9 @@ class _ExplorePageState extends State<ExplorePage> {
                         onFilterSelected:
                             _onFilterSelected,
                       ),
+
                       _buildExploreCategoriesSection(),
-                      _buildSuggestionsSection(),
+
                       SectionHeader(
                         title:
                             _buildResultsTitle(),
@@ -1104,6 +1077,7 @@ class _ExplorePageState extends State<ExplorePage> {
                         onActionPressed:
                             _onViewAllPressed,
                       ),
+
                       if (_isLoading)
                         const _LoadingPlaces()
                       else if (_errorMessage !=
@@ -1131,83 +1105,28 @@ class _ExplorePageState extends State<ExplorePage> {
                                 vertical: 8,
                               ),
                               child:
-                                  Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment
-                                        .stretch,
-                                children: [
                                   PlaceCard(
-                                    place:
-                                        place,
-                                    onFavoritePressed:
-                                        () {
-                                      _onFavoritePressed(
-                                        place,
-                                      );
-                                    },
-                                    onPressed:
-                                        () {
-                                      _onPlacePressed(
-                                        place,
-                                      );
-                                    },
-                                  ),
-                                  if (distance !=
-                                      null)
-                                    Padding(
-                                      padding:
-                                          const EdgeInsets
-                                              .only(
-                                        top: 5,
-                                        right: 8,
-                                      ),
-                                      child:
-                                          Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment
-                                                .start,
-                                        children: [
-                                          const Icon(
-                                            Icons
-                                                .near_me_rounded,
-                                            size:
-                                                14,
-                                            color:
-                                                Color(
-                                              0xFF18A99A,
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                            width:
-                                                4,
-                                          ),
-                                          Text(
-                                            _formatDistance(
-                                              distance,
-                                            ),
-                                            textDirection:
-                                                TextDirection
-                                                    .rtl,
-                                            style:
-                                                TextStyle(
-                                              fontSize:
-                                                  11,
-                                              fontWeight:
-                                                  FontWeight
-                                                      .w700,
-                                              color:
-                                                  colors
-                                                      .textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
+                                place:
+                                    place,
+                                distanceKm:
+                                    distance,
+                                onFavoritePressed:
+                                    () {
+                                  _onFavoritePressed(
+                                    place,
+                                  );
+                                },
+                                onPressed:
+                                    () {
+                                  _onPlacePressed(
+                                    place,
+                                  );
+                                },
                               ),
                             );
                           },
                         ),
+
                       if (_isLoadingMore)
                         const Padding(
                           padding:
@@ -1226,6 +1145,7 @@ class _ExplorePageState extends State<ExplorePage> {
                             ),
                           ),
                         ),
+
                       const SizedBox(
                         height: 100,
                       ),
@@ -1595,227 +1515,6 @@ class _ExplorePageState extends State<ExplorePage> {
       default:
         return Icons.place_rounded;
     }
-  }
-
-  // ================================================================
-  // SUGGESTIONS
-  // ================================================================
-
-  Widget _buildSuggestionsSection() {
-    final colors =
-        context.waynColors;
-
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding:
-              const EdgeInsets.fromLTRB(
-            20,
-            28,
-            20,
-            12,
-          ),
-          child: Text(
-            'اقتراحات لك',
-            textDirection:
-                TextDirection.rtl,
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight:
-                  FontWeight.w800,
-              color:
-                  colors.textPrimary,
-            ),
-          ),
-        ),
-        _buildSuggestionCard(
-          title: 'أماكن قريبة منك',
-          subtitle:
-              _hasLocationPermission
-                  ? 'أماكن مميزة حول موقعك الحالي'
-                  : 'فعّل موقعك لاكتشاف الأماكن القريبة',
-          icon:
-              Icons.near_me_rounded,
-          iconColor:
-              const Color(0xFF18A99A),
-          onPressed:
-              _loadNearbyPlaces,
-        ),
-        _buildSuggestionCard(
-          title: 'أماكن مناسبة لك',
-          subtitle:
-              'اقتراحات بناءً على اهتماماتك',
-          icon:
-              Icons.auto_awesome_rounded,
-          iconColor:
-              const Color(0xFF7B61D9),
-          onPressed: () {
-            debugPrint(
-              'Personalized places pressed',
-            );
-          },
-        ),
-        _buildSuggestionCard(
-          title: 'أماكن مفتوحة الآن',
-          subtitle:
-              'اكتشف الأماكن المتاحة حاليًا',
-          icon:
-              Icons.access_time_rounded,
-          iconColor:
-              const Color(0xFF2997FF),
-          onPressed:
-              _openPlacesSuggestion,
-        ),
-        if (_isLoadingLocation)
-          Padding(
-            padding:
-                const EdgeInsets.only(
-              top: 6,
-            ),
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child:
-                    CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color:
-                      colors.brand,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // ================================================================
-  // SUGGESTION CARD
-  // ================================================================
-
-  Widget _buildSuggestionCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-    required VoidCallback onPressed,
-  }) {
-    final colors =
-        context.waynColors;
-
-    return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 6,
-      ),
-      child: GestureDetector(
-        onTap: onPressed,
-        behavior:
-            HitTestBehavior.opaque,
-        child: Container(
-          padding:
-              const EdgeInsets.all(16),
-          decoration:
-              BoxDecoration(
-            color: colors.surface,
-            borderRadius:
-                BorderRadius.circular(
-              20,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.shadow,
-                blurRadius: 14,
-                offset:
-                    const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration:
-                    BoxDecoration(
-                  color:
-                      iconColor.withValues(
-                    alpha: 0.10,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(
-                    16,
-                  ),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 25,
-                ),
-              ),
-              const SizedBox(
-                width: 14,
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-                  children: [
-                    Text(
-                      title,
-                      textDirection:
-                          TextDirection
-                              .rtl,
-                      style:
-                          TextStyle(
-                        fontSize: 15,
-                        fontWeight:
-                            FontWeight
-                                .w800,
-                        color: colors
-                            .textPrimary,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 4,
-                    ),
-                    Text(
-                      subtitle,
-                      textDirection:
-                          TextDirection
-                              .rtl,
-                      style:
-                          TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight
-                                .w500,
-                        color: colors
-                            .textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(
-                width: 10,
-              ),
-              Icon(
-                Icons
-                    .arrow_back_ios_new_rounded,
-                size: 15,
-                color:
-                    colors.textMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   // ================================================================

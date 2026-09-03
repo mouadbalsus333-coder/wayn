@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/wayn_colors.dart';
@@ -24,71 +22,101 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
   final TextEditingController _controller =
       TextEditingController();
 
-  Timer? _debounce;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   void _onTextChanged(String value) {
-    _debounce?.cancel();
-
-    _debounce = Timer(
-      const Duration(milliseconds: 450),
-      () {
-        widget.onSearchChanged?.call(value);
-      },
-    );
-
+    // أثناء الكتابة لا ننفذ البحث.
+    // البحث يتم فقط عند الضغط على زر البحث في لوحة المفاتيح.
     setState(() {});
   }
 
+  void _submitSearch() {
+    widget.onSearchChanged?.call(
+      _controller.text.trim(),
+    );
+  }
+
   void _clearSearch() {
-    _debounce?.cancel();
     _controller.clear();
 
     widget.onSearchChanged?.call('');
+
+    _focusNode.requestFocus();
 
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
+
+    final searchBackground = isDark
+        ? const Color(0xFF151A22)
+        : Colors.white;
+
+    final searchBorder = isDark
+        ? const Color(0xFF2B3340)
+        : const Color(0xFFE7EBF0);
+
+    final searchText = isDark
+        ? Colors.white
+        : const Color(0xFF172033);
+
+    final searchHint = isDark
+        ? const Color(0xFF8F99A8)
+        : const Color(0xFF9AA3B1);
+
+    final filterBackground = isDark
+        ? const Color(0xFF17332F)
+        : const Color(0xFFE8F8F6);
+
     final hasText =
         _controller.text.trim().isNotEmpty;
-    final colors = context.waynColors;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        20,
+        12,
         14,
-        20,
+        12,
         12,
       ),
       child: Container(
         height: 58,
         decoration: BoxDecoration(
-          color: colors.surfaceElevated,
-          borderRadius: BorderRadius.circular(18),
+          color: searchBackground,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: searchBorder,
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: colors.shadow,
-              blurRadius: 20,
-              offset: const Offset(0, 6),
+              color: Colors.black.withValues(
+                alpha: isDark ? 0.25 : 0.12,
+              ),
+              blurRadius: 24,
+              offset: const Offset(0, 7),
             ),
           ],
         ),
         child: Row(
           children: [
-            const SizedBox(width: 16),
+            const SizedBox(width: 15),
 
-            Icon(
+            const Icon(
               Icons.search_rounded,
-              size: 25,
-              color: colors.textMuted,
+              size: 24,
+              color: Color(0xFF18A99A),
             ),
 
             const SizedBox(width: 10),
@@ -96,18 +124,44 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
             Expanded(
               child: TextField(
                 controller: _controller,
+                focusNode: _focusNode,
                 textDirection: TextDirection.rtl,
                 textAlign: TextAlign.right,
-                textInputAction: TextInputAction.search,
+                textAlignVertical:
+                    TextAlignVertical.center,
+                textInputAction:
+                    TextInputAction.search,
                 onChanged: _onTextChanged,
+                onSubmitted: (_) {
+                  _submitSearch();
+                },
+                cursorColor:
+                    const Color(0xFF18A99A),
+                style: TextStyle(
+                  color: searchText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
                 decoration: InputDecoration(
                   hintText: 'شن ادور؟',
                   hintStyle: TextStyle(
-                    color: colors.textMuted,
-                    fontSize: 15,
+                    color: searchHint,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
+
+                  // مهم:
+                  // إزالة أي إطار داخلي حول TextField.
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+
+                  filled: false,
                   isCollapsed: true,
+                  contentPadding: EdgeInsets.zero,
                 ),
               ),
             ),
@@ -116,59 +170,54 @@ class _HomeSearchBarState extends State<HomeSearchBar> {
               GestureDetector(
                 onTap: _clearSearch,
                 behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 4,
+                  ),
                   child: Icon(
                     Icons.close_rounded,
-                    size: 20,
-                    color: colors.textMuted,
+                    color: Color(0xFF8993A3),
+                    size: 21,
                   ),
                 ),
               ),
 
+            const SizedBox(width: 4),
+
             Container(
-              height: 38,
-              width: 1,
-              color: colors.divider,
-            ),
-
-            InkWell(
-              onTap: widget.onCategoryPressed,
-              borderRadius: BorderRadius.circular(14),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxWidth: 90,
-                      ),
-                      child: Text(
-                        widget.selectedCategory,
-                        textDirection: TextDirection.rtl,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: colors.textPrimary,
+              width: 43,
+              height: 43,
+              margin: const EdgeInsets.only(
+                right: 7,
+              ),
+              decoration: BoxDecoration(
+                color: filterBackground,
+                borderRadius:
+                    BorderRadius.circular(14),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.onCategoryPressed,
+                  borderRadius:
+                      BorderRadius.circular(14),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.tune_rounded,
+                          color: colors.brand,
+                          size: 21,
                         ),
-                      ),
+                      ],
                     ),
-
-                    const SizedBox(width: 4),
-
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: colors.textMuted,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
+
+            const SizedBox(width: 7),
           ],
         ),
       ),
