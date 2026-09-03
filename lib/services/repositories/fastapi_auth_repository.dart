@@ -1,12 +1,18 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/dart_http_api_client.dart';
 import '../../models/user.dart';
+import '../user_session_storage.dart';
 import 'auth_repository.dart';
 
 class FastApiAuthRepository implements AuthRepository {
   final DartHttpApiClient _api;
+  final UserSessionStorage _userSessionStorage;
 
-  FastApiAuthRepository(this._api);
+  FastApiAuthRepository(
+    this._api, {
+    UserSessionStorage? userSessionStorage,
+  }) : _userSessionStorage =
+            userSessionStorage ?? UserSessionStorage();
 
   // ============================================================
   // Register
@@ -108,13 +114,40 @@ class FastApiAuthRepository implements AuthRepository {
         );
       }
 
-      return User.fromMap(
+      final user = User.fromMap(
         Map<String, dynamic>.from(response),
       );
+
+      await _userSessionStorage.saveUser(user);
+
+      return user;
     } on ApiClientException catch (error) {
+      // A 401 means the server explicitly rejected the
+      // authentication token. This is different from a
+      // network failure and should end the local session.
       if (error.statusCode == 401) {
-        await _api.clearAuthToken();
+        await _clearLocalSession();
         return null;
+      }
+
+      // Any other API error is not treated as logout.
+      // Try the last locally cached authenticated user.
+      final cachedUser =
+          await _userSessionStorage.getCachedUser();
+
+      if (cachedUser != null) {
+        return cachedUser;
+      }
+
+      rethrow;
+    } catch (_) {
+      // Network errors such as no internet, timeout, DNS failure,
+      // or connection refused must not log the user out.
+      final cachedUser =
+          await _userSessionStorage.getCachedUser();
+
+      if (cachedUser != null) {
+        return cachedUser;
       }
 
       rethrow;
@@ -127,7 +160,7 @@ class FastApiAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {
-    await _api.clearAuthToken();
+    await _clearLocalSession();
   }
 
   // ============================================================
@@ -180,12 +213,16 @@ class FastApiAuthRepository implements AuthRepository {
         );
       }
 
-      return User.fromMap(
+      final user = User.fromMap(
         Map<String, dynamic>.from(response),
       );
+
+      await _userSessionStorage.saveUser(user);
+
+      return user;
     } on ApiClientException catch (error) {
       if (error.statusCode == 401) {
-        await _api.clearAuthToken();
+        await _clearLocalSession();
         return null;
       }
 
@@ -212,7 +249,7 @@ class FastApiAuthRepository implements AuthRepository {
       );
     } on ApiClientException catch (error) {
       if (error.statusCode == 401) {
-        await _api.clearAuthToken();
+        await _clearLocalSession();
       }
 
       rethrow;
@@ -269,6 +306,7 @@ class FastApiAuthRepository implements AuthRepository {
     );
 
     await _api.setAuthToken(accessToken);
+    await _userSessionStorage.saveUser(user);
 
     return VerificationResult(
       user: user,
@@ -406,12 +444,29 @@ class FastApiAuthRepository implements AuthRepository {
       // Convert API user
       // ----------------------------------------------------------
 
-      return User.fromMap(userMap);
+      final user = User.fromMap(userMap);
+
+      // ----------------------------------------------------------
+      // Save local authenticated user
+      // ----------------------------------------------------------
+
+      await _userSessionStorage.saveUser(user);
+
+      return user;
     } catch (error, stackTrace) {
       print('WAYN AUTH FAILED: $error');
       print('WAYN AUTH STACKTRACE: $stackTrace');
 
       rethrow;
     }
+  }
+
+  // ============================================================
+  // Local session
+  // ============================================================
+
+  Future<void> _clearLocalSession() async {
+    await _api.clearAuthToken();
+    await _userSessionStorage.clearUser();
   }
 }

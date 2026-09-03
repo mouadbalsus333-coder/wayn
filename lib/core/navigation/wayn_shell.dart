@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/wayn_colors.dart';
 import '../widgets/wayn_guest_banner.dart';
@@ -49,6 +50,8 @@ class _WaynShellState extends State<WaynShell> {
 
     if (_currentIndex == _profileTabIndex) return;
 
+    HapticFeedback.selectionClick();
+
     setState(() {
       _currentIndex = _profileTabIndex;
     });
@@ -64,6 +67,18 @@ class _WaynShellState extends State<WaynShell> {
         user: user,
       ),
     ];
+  }
+
+  void _selectTab(int index) {
+    if (_currentIndex == index) {
+      return;
+    }
+
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      _currentIndex = index;
+    });
   }
 
   @override
@@ -87,6 +102,7 @@ class _WaynShellState extends State<WaynShell> {
                     WaynGuestBannerDismissed.instance.value == false) {
                   WaynGuestBannerDismissed.instance.value = true;
                 }
+
                 return false;
               },
               child: IndexedStack(
@@ -94,6 +110,7 @@ class _WaynShellState extends State<WaynShell> {
                 children: _pages,
               ),
             ),
+
             // في تبويب المجتمع يعرض الصفحة إشعارها الخاص أسفل الهيدر،
             // لذا لا نظهر البنر العام هنا لتجنب التكرار.
             if (isGuest && _currentIndex != _communityTabIndex)
@@ -165,47 +182,59 @@ class _WaynShellState extends State<WaynShell> {
                 final selected = _currentIndex == index;
 
                 return Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      setState(() {
-                        _currentIndex = index;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? colors.surfaceAlt
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            items[index].$1,
-                            size: 24,
-                            color: selected
-                                ? colors.brand
-                                : colors.textMuted,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            items[index].$2,
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: selected
-                                  ? FontWeight.w800
-                                  : FontWeight.w500,
-                              color: selected
-                                  ? colors.brand
-                                  : colors.textMuted,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      splashFactory: InkRipple.splashFactory,
+                      onTap: () => _selectTab(index),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? colors.surfaceAlt
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedScale(
+                              scale: selected ? 1.08 : 1.0,
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOutBack,
+                              child: Icon(
+                                items[index].$1,
+                                size: 24,
+                                color: selected
+                                    ? colors.brand
+                                    : colors.textMuted,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOutCubic,
+                              style: TextStyle(
+                                fontSize: selected ? 12 : 12,
+                                fontWeight: selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
+                                color: selected
+                                    ? colors.brand
+                                    : colors.textMuted,
+                              ),
+                              child: Text(
+                                items[index].$2,
+                                textDirection: TextDirection.rtl,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
