@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../navigation/wayn_actions.dart';
@@ -13,8 +11,10 @@ import '../../services/auth_service.dart';
 
 /// يفتح قائمة WAYN الجانبية من زر القائمة في الهيدر.
 ///
-/// القائمة تظهر من جهة اليمين (جهة RTL)، بعرض متوسط، مع خلفية ضبابية
-/// خلفها، ولا تغطي الشاشة بالكامل.
+/// القائمة تظهر من جهة اليمين (جهة RTL)، بعرض متوسط.
+///
+/// طبقة التعتيم خارج القائمة مستقلة عن حركة القائمة، لذلك لا تتحرك
+/// معها ولا يظهر مستطيل ملاصق لها أثناء الـ SlideTransition.
 Future<void> showWaynMenu(BuildContext context) async {
   await Navigator.of(context).push(
     PageRouteBuilder<void>(
@@ -22,22 +22,59 @@ Future<void> showWaynMenu(BuildContext context) async {
       barrierDismissible: true,
       barrierLabel: 'إغلاق القائمة',
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 280),
-      reverseTransitionDuration: const Duration(milliseconds: 220),
+
+      // ================================================================
+      // حركة الدخول والخروج
+      //
+      // الإغلاق أصبح بنفس منحنى الحركة الناعم بدل easeInCubic،
+      // لأن easeInCubic يجعل نهاية الإغلاق تبدو حادة وغير طبيعية.
+      // ================================================================
+      transitionDuration: const Duration(milliseconds: 240),
+      reverseTransitionDuration: const Duration(milliseconds: 250),
+
       pageBuilder: (_, _, _) => const WaynMenuDrawer(),
+
       transitionsBuilder: (_, animation, _, child) {
         final curved = CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
+          reverseCurve: Curves.easeOutCubic,
         );
 
-        return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0.30, 0),
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            // ============================================================
+            // طبقة التعتيم خارج القائمة.
+            //
+            // ثابتة ولا تتحرك مع القائمة.
+            // ============================================================
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.of(context).pop(),
+                child: const ColoredBox(
+                  color: Color(0x1F000000),
+                ),
+              ),
+            ),
+
+            // ============================================================
+            // القائمة نفسها.
+            //
+            // الحركة تطبق على لوحة القائمة فقط.
+            // ============================================================
+            Align(
+              alignment: Alignment.centerRight,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.30, 0),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: child,
+              ),
+            ),
+          ],
         );
       },
     ),
@@ -145,125 +182,105 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
     final colors = context.waynColors;
     final isGuest = _user == null;
 
+    // ================================================================
+    // القائمة فقط.
+    //
+    // لا توجد هنا طبقة خلفية ولا BackdropFilter.
+    // هذا مهم لأن WaynMenuDrawer هو العنصر الذي يتحرك بالـ SlideTransition.
+    // ================================================================
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Stack(
-        children: [
-          // ============================================================
-          // الخلفية الضبابية القابلة للنقر للإغلاق
-          // ============================================================
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).pop(),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: 8,
-                  sigmaY: 8,
-                ),
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.12),
-                ),
-              ),
-            ),
-          ),
-
-          // ============================================================
-          // لوحة القائمة (بعرض متوسط، على جهة RTL)
-          // ============================================================
-          Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              width: width,
-              height: double.infinity,
-              child: Material(
-                color: colors.surface,
-                elevation: 16,
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      _header(),
-                      Expanded(
-                        child: ListView(
-                          padding: const EdgeInsets.fromLTRB(
-                            14,
-                            8,
-                            14,
-                            24,
-                          ),
-                          children: [
-                            if (isGuest)
-                              _MenuTile(
-                                icon: Icons.login_rounded,
-                                title: 'تسجيل الدخول',
-                                subtitle: 'ادخل للاستمتاع بمزايا وين الكاملة',
-                                onTap: _navigateToLogin,
-                              )
-                            else ...[
-                              _MenuTile(
-                                icon: Icons.account_balance_wallet_rounded,
-                                title: 'المحفظة',
-                                subtitle: 'النقاط والعملات والتحويلات',
-                                onTap: () => _open(const WalletPage()),
-                              ),
-                              _MenuTile(
-                                icon: Icons.bookmark_border_rounded,
-                                title: 'المحفوظات',
-                                subtitle: 'منشوراتك وأماكنك المحفوظة',
-                                onTap: () => _open(
-                                  const SavedPostsPage(),
-                                ),
-                              ),
-                              _MenuTile(
-                                icon: Icons.history_rounded,
-                                title: 'النشاط',
-                                subtitle: 'مراجعاتك وتفاعلاتك',
-                                onTap: () =>
-                                    _showMessage('سجل النشاط'),
-                              ),
-                            ],
-                            Divider(
-                              height: 24,
-                              indent: 14,
-                              endIndent: 14,
-                              color: colors.divider,
-                            ),
-                            _MenuTile(
-                              icon: Icons.settings_outlined,
-                              title: 'الإعدادات',
-                              subtitle: 'إدارة الحساب والتخصيص',
-                              onTap: () => _open(
-                                const SettingsPage(),
-                              ),
-                            ),
-                          ],
-                        ),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: SizedBox(
+          width: width,
+          height: double.infinity,
+          child: Material(
+            color: colors.surface,
+            elevation: 16,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  _header(),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(
+                        14,
+                        8,
+                        14,
+                        24,
                       ),
-
-                      // زر تسجيل الخروج مثبت أسفل القائمة تمامًا
-                      // ولا يتحرك مع Scroll مهما زادت عناصر القائمة.
-                      if (!isGuest) ...[
+                      children: [
+                        if (isGuest)
+                          _MenuTile(
+                            icon: Icons.login_rounded,
+                            title: 'تسجيل الدخول',
+                            subtitle: 'ادخل للاستمتاع بمزايا وين الكاملة',
+                            onTap: _navigateToLogin,
+                          )
+                        else ...[
+                          _MenuTile(
+                            icon: Icons.account_balance_wallet_rounded,
+                            title: 'المحفظة',
+                            subtitle: 'النقاط والعملات والتحويلات',
+                            onTap: () => _open(const WalletPage()),
+                          ),
+                          _MenuTile(
+                            icon: Icons.bookmark_border_rounded,
+                            title: 'المحفوظات',
+                            subtitle: 'منشوراتك وأماكنك المحفوظة',
+                            onTap: () => _open(
+                              const SavedPostsPage(),
+                            ),
+                          ),
+                          _MenuTile(
+                            icon: Icons.history_rounded,
+                            title: 'النشاط',
+                            subtitle: 'مراجعاتك وتفاعلاتك',
+                            onTap: () =>
+                                _showMessage('سجل النشاط'),
+                          ),
+                        ],
                         Divider(
-                          height: 1,
+                          height: 24,
                           indent: 14,
                           endIndent: 14,
                           color: colors.divider,
                         ),
                         _MenuTile(
-                          icon: Icons.logout_rounded,
-                          title: 'تسجيل الخروج',
-                          subtitle: 'الخروج من الحساب',
-                          destructive: true,
-                          onTap: _handleLogout,
+                          icon: Icons.settings_outlined,
+                          title: 'الإعدادات',
+                          subtitle: 'إدارة الحساب والتخصيص',
+                          onTap: () => _open(
+                            const SettingsPage(),
+                          ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
+
+                  // زر تسجيل الخروج مثبت أسفل القائمة تمامًا
+                  // ولا يتحرك مع Scroll مهما زادت عناصر القائمة.
+                  if (!isGuest) ...[
+                    Divider(
+                      height: 1,
+                      indent: 14,
+                      endIndent: 14,
+                      color: colors.divider,
+                    ),
+                    _MenuTile(
+                      icon: Icons.logout_rounded,
+                      title: 'تسجيل الخروج',
+                      subtitle: 'الخروج من الحساب',
+                      destructive: true,
+                      onTap: _handleLogout,
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
