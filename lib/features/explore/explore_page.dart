@@ -323,7 +323,8 @@ class _ExplorePageState extends State<ExplorePage> {
         final ref = _referencePoint;
 
         if (ref != null) {
-          final refPos = _positionFromReference(
+          final refPos =
+              _positionFromReference(
             ref,
           );
 
@@ -608,46 +609,56 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
+  // ================================================================
+  // SORT BY DISTANCE
+  // ================================================================
+
   List<Place> _sortByDistance(
     List<Place> places,
     Position position,
   ) {
-    final sorted =
-        List<Place>.from(places);
+    final placesWithDistance = <_PlaceDistance>[];
 
-    sorted.sort((a, b) {
-      if (a.latitude == null ||
-          a.longitude == null) {
-        return 1;
+    for (final place in places) {
+      if (place.latitude == null ||
+          place.longitude == null) {
+        placesWithDistance.add(
+          _PlaceDistance(
+            place: place,
+            distance: double.infinity,
+          ),
+        );
+        continue;
       }
 
-      if (b.latitude == null ||
-          b.longitude == null) {
-        return -1;
-      }
-
-      final distanceA =
+      final distance =
           Geolocator.distanceBetween(
         position.latitude,
         position.longitude,
-        a.latitude!,
-        a.longitude!,
+        place.latitude!,
+        place.longitude!,
       );
 
-      final distanceB =
-          Geolocator.distanceBetween(
-        position.latitude,
-        position.longitude,
-        b.latitude!,
-        b.longitude!,
+      placesWithDistance.add(
+        _PlaceDistance(
+          place: place,
+          distance: distance,
+        ),
       );
+    }
 
-      return distanceA.compareTo(
-        distanceB,
-      );
-    });
+    placesWithDistance.sort(
+      (a, b) =>
+          a.distance.compareTo(
+        b.distance,
+      ),
+    );
 
-    return sorted;
+    return placesWithDistance
+        .map(
+          (item) => item.place,
+        )
+        .toList();
   }
 
   // ================================================================
@@ -1038,8 +1049,7 @@ class _ExplorePageState extends State<ExplorePage> {
                     _searchPlaces,
               ),
               Expanded(
-                child:
-                    RefreshIndicator(
+                child: RefreshIndicator(
                   onRefresh: () async {
                     await Future.wait([
                       _loadCurrentLocation(),
@@ -1049,7 +1059,7 @@ class _ExplorePageState extends State<ExplorePage> {
                     await _reloadCurrentView();
                   },
                   color: colors.brand,
-                  child: ListView(
+                  child: CustomScrollView(
                     controller:
                         _scrollController,
                     physics:
@@ -1057,97 +1067,161 @@ class _ExplorePageState extends State<ExplorePage> {
                       parent:
                           AlwaysScrollableScrollPhysics(),
                     ),
-                    padding:
-                        EdgeInsets.zero,
-                    children: [
-                      HomeFilters(
-                        selectedIndex:
-                            _selectedFilterIndex,
-                        onFilterSelected:
-                            _onFilterSelected,
+                    slivers: [
+                      // ------------------------------------------------
+                      // FILTERS
+                      // ------------------------------------------------
+
+                      SliverToBoxAdapter(
+                        child: HomeFilters(
+                          selectedIndex:
+                              _selectedFilterIndex,
+                          onFilterSelected:
+                              _onFilterSelected,
+                        ),
                       ),
 
-                      _buildExploreCategoriesSection(),
+                      // ------------------------------------------------
+                      // CATEGORIES
+                      // ------------------------------------------------
 
-                      SectionHeader(
-                        title:
-                            _buildResultsTitle(),
-                        action:
-                            'عرض الكل',
-                        onActionPressed:
-                            _onViewAllPressed,
+                      SliverToBoxAdapter(
+                        child:
+                            _buildExploreCategoriesSection(),
                       ),
+
+                      // ------------------------------------------------
+                      // RESULTS HEADER
+                      // ------------------------------------------------
+
+                      SliverToBoxAdapter(
+                        child: SectionHeader(
+                          title:
+                              _buildResultsTitle(),
+                          action:
+                              'عرض الكل',
+                          onActionPressed:
+                              _onViewAllPressed,
+                        ),
+                      ),
+
+                      // ------------------------------------------------
+                      // LOADING
+                      // ------------------------------------------------
 
                       if (_isLoading)
-                        const _LoadingPlaces()
-                      else if (_errorMessage !=
-                          null)
-                        _buildErrorState()
+                        const SliverToBoxAdapter(
+                          child:
+                              _LoadingPlaces(),
+                        )
+
+                      // ------------------------------------------------
+                      // ERROR
+                      // ------------------------------------------------
+
+                      else if (_errorMessage != null)
+                        SliverToBoxAdapter(
+                          child:
+                              _buildErrorState(),
+                        )
+
+                      // ------------------------------------------------
+                      // EMPTY
+                      // ------------------------------------------------
+
                       else if (_places.isEmpty)
-                        _buildEmptyState()
+                        SliverToBoxAdapter(
+                          child:
+                              _buildEmptyState(),
+                        )
+
+                      // ------------------------------------------------
+                      // PLACES - LAZY LIST
+                      // ------------------------------------------------
+
                       else
-                        ...List.generate(
-                          _places.length,
-                          (index) {
-                            final place =
-                                _places[index];
+                        SliverList(
+                          delegate:
+                              SliverChildBuilderDelegate(
+                            (context, index) {
+                              final place =
+                                  _places[index];
 
-                            final distance =
-                                _distanceToPlace(
-                              place,
-                            );
+                              final distance =
+                                  _distanceToPlace(
+                                place,
+                              );
 
-                            return Padding(
-                              padding:
-                                  const EdgeInsets
-                                      .symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              child:
-                                  PlaceCard(
-                                place:
-                                    place,
-                                distanceKm:
-                                    distance,
-                                onFavoritePressed:
-                                    () {
-                                  _onFavoritePressed(
-                                    place,
-                                  );
-                                },
-                                onPressed:
-                                    () {
-                                  _onPlacePressed(
-                                    place,
-                                  );
-                                },
-                              ),
-                            );
-                          },
+                              return RepaintBoundary(
+                                key: ValueKey(
+                                  place.id,
+                                ),
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets
+                                          .symmetric(
+                                    horizontal: 20,
+                                    vertical: 8,
+                                  ),
+                                  child: PlaceCard(
+                                    place:
+                                        place,
+                                    distanceKm:
+                                        distance,
+                                    onFavoritePressed:
+                                        () {
+                                      _onFavoritePressed(
+                                        place,
+                                      );
+                                    },
+                                    onPressed:
+                                        () {
+                                      _onPlacePressed(
+                                        place,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                            childCount:
+                                _places.length,
+                          ),
                         ),
 
+                      // ------------------------------------------------
+                      // LOADING MORE
+                      // ------------------------------------------------
+
                       if (_isLoadingMore)
-                        const Padding(
-                          padding:
-                              EdgeInsets.symmetric(
-                            vertical: 20,
-                          ),
-                          child: Center(
-                            child:
-                                CircularProgressIndicator(
-                              strokeWidth:
-                                  2.2,
-                              color:
-                                  Color(
-                                0xFF18A99A,
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding:
+                                EdgeInsets.symmetric(
+                              vertical: 20,
+                            ),
+                            child: Center(
+                              child:
+                                  CircularProgressIndicator(
+                                strokeWidth:
+                                    2.2,
+                                color:
+                                    Color(
+                                  0xFF18A99A,
+                                ),
                               ),
                             ),
                           ),
                         ),
 
-                      const SizedBox(
-                        height: 100,
+                      // ------------------------------------------------
+                      // BOTTOM SPACE
+                      // ------------------------------------------------
+
+                      const SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: 100,
+                        ),
                       ),
                     ],
                   ),
@@ -1283,8 +1357,7 @@ class _ExplorePageState extends State<ExplorePage> {
         ),
         SizedBox(
           height: 108,
-          child:
-              ListView.separated(
+          child: ListView.separated(
             padding:
                 const EdgeInsets.symmetric(
               horizontal: 20,
@@ -1793,6 +1866,20 @@ class _ExplorePageState extends State<ExplorePage> {
       ),
     );
   }
+}
+
+// ==================================================================
+// DISTANCE HOLDER
+// ==================================================================
+
+class _PlaceDistance {
+  final Place place;
+  final double distance;
+
+  const _PlaceDistance({
+    required this.place,
+    required this.distance,
+  });
 }
 
 // ==================================================================

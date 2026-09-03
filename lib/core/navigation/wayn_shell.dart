@@ -28,14 +28,35 @@ class WaynShell extends StatefulWidget {
 class _WaynShellState extends State<WaynShell> {
   static const int _profileTabIndex = 4;
   static const int _communityTabIndex = 3;
+  static const int _tabCount = 5;
 
   int _currentIndex = 0;
-  late List<Widget> _pages;
+
+  // =========================================================
+  // LAZY PAGES
+  // =========================================================
+  //
+  // الصفحة تُنشأ فقط عند أول فتح لها.
+  //
+  // بعد إنشائها تبقى محفوظة حتى لا نفقد:
+  // - scroll position
+  // - page state
+  // - loaded data
+  // - map state
+  // - أي state داخلي للصفحة
+  //
+  final List<Widget?> _pages = List<Widget?>.filled(
+    _tabCount,
+    null,
+  );
 
   @override
   void initState() {
     super.initState();
-    _pages = _buildPages(widget.user);
+
+    // الصفحة الأولى فقط تُنشأ عند تشغيل الـ Shell.
+    _pages[0] = const ExplorePage();
+
     waynGoToProfileRequest.addListener(_onGoToProfile);
   }
 
@@ -45,6 +66,55 @@ class _WaynShellState extends State<WaynShell> {
     super.dispose();
   }
 
+  // =========================================================
+  // LAZY PAGE CREATION
+  // =========================================================
+
+  Widget _pageForIndex(int index) {
+    final existingPage = _pages[index];
+
+    if (existingPage != null) {
+      return existingPage;
+    }
+
+    final Widget page;
+
+    switch (index) {
+      case 0:
+        page = const ExplorePage();
+        break;
+
+      case 1:
+        page = const MapPage();
+        break;
+
+      case 2:
+        page = const StorePage();
+        break;
+
+      case 3:
+        page = const CommunityPage();
+        break;
+
+      case 4:
+        page = ProfilePage(
+          user: widget.user,
+        );
+        break;
+
+      default:
+        page = const SizedBox.shrink();
+    }
+
+    _pages[index] = page;
+
+    return page;
+  }
+
+  // =========================================================
+  // PROFILE REQUEST
+  // =========================================================
+
   void _onGoToProfile() {
     if (!mounted) return;
 
@@ -53,21 +123,19 @@ class _WaynShellState extends State<WaynShell> {
     HapticFeedback.selectionClick();
 
     setState(() {
+      // نضمن إنشاء صفحة الحساب عند الانتقال إليها
+      // مع الحفاظ على state بعد ذلك.
+      _pages[_profileTabIndex] ??= ProfilePage(
+        user: widget.user,
+      );
+
       _currentIndex = _profileTabIndex;
     });
   }
 
-  List<Widget> _buildPages(User? user) {
-    return [
-      const ExplorePage(),
-      const MapPage(),
-      const StorePage(),
-      const CommunityPage(),
-      ProfilePage(
-        user: user,
-      ),
-    ];
-  }
+  // =========================================================
+  // TAB SELECTION
+  // =========================================================
 
   void _selectTab(int index) {
     if (_currentIndex == index) {
@@ -77,9 +145,16 @@ class _WaynShellState extends State<WaynShell> {
     HapticFeedback.selectionClick();
 
     setState(() {
+      // الصفحة يتم إنشاؤها هنا فقط عند أول دخول للتبويب.
+      _pageForIndex(index);
+
       _currentIndex = index;
     });
   }
+
+  // =========================================================
+  // BUILD
+  // =========================================================
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +182,12 @@ class _WaynShellState extends State<WaynShell> {
               },
               child: IndexedStack(
                 index: _currentIndex,
-                children: _pages,
+                children: List<Widget>.generate(
+                  _tabCount,
+                  (index) {
+                    return _pages[index] ?? const SizedBox.shrink();
+                  },
+                ),
               ),
             ),
 
@@ -132,6 +212,10 @@ class _WaynShellState extends State<WaynShell> {
       ),
     );
   }
+
+  // =========================================================
+  // BOTTOM NAVIGATION
+  // =========================================================
 
   Widget _buildBottomNavigation(WaynColors colors) {
     const items = [

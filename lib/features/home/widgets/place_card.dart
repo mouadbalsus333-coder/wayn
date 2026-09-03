@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/wayn_colors.dart';
@@ -199,123 +197,124 @@ class PlaceCard extends StatelessWidget {
             // =========================================================
             // FROSTED INFORMATION PANEL
             // =========================================================
+            //
+            // Performance optimization:
+            // The previous version used BackdropFilter/ImageFilter.blur.
+            // That blur is expensive because Flutter has to rasterize and
+            // blur the content behind every visible card.
+            //
+            // We keep the frosted/glass appearance using a translucent
+            // surface instead, without the real-time GPU blur.
+            //
 
             Positioned(
               right: 0,
               left: 0,
               bottom: 0,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(
+                  16,
+                  13,
+                  16,
+                  14,
                 ),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(
-                    sigmaX: 14,
-                    sigmaY: 14,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.86),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(
-                      16,
-                      13,
-                      16,
-                      14,
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.35),
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.82),
-                      border: Border(
-                        top: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // -------------------------------------------------
+                      // PLACE NAME
+                      // -------------------------------------------------
+
+                      Text(
+                        place.name,
+                        textDirection: TextDirection.rtl,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF172033),
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          height: 1.15,
                         ),
                       ),
-                    ),
-                    child: Directionality(
-                      textDirection: TextDirection.rtl,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // -------------------------------------------------
-                          // PLACE NAME
-                          // -------------------------------------------------
 
-                          Text(
-                            place.name,
-                            textDirection: TextDirection.rtl,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF172033),
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              height: 1.15,
+                      const SizedBox(height: 9),
+
+                      // -------------------------------------------------
+                      // LOCATION / CATEGORY / DISTANCE
+                      // -------------------------------------------------
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.location_on_rounded,
+                                  size: 15,
+                                  color: Color(0xFF18A99A),
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    '${place.city} • ${place.category}',
+                                    textDirection: TextDirection.rtl,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF667085),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
 
-                          const SizedBox(height: 9),
+                          if (distanceKm != null) ...[
+                            const SizedBox(width: 12),
 
-                          // -------------------------------------------------
-                          // LOCATION / CATEGORY / DISTANCE
-                          // -------------------------------------------------
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.location_on_rounded,
-                                      size: 15,
-                                      color: Color(0xFF18A99A),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        '${place.city} • ${place.category}',
-                                        textDirection: TextDirection.rtl,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Color(0xFF667085),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.near_me_rounded,
+                                  size: 15,
+                                  color: Color(0xFF18A99A),
                                 ),
-                              ),
-
-                              if (distanceKm != null) ...[
-                                const SizedBox(width: 12),
-
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.near_me_rounded,
-                                      size: 15,
-                                      color: Color(0xFF18A99A),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _formatDistance(distanceKm!),
-                                      textDirection: TextDirection.rtl,
-                                      style: const TextStyle(
-                                        color: Color(0xFF18A99A),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatDistance(distanceKm!),
+                                  textDirection: TextDirection.rtl,
+                                  style: const TextStyle(
+                                    color: Color(0xFF18A99A),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ],
-                            ],
-                          ),
+                            ),
+                          ],
                         ],
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
