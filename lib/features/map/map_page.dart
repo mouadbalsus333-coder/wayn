@@ -52,6 +52,8 @@ class _MapPageState extends State<MapPage> {
   final TextEditingController _searchController =
       TextEditingController();
 
+  final FocusNode _searchFocusNode = FocusNode();
+
   final PlaceService _placeService = PlaceService();
 
   late final CommunityRepository _communityRepository =
@@ -59,8 +61,6 @@ class _MapPageState extends State<MapPage> {
 
   late final CommunityService _communityService =
       CommunityService(_communityRepository);
-
-  Timer? _searchDebounce;
 
   Timer? _placeCarouselTimer;
 
@@ -96,8 +96,8 @@ class _MapPageState extends State<MapPage> {
 
   /// رقم الجيل الحالي لطلبات البحث.
   ///
-  /// كلما بدأ المستخدم بحثًا جديدًا أو مسح البحث،
-  /// يتم رفع الرقم حتى تصبح أي نتيجة قديمة غير صالحة
+  /// كلما بدأ المستخدم بحثًا جديدًا أو غيّر النص أثناء وجود
+  /// طلب سابق، يتم رفع الرقم حتى تصبح أي نتيجة قديمة غير صالحة
   /// لتحديث الخريطة.
   int _searchRequestId = 0;
 
@@ -134,11 +134,15 @@ class _MapPageState extends State<MapPage> {
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _placeCarouselTimer?.cancel();
     _placeCarouselController?.dispose();
     _searchController.dispose();
-    SavedLocationsStore.instance.removeListener(_onSavedLocationsChanged);
+    _searchFocusNode.dispose();
+
+    SavedLocationsStore.instance.removeListener(
+      _onSavedLocationsChanged,
+    );
+
     super.dispose();
   }
 
@@ -1006,41 +1010,28 @@ class _MapPageState extends State<MapPage> {
   // SEARCH
   // ===============================================================
 
+  /// أثناء الكتابة لا يتم تنفيذ أي طلب API.
+  ///
+  /// نُبطل فقط أي طلب بحث سابق حتى لا تصل نتيجة قديمة
+  /// وتقوم بتحديث الخريطة بعد أن يغيّر المستخدم النص.
   void _onSearchChanged(
     String value,
   ) {
-    _searchDebounce?.cancel();
-
-    // كل تغيير في نص البحث ينشئ جيلًا جديدًا.
-    // هذا يبطل أي طلب بحث سابق حتى لو عاد من السيرفر لاحقًا.
-    final requestId = ++_searchRequestId;
-
-    final query =
-        value.trim();
-
-    if (query.isEmpty) {
-      setState(() {
-        _searchQuery = '';
-        _isSearching = false;
-        _selectedPlace = null;
-        _selectedPlacePosts = [];
-      });
-
-      _loadPlaces();
+    if (!mounted) {
       return;
     }
 
-    _searchDebounce = Timer(
-      const Duration(
-        milliseconds: 450,
-      ),
-      () {
-        _searchPlaces(
-          query,
-          requestId,
-        );
-      },
-    );
+    ++_searchRequestId;
+
+    final query = value.trim();
+
+    setState(() {
+      _searchQuery = query.isEmpty ? '' : _searchQuery;
+
+      if (query.isEmpty) {
+        _isSearching = false;
+      }
+    });
   }
 
   Future<void> _searchPlaces(
@@ -1074,7 +1065,7 @@ class _MapPageState extends State<MapPage> {
         trimmedQuery,
       );
 
-      // إذا بدأ المستخدم بحثًا جديدًا أثناء انتظار الطلب،
+      // إذا بدأ المستخدم بحثًا جديدًا أو غيّر النص أثناء انتظار الطلب،
       // نتجاهل هذه النتيجة بالكامل.
       if (!mounted ||
           requestId != _searchRequestId) {
@@ -1608,6 +1599,37 @@ class _MapPageState extends State<MapPage> {
   // ===============================================================
 
   Widget _buildSearchBar() {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
+
+    final searchBackground = isDark
+        ? const Color(0xFF151A22)
+        : Colors.white;
+
+    final searchBorder = isDark
+        ? const Color(0xFF2A3340)
+        : const Color(0xFFE7EBF0);
+
+    final searchTextColor = isDark
+        ? const Color(0xFFF4F7FA)
+        : _waynText;
+
+    final searchHintColor = isDark
+        ? const Color(0xFF8E99A8)
+        : const Color(0xFF9AA3B1);
+
+    final filterBackground = isDark
+        ? const Color(0xFF173B36)
+        : _waynTealLight;
+
+    final filterIconColor = isDark
+        ? const Color(0xFF5ED5C5)
+        : _waynTeal;
+
+    final closeIconColor = isDark
+        ? const Color(0xFF9DA7B5)
+        : _waynMuted;
+
     return Positioned(
       left: 12,
       right: 12,
@@ -1616,29 +1638,20 @@ class _MapPageState extends State<MapPage> {
         top: false,
         child: Container(
           height: 58,
-          decoration:
-              BoxDecoration(
-            color: Colors.white,
-            borderRadius:
-                BorderRadius.circular(
-              20,
-            ),
+          decoration: BoxDecoration(
+            color: searchBackground,
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color:
-                  const Color(
-                0xFFE7EBF0,
-              ),
+              color: searchBorder,
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black
-                    .withValues(
-                  alpha: 0.12,
+                color: Colors.black.withValues(
+                  alpha: isDark ? 0.28 : 0.12,
                 ),
                 blurRadius: 24,
-                offset:
-                    const Offset(0, 7),
+                offset: const Offset(0, 7),
               ),
             ],
           ),
@@ -1647,31 +1660,33 @@ class _MapPageState extends State<MapPage> {
               const SizedBox(
                 width: 15,
               ),
+
               const Icon(
                 Icons.search_rounded,
                 size: 24,
                 color: _waynTeal,
               ),
+
               const SizedBox(
                 width: 10,
               ),
+
               Expanded(
                 child: TextField(
-                  controller:
-                      _searchController,
-                  textDirection:
-                      TextDirection.rtl,
-                  textAlign:
-                      TextAlign.right,
-                  textInputAction:
-                      TextInputAction.search,
-                  onChanged:
-                      _onSearchChanged,
-                  onSubmitted:
-                      (value) {
-                    _searchDebounce
-                        ?.cancel();
-
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.right,
+                  textAlignVertical: TextAlignVertical.center,
+                  textInputAction: TextInputAction.search,
+                  style: TextStyle(
+                    color: searchTextColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  cursorColor: _waynTeal,
+                  onChanged: _onSearchChanged,
+                  onSubmitted: (value) {
                     final requestId =
                         ++_searchRequestId;
 
@@ -1680,116 +1695,95 @@ class _MapPageState extends State<MapPage> {
                       requestId,
                     );
                   },
-                  decoration:
-                      const InputDecoration(
-                    hintText:
-                        'شن تبي تلقى؟',
-                    hintStyle:
-                        TextStyle(
-                      color:
-                          Color(
-                        0xFF9AA3B1,
-                      ),
+                  decoration: InputDecoration(
+                    hintText: 'شن تبي تلقى؟',
+                    hintStyle: TextStyle(
+                      color: searchHintColor,
                       fontSize: 14,
-                      fontWeight:
-                          FontWeight.w500,
+                      fontWeight: FontWeight.w500,
                     ),
-                    border:
-                        InputBorder.none,
-                    isCollapsed:
-                        true,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    filled: false,
+                    isCollapsed: true,
+                    contentPadding: EdgeInsets.zero,
                   ),
                 ),
               ),
+
               if (_isSearching)
                 const SizedBox(
                   width: 22,
                   height: 22,
-                  child:
-                      CircularProgressIndicator(
+                  child: CircularProgressIndicator(
                     strokeWidth: 2.2,
                     color: _waynTeal,
                   ),
                 )
-              else if (_searchController
-                  .text
-                  .isNotEmpty)
+              else if (_searchController.text.isNotEmpty)
                 GestureDetector(
                   onTap: () {
-                    _searchController
-                        .clear();
-
-                    _searchDebounce
-                        ?.cancel();
+                    _searchController.clear();
 
                     // إبطال أي طلب بحث جارٍ قبل إعادة تحميل
                     // الأماكن الأصلية.
                     ++_searchRequestId;
 
                     setState(() {
-                      _searchQuery =
-                          '';
-
-                      _isSearching =
-                          false;
-
-                      _selectedPlace =
-                          null;
-
-                      _selectedPlacePosts =
-                          [];
+                      _searchQuery = '';
+                      _isSearching = false;
+                      _selectedPlace = null;
+                      _selectedPlacePosts = [];
                     });
 
+                    _resetPlaceCarousel();
                     _loadPlaces();
+
+                    // نحافظ على تجربة البحث: بعد المسح يعود التركيز
+                    // إلى الحقل ويبقى الكيبورد متاحًا.
+                    _searchFocusNode.requestFocus();
                   },
-                  child:
-                      const Padding(
-                    padding:
-                        EdgeInsets
-                            .symmetric(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 4,
                     ),
                     child: Icon(
-                      Icons
-                          .close_rounded,
-                      color:
-                          _waynMuted,
+                      Icons.close_rounded,
+                      color: closeIconColor,
                       size: 21,
                     ),
                   ),
                 ),
+
               const SizedBox(
                 width: 8,
               ),
+
               GestureDetector(
                 onTap: _openFilterSheet,
                 child: Container(
                   width: 43,
                   height: 43,
-                  margin:
-                      const EdgeInsets.only(
+                  margin: const EdgeInsets.only(
                     left: 7,
                   ),
-                  decoration:
-                      BoxDecoration(
-                    color:
-                        _waynTealLight,
+                  decoration: BoxDecoration(
+                    color: filterBackground,
                     borderRadius:
-                        BorderRadius
-                            .circular(
-                      14,
-                    ),
+                        BorderRadius.circular(14),
                   ),
-                  child:
-                      const Icon(
-                    Icons
-                        .tune_rounded,
-                    color:
-                        _waynTeal,
+                  child: Icon(
+                    Icons.tune_rounded,
+                    color: filterIconColor,
                     size: 21,
                   ),
                 ),
               ),
+
               const SizedBox(
                 width: 7,
               ),
