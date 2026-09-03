@@ -37,6 +37,7 @@ class _ExplorePageState extends State<ExplorePage> {
   int _selectedFilterIndex = 0;
 
   List<Place> _places = [];
+  Map<String, double?> _placeDistances = <String, double?>{};
   List<Category> _categories = [];
 
   bool _isLoading = true;
@@ -119,7 +120,7 @@ class _ExplorePageState extends State<ExplorePage> {
     if (changed) {
       _loadNearbyPlaces();
     } else {
-      setState(() {});
+      setState(_refreshDistanceCache);
     }
   }
 
@@ -202,6 +203,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _currentPosition = position;
         _isLoadingLocation = false;
         _hasLocationPermission = true;
+        _refreshDistanceCache();
       });
     } catch (error) {
       debugPrint(
@@ -233,7 +235,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = null;
         _currentPage = 1;
         _totalPages = 0;
-        _places = [];
+        _replacePlaces([]);
         _showingAllPlaces = true;
       });
     }
@@ -252,12 +254,12 @@ class _ExplorePageState extends State<ExplorePage> {
 
       setState(() {
         if (reset) {
-          _places = prepared;
+          _replacePlaces(prepared);
         } else {
-          _places = [
+          _replacePlaces([
             ..._places,
             ...prepared,
-          ];
+          ]);
         }
 
         _currentPage = result.page;
@@ -270,7 +272,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
       setState(() {
         if (reset) {
-          _places = [];
+          _replacePlaces([]);
           _isLoading = false;
         }
 
@@ -336,7 +338,7 @@ class _ExplorePageState extends State<ExplorePage> {
       }
 
       setState(() {
-        _places = combinedPlaces;
+        _replacePlaces(combinedPlaces);
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoadingMore = false;
@@ -512,7 +514,7 @@ class _ExplorePageState extends State<ExplorePage> {
       _searchQuery = '';
       _currentPage = 1;
       _totalPages = 0;
-      _places = [];
+      _replacePlaces([]);
       _showingAllPlaces = false;
     });
 
@@ -534,10 +536,10 @@ class _ExplorePageState extends State<ExplorePage> {
       );
 
       setState(() {
-        _places = _sortByDistance(
+        _replacePlaces(_sortByDistance(
           _preparePlaces(result.items),
           refPos,
-        );
+        ));
 
         _currentPage = result.page;
         _totalPages = result.pages;
@@ -554,7 +556,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted) return;
 
       setState(() {
-        _places = [];
+        _replacePlaces([]);
         _isLoading = false;
         _isLoadingMore = false;
         _errorMessage = error.toString();
@@ -607,6 +609,17 @@ class _ExplorePageState extends State<ExplorePage> {
       place.latitude!,
       place.longitude!,
     );
+  }
+
+  void _replacePlaces(List<Place> places) {
+    _places = places;
+    _refreshDistanceCache();
+  }
+
+  void _refreshDistanceCache() {
+    _placeDistances = <String, double?>{
+      for (final place in _places) place.id: _distanceToPlace(place),
+    };
   }
 
   // ================================================================
@@ -751,7 +764,7 @@ class _ExplorePageState extends State<ExplorePage> {
       _errorMessage = null;
       _currentPage = 1;
       _totalPages = 0;
-      _places = [];
+      _replacePlaces([]);
     });
 
     try {
@@ -765,8 +778,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted) return;
 
       setState(() {
-        _places =
-            _preparePlaces(result.items);
+        _replacePlaces(_preparePlaces(result.items));
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoading = false;
@@ -776,7 +788,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted) return;
 
       setState(() {
-        _places = [];
+        _replacePlaces([]);
         _isLoading = false;
         _isLoadingMore = false;
         _errorMessage = error.toString();
@@ -808,7 +820,7 @@ class _ExplorePageState extends State<ExplorePage> {
       _errorMessage = null;
       _currentPage = 1;
       _totalPages = 0;
-      _places = [];
+      _replacePlaces([]);
     });
 
     try {
@@ -840,7 +852,7 @@ class _ExplorePageState extends State<ExplorePage> {
       }
 
       setState(() {
-        _places = places;
+        _replacePlaces(places);
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoading = false;
@@ -850,7 +862,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted) return;
 
       setState(() {
-        _places = [];
+        _replacePlaces([]);
         _isLoading = false;
         _isLoadingMore = false;
         _errorMessage = error.toString();
@@ -882,7 +894,7 @@ class _ExplorePageState extends State<ExplorePage> {
       _errorMessage = null;
       _currentPage = 1;
       _totalPages = 0;
-      _places = [];
+      _replacePlaces([]);
     });
 
     try {
@@ -896,8 +908,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted) return;
 
       setState(() {
-        _places =
-            _preparePlaces(result.items);
+        _replacePlaces(_preparePlaces(result.items));
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoading = false;
@@ -907,7 +918,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted) return;
 
       setState(() {
-        _places = [];
+        _replacePlaces([]);
         _isLoading = false;
         _isLoadingMore = false;
         _errorMessage = error.toString();
@@ -938,7 +949,7 @@ class _ExplorePageState extends State<ExplorePage> {
       _errorMessage = null;
       _currentPage = 1;
       _totalPages = 0;
-      _places = [];
+      _replacePlaces([]);
     });
 
     try {
@@ -951,8 +962,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted) return;
 
       setState(() {
-        _places =
-            _preparePlaces(result.items);
+        _replacePlaces(_preparePlaces(result.items));
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoading = false;
@@ -962,7 +972,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted) return;
 
       setState(() {
-        _places = [];
+        _replacePlaces([]);
         _isLoading = false;
         _isLoadingMore = false;
         _errorMessage = error.toString();
@@ -1148,9 +1158,7 @@ class _ExplorePageState extends State<ExplorePage> {
                                   _places[index];
 
                               final distance =
-                                  _distanceToPlace(
-                                place,
-                              );
+                                  _placeDistances[place.id];
 
                               return RepaintBoundary(
                                 key: ValueKey(
