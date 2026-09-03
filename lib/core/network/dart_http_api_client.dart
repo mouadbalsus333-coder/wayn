@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -137,8 +138,7 @@ class DartHttpApiClient implements ApiClient {
           ...?defaultHeaders,
         },
         _client = client ?? http.Client(),
-        _secureStorage =
-            secureStorage ?? SecureAuthTokenStorage();
+        _secureStorage = secureStorage ?? SecureAuthTokenStorage();
 
   // ============================================================
   // Authentication
@@ -649,20 +649,25 @@ class DartHttpApiClient implements ApiClient {
     final status = response.statusCode;
 
     // ----------------------------------------------------------
-    // TEMPORARY AUTH DEBUG
+    // DEBUG HTTP LOGGING
     // ----------------------------------------------------------
 
-    print(
-      'WAYN HTTP: '
-      '${response.request?.method} '
-      '${response.request?.url}',
-    );
+    if (kDebugMode) {
+      print(
+        'WAYN HTTP: '
+        '${response.request?.method} '
+        '${response.request?.url}',
+      );
 
-    print('WAYN HTTP STATUS: $status');
+      print('WAYN HTTP STATUS: $status');
 
-    print(
-      'WAYN HTTP BODY: ${response.body}',
-    );
+      // Response bodies can be large, especially for places,
+      // community posts, and other list endpoints.
+      // Keep the full body logging available for debugging only.
+      print(
+        'WAYN HTTP BODY: ${response.body}',
+      );
+    }
 
     // ----------------------------------------------------------
     // Success
@@ -670,23 +675,30 @@ class DartHttpApiClient implements ApiClient {
 
     if (status >= 200 && status < 300) {
       if (status == 204 || response.body.trim().isEmpty) {
-        print('WAYN HTTP: empty successful response');
+        if (kDebugMode) {
+          print('WAYN HTTP: empty successful response');
+        }
+
         return null;
       }
 
       try {
         final decoded = jsonDecode(response.body);
 
-        print(
-          'WAYN HTTP: JSON decoded successfully '
-          '(${decoded.runtimeType})',
-        );
+        if (kDebugMode) {
+          print(
+            'WAYN HTTP: JSON decoded successfully '
+            '(${decoded.runtimeType})',
+          );
+        }
 
         return decoded;
       } catch (error) {
-        print(
-          'WAYN HTTP: JSON decode failed: $error',
-        );
+        if (kDebugMode) {
+          print(
+            'WAYN HTTP: JSON decode failed: $error',
+          );
+        }
 
         return response.body;
       }
@@ -728,9 +740,11 @@ class DartHttpApiClient implements ApiClient {
       message = decodedBody.toString();
     }
 
-    print(
-      'WAYN HTTP ERROR: $message',
-    );
+    if (kDebugMode) {
+      print(
+        'WAYN HTTP ERROR: $message',
+      );
+    }
 
     throw ApiClientException(
       message,

@@ -66,6 +66,13 @@ class _ExplorePageState extends State<ExplorePage> {
       _lastLoadedReference;
 
   // ================================================================
+  // DISTANCE CACHE REFERENCE
+  // ================================================================
+
+  ({double latitude, double longitude})?
+      _distanceCacheReference;
+
+  // ================================================================
   // PAGINATION
   // ================================================================
 
@@ -330,6 +337,15 @@ class _ExplorePageState extends State<ExplorePage> {
             ref,
           );
 
+          _ensureDistanceCacheReference(
+            ref,
+          );
+
+          _cacheMissingDistances(
+            prepared,
+            ref,
+          );
+
           combinedPlaces = _sortByDistance(
             combinedPlaces,
             refPos,
@@ -338,7 +354,10 @@ class _ExplorePageState extends State<ExplorePage> {
       }
 
       setState(() {
-        _replacePlaces(combinedPlaces);
+        _replacePlaces(
+          combinedPlaces,
+          refreshDistanceCache: false,
+        );
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoadingMore = false;
@@ -530,16 +549,34 @@ class _ExplorePageState extends State<ExplorePage> {
 
       if (!mounted) return;
 
+      final prepared =
+          _preparePlaces(result.items);
+
       final refPos =
           _positionFromReference(
         currentRef,
       );
 
+      _ensureDistanceCacheReference(
+        currentRef,
+      );
+
+      _cacheMissingDistances(
+        prepared,
+        currentRef,
+      );
+
+      final sortedPlaces =
+          _sortByDistance(
+        prepared,
+        refPos,
+      );
+
       setState(() {
-        _replacePlaces(_sortByDistance(
-          _preparePlaces(result.items),
-          refPos,
-        ));
+        _replacePlaces(
+          sortedPlaces,
+          refreshDistanceCache: false,
+        );
 
         _currentPage = result.page;
         _totalPages = result.pages;
@@ -611,14 +648,93 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
-  void _replacePlaces(List<Place> places) {
+  bool _isSameDistanceCacheReference(
+    ({double latitude, double longitude}) ref,
+  ) {
+    final cached =
+        _distanceCacheReference;
+
+    if (cached == null) {
+      return false;
+    }
+
+    return cached.latitude == ref.latitude &&
+        cached.longitude == ref.longitude;
+  }
+
+  void _ensureDistanceCacheReference(
+    ({double latitude, double longitude}) ref,
+  ) {
+    if (_isSameDistanceCacheReference(ref)) {
+      return;
+    }
+
+    _distanceCacheReference = (
+      latitude: ref.latitude,
+      longitude: ref.longitude,
+    );
+
+    _placeDistances = <String, double?>{};
+  }
+
+  void _cacheMissingDistances(
+    List<Place> places,
+    ({double latitude, double longitude}) ref,
+  ) {
+    _ensureDistanceCacheReference(ref);
+
+    for (final place in places) {
+      if (_placeDistances.containsKey(place.id)) {
+        continue;
+      }
+
+      if (place.latitude == null ||
+          place.longitude == null) {
+        _placeDistances[place.id] = null;
+        continue;
+      }
+
+      _placeDistances[place.id] =
+          Geolocator.distanceBetween(
+        ref.latitude,
+        ref.longitude,
+        place.latitude!,
+        place.longitude!,
+      );
+    }
+  }
+
+  void _replacePlaces(
+    List<Place> places, {
+    bool refreshDistanceCache = true,
+  }) {
     _places = places;
-    _refreshDistanceCache();
+
+    if (refreshDistanceCache) {
+      _refreshDistanceCache();
+    }
   }
 
   void _refreshDistanceCache() {
+    final ref = _referencePoint;
+
+    if (ref == null) {
+      _distanceCacheReference = null;
+      _placeDistances = <String, double?>{
+        for (final place in _places)
+          place.id: null,
+      };
+      return;
+    }
+
+    _distanceCacheReference = (
+      latitude: ref.latitude,
+      longitude: ref.longitude,
+    );
+
     _placeDistances = <String, double?>{
-      for (final place in _places) place.id: _distanceToPlace(place),
+      for (final place in _places)
+        place.id: _distanceToPlace(place),
     };
   }
 
@@ -630,32 +746,40 @@ class _ExplorePageState extends State<ExplorePage> {
     List<Place> places,
     Position position,
   ) {
-    final placesWithDistance = <_PlaceDistance>[];
+    final ref = (
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+
+    _ensureDistanceCacheReference(ref);
+
+    final placesWithDistance =
+        <_PlaceDistance>[];
 
     for (final place in places) {
-      if (place.latitude == null ||
-          place.longitude == null) {
-        placesWithDistance.add(
-          _PlaceDistance(
-            place: place,
-            distance: double.infinity,
-          ),
-        );
-        continue;
-      }
+      var distance =
+          _placeDistances[place.id];
 
-      final distance =
-          Geolocator.distanceBetween(
-        position.latitude,
-        position.longitude,
-        place.latitude!,
-        place.longitude!,
-      );
+      if (distance == null &&
+          place.latitude != null &&
+          place.longitude != null) {
+        distance =
+            Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          place.latitude!,
+          place.longitude!,
+        );
+
+        _placeDistances[place.id] =
+            distance;
+      }
 
       placesWithDistance.add(
         _PlaceDistance(
           place: place,
-          distance: distance,
+          distance:
+              distance ?? double.infinity,
         ),
       );
     }
@@ -843,6 +967,15 @@ class _ExplorePageState extends State<ExplorePage> {
             ref,
           );
 
+          _ensureDistanceCacheReference(
+            ref,
+          );
+
+          _cacheMissingDistances(
+            places,
+            ref,
+          );
+
           places =
               _sortByDistance(
             places,
@@ -852,7 +985,11 @@ class _ExplorePageState extends State<ExplorePage> {
       }
 
       setState(() {
-        _replacePlaces(places);
+        _replacePlaces(
+          places,
+          refreshDistanceCache:
+              index != 0,
+        );
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoading = false;

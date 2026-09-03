@@ -4,7 +4,6 @@ import '../theme/wayn_colors.dart';
 import '../../features/location/saved_locations_store.dart';
 import '../../features/location/widgets/location_selector_sheet.dart';
 import '../../features/map/location_picker_page.dart';
-import '../../models/user_notification.dart';
 import '../../services/social_service.dart';
 
 /// الهيدر الموحّد لصفحات WAYN.
@@ -35,9 +34,22 @@ class WaynHeader extends StatefulWidget {
 }
 
 class _WaynHeaderState extends State<WaynHeader> {
-  final SocialService _socialService = SocialService();
+  static const Duration _notificationCacheDuration = Duration(seconds: 30);
 
-  bool _hasUnreadNotifications = false;
+  /// حالة مشتركة بين جميع نسخ WaynHeader.
+  ///
+  /// هذا يمنع كل صفحة من إعادة طلب حالة الإشعارات بشكل مستقل.
+  static final ValueNotifier<bool> _sharedHasUnreadNotifications =
+      ValueNotifier<bool>(false);
+
+  /// الطلب الحالي المشترك، حتى لو أنشأت عدة صفحات الهيدر في نفس الوقت
+  /// فلن نرسل عدة requests متزامنة.
+  static Future<void>? _sharedLoadFuture;
+
+  /// وقت آخر تحديث ناجح لحالة الإشعارات.
+  static DateTime? _sharedLoadedAt;
+
+  final SocialService _socialService = SocialService();
 
   @override
   void initState() {
@@ -45,31 +57,49 @@ class _WaynHeaderState extends State<WaynHeader> {
     _loadNotificationStatus();
   }
 
-  Future<void> _loadNotificationStatus() async {
+  /// تحميل حالة الإشعارات من endpoint خفيف بدل تحميل قائمة كاملة
+  /// من الإشعارات.
+  ///
+  /// يتم استخدام cache مشترك لمدة قصيرة لمنع تكرار نفس الطلب بين
+  /// نسخ WaynHeader الموجودة في صفحات التطبيق.
+  Future<void> _loadNotificationStatus({
+    bool forceRefresh = false,
+  }) async {
+    final now = DateTime.now();
+    final lastLoadedAt = _sharedLoadedAt;
+
+    if (!forceRefresh &&
+        lastLoadedAt != null &&
+        now.difference(lastLoadedAt) < _notificationCacheDuration) {
+      return;
+    }
+
+    if (_sharedLoadFuture != null) {
+      await _sharedLoadFuture;
+      return;
+    }
+
+    final future = _fetchSharedNotificationStatus();
+    _sharedLoadFuture = future;
+
     try {
-      final List<UserNotification> notifications =
-          await _socialService.getNotifications(limit: 100);
-
-      if (!mounted) return;
-
-      final hasUnread = notifications.any(
-        (notification) => !notification.isRead,
-      );
-
-      if (hasUnread == _hasUnreadNotifications) return;
-
-      setState(() {
-        _hasUnreadNotifications = hasUnread;
-      });
-    } catch (_) {
-      // إذا تعذر تحميل الإشعارات، لا نظهر النقطة.
-      if (!mounted) return;
-
-      if (_hasUnreadNotifications) {
-        setState(() {
-          _hasUnreadNotifications = false;
-        });
+      await future;
+    } finally {
+      if (identical(_sharedLoadFuture, future)) {
+        _sharedLoadFuture = null;
       }
+    }
+  }
+
+  Future<void> _fetchSharedNotificationStatus() async {
+    try {
+      final unreadCount = await _socialService.getUnreadCount();
+
+      _sharedHasUnreadNotifications.value = unreadCount > 0;
+      _sharedLoadedAt = DateTime.now();
+    } catch (_) {
+      // إذا تعذر تحميل حالة الإشعارات، لا نظهر النقطة.
+      _sharedHasUnreadNotifications.value = false;
     }
   }
 
@@ -82,7 +112,7 @@ class _WaynHeaderState extends State<WaynHeader> {
 
     if (!mounted) return;
 
-    await _loadNotificationStatus();
+    await _loadNotificationStatus(forceRefresh: true);
   }
 
   @override
@@ -106,10 +136,15 @@ class _WaynHeaderState extends State<WaynHeader> {
 
           const SizedBox(width: 10),
 
-          _HeaderIconButton(
-            icon: Icons.notifications_none_rounded,
-            onPressed: _openNotifications,
-            showBadge: _hasUnreadNotifications,
+          ValueListenableBuilder<bool>(
+            valueListenable: _sharedHasUnreadNotifications,
+            builder: (context, hasUnreadNotifications, _) {
+              return _HeaderIconButton(
+                icon: Icons.notifications_none_rounded,
+                onPressed: _openNotifications,
+                showBadge: hasUnreadNotifications,
+              );
+            },
           ),
 
           ...?widget.trailing,
@@ -145,7 +180,7 @@ class _WaynHeaderState extends State<WaynHeader> {
 
 /// إضافة موقع يدويًا عبر [LocationPickerPage] ثم طلب اسم وتخزينه. التصميم:
 
-/// أنشئ ورق أسفلية تطلب اسم الموقع بعد اختيار الإحداثيات.
+/// أنشئ ورق أسفلين تطلب اسم الموقع بعد اختيار الإحداثيات.
 Future<String?> _promptLocationName(BuildContext context) {
   final controller = TextEditingController();
 
