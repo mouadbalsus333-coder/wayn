@@ -83,6 +83,25 @@ class CommunityService:
             limit=limit,
         )
 
+    async def get_posts_feed_data(
+        self,
+        *,
+        posts: list[CommunityPost],
+        user_id: UUID | None = None,
+    ) -> dict[UUID, dict[str, object]]:
+        """
+        Load all additional data required to build Community
+        post responses in batches.
+
+        This delegates to the repository batch loader so the
+        Community feed does not execute multiple database queries
+        for every individual post.
+        """
+        return await self.repository.get_posts_feed_data(
+            posts=posts,
+            user_id=user_id,
+        )
+
     async def update_post(
         self,
         *,

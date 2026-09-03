@@ -7,10 +7,18 @@ class FastApiPlaceRepository implements PlaceRepository {
 
   FastApiPlaceRepository(this._apiClient);
 
+  // ---------------------------------------------------------------------------
+  // Existing list-based API
+  // ---------------------------------------------------------------------------
+
   @override
   Future<List<Place>> getPlaces() async {
     final response = await _apiClient.get(
       '/api/v1/places',
+      queryParams: {
+        'page': 1,
+        'limit': 20,
+      },
     );
 
     return _placesFromResponse(response);
@@ -29,6 +37,7 @@ class FastApiPlaceRepository implements PlaceRepository {
         'latitude': latitude,
         'longitude': longitude,
         'radius': radius,
+        'page': 1,
         'limit': limit,
       },
     );
@@ -71,6 +80,8 @@ class FastApiPlaceRepository implements PlaceRepository {
       '/api/v1/places/search',
       queryParams: {
         'q': search,
+        'page': 1,
+        'limit': 20,
       },
     );
 
@@ -83,6 +94,10 @@ class FastApiPlaceRepository implements PlaceRepository {
   ) async {
     final response = await _apiClient.get(
       '/api/v1/places/category/$categoryId',
+      queryParams: {
+        'page': 1,
+        'limit': 20,
+      },
     );
 
     return _placesFromResponse(response);
@@ -92,6 +107,10 @@ class FastApiPlaceRepository implements PlaceRepository {
   Future<List<Place>> getOpenPlaces() async {
     final response = await _apiClient.get(
       '/api/v1/places/open',
+      queryParams: {
+        'page': 1,
+        'limit': 20,
+      },
     );
 
     return _placesFromResponse(response);
@@ -103,11 +122,13 @@ class FastApiPlaceRepository implements PlaceRepository {
   }) async {
     final response = await _apiClient.get(
       '/api/v1/places/top-rated',
+      queryParams: {
+        'page': 1,
+        'limit': limit,
+      },
     );
 
-    final places = _placesFromResponse(response);
-
-    return places.take(limit).toList();
+    return _placesFromResponse(response).take(limit).toList();
   }
 
   @override
@@ -116,31 +137,273 @@ class FastApiPlaceRepository implements PlaceRepository {
   }) async {
     final response = await _apiClient.get(
       '/api/v1/places/most-visited',
+      queryParams: {
+        'page': 1,
+        'limit': limit,
+      },
     );
 
-    final places = _placesFromResponse(response);
-
-    return places.take(limit).toList();
+    return _placesFromResponse(response).take(limit).toList();
   }
 
-  // ===============================================================
-  // RESPONSE PARSING
-  // ===============================================================
+  // ---------------------------------------------------------------------------
+  // Paginated API
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<PaginatedPlaces> getPlacesPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _apiClient.get(
+      '/api/v1/places',
+      queryParams: {
+        'page': page,
+        'limit': limit,
+      },
+    );
+
+    return _paginatedPlacesFromResponse(
+      response,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<PaginatedPlaces> getNearbyPlacesPage({
+    required double latitude,
+    required double longitude,
+    double radius = 5000,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _apiClient.get(
+      '/api/v1/places/nearby',
+      queryParams: {
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius': radius,
+        'page': page,
+        'limit': limit,
+      },
+    );
+
+    return _paginatedPlacesFromResponse(
+      response,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<PaginatedPlaces> searchPlacesPage(
+    String query, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final search = query.trim();
+
+    if (search.isEmpty) {
+      return getPlacesPage(
+        page: page,
+        limit: limit,
+      );
+    }
+
+    final response = await _apiClient.get(
+      '/api/v1/places/search',
+      queryParams: {
+        'q': search,
+        'page': page,
+        'limit': limit,
+      },
+    );
+
+    return _paginatedPlacesFromResponse(
+      response,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<PaginatedPlaces> getPlacesByCategoryPage(
+    String categoryId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _apiClient.get(
+      '/api/v1/places/category/$categoryId',
+      queryParams: {
+        'page': page,
+        'limit': limit,
+      },
+    );
+
+    return _paginatedPlacesFromResponse(
+      response,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<PaginatedPlaces> getOpenPlacesPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _apiClient.get(
+      '/api/v1/places/open',
+      queryParams: {
+        'page': page,
+        'limit': limit,
+      },
+    );
+
+    return _paginatedPlacesFromResponse(
+      response,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<PaginatedPlaces> getHighestRatedPlacesPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _apiClient.get(
+      '/api/v1/places/top-rated',
+      queryParams: {
+        'page': page,
+        'limit': limit,
+      },
+    );
+
+    return _paginatedPlacesFromResponse(
+      response,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<PaginatedPlaces> getMostVisitedPlacesPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _apiClient.get(
+      '/api/v1/places/most-visited',
+      queryParams: {
+        'page': page,
+        'limit': limit,
+      },
+    );
+
+    return _paginatedPlacesFromResponse(
+      response,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Paginated response parsing
+  // ---------------------------------------------------------------------------
+
+  PaginatedPlaces _paginatedPlacesFromResponse(
+    dynamic response, {
+    required int page,
+    required int limit,
+  }) {
+    if (response == null) {
+      return PaginatedPlaces(
+        items: const [],
+        total: 0,
+        page: page,
+        limit: limit,
+        pages: 0,
+      );
+    }
+
+    if (response is Map) {
+      final items = response['items'];
+
+      if (items is List) {
+        final parsedItems = _placesFromList(items);
+
+        final total = _parseInt(
+          response['total'],
+          parsedItems.length,
+        );
+
+        final responsePage = _parseInt(
+          response['page'],
+          page,
+        );
+
+        final responseLimit = _parseInt(
+          response['limit'],
+          limit,
+        );
+
+        final pages = _parseInt(
+          response['pages'],
+          _calculatePages(
+            total,
+            responseLimit,
+          ),
+        );
+
+        return PaginatedPlaces(
+          items: parsedItems,
+          total: total,
+          page: responsePage,
+          limit: responseLimit,
+          pages: pages,
+        );
+      }
+
+      return PaginatedPlaces(
+        items: const [],
+        total: 0,
+        page: page,
+        limit: limit,
+        pages: 0,
+      );
+    }
+
+    if (response is List) {
+      final parsedItems = _placesFromList(response);
+
+      return PaginatedPlaces(
+        items: parsedItems,
+        total: parsedItems.length,
+        page: page,
+        limit: limit,
+        pages: parsedItems.isEmpty ? 0 : 1,
+      );
+    }
+
+    return PaginatedPlaces(
+      items: const [],
+      total: 0,
+      page: page,
+      limit: limit,
+      pages: 0,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // List response parsing
+  // ---------------------------------------------------------------------------
 
   List<Place> _placesFromResponse(dynamic response) {
     if (response == null) {
       return [];
     }
 
-    // PaginatedResponse:
-    //
-    // {
-    //   "items": [...],
-    //   "total": 100,
-    //   "page": 1,
-    //   "limit": 50,
-    //   "pages": 2
-    // }
     if (response is Map) {
       final items = response['items'];
 
@@ -151,12 +414,6 @@ class FastApiPlaceRepository implements PlaceRepository {
       return [];
     }
 
-    // Direct list response:
-    //
-    // [
-    //   {...},
-    //   {...}
-    // ]
     if (response is List) {
       return _placesFromList(response);
     }
@@ -186,5 +443,39 @@ class FastApiPlaceRepository implements PlaceRepository {
     }
 
     return places;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pagination helpers
+  // ---------------------------------------------------------------------------
+
+  int _parseInt(
+    dynamic value,
+    int fallback,
+  ) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      return int.tryParse(value) ?? fallback;
+    }
+
+    return fallback;
+  }
+
+  int _calculatePages(
+    int total,
+    int limit,
+  ) {
+    if (total <= 0 || limit <= 0) {
+      return 0;
+    }
+
+    return (total + limit - 1) ~/ limit;
   }
 }

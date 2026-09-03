@@ -11,16 +11,16 @@ class PlaceService {
             placeRepository ?? createPlaceRepository();
 
   // ===============================================================
-  // GET ALL ACTIVE PLACES
+  // EXISTING LIST-BASED API
   // ===============================================================
+  //
+  // These methods are kept for existing screens such as MapPage
+  // and PlacePickerPage.
+  //
 
   Future<List<Place>> getPlaces() async {
     return _placeRepository.getPlaces();
   }
-
-  // ===============================================================
-  // GET NEARBY PLACES
-  // ===============================================================
 
   Future<List<Place>> getNearbyPlaces({
     required double latitude,
@@ -36,45 +36,23 @@ class PlaceService {
     );
   }
 
-  // ===============================================================
-  // GET PLACE BY ID
-  // ===============================================================
-
   Future<Place?> getPlaceById(String id) async {
     return _placeRepository.getPlaceById(id);
   }
-
-  // ===============================================================
-  // SEARCH PLACES
-  // ===============================================================
 
   Future<List<Place>> searchPlaces(String query) async {
     return _placeRepository.searchPlaces(query);
   }
 
-  // ===============================================================
-  // GET PLACES BY CATEGORY
-  // ===============================================================
-
   Future<List<Place>> getPlacesByCategory(
     String categoryId,
   ) async {
-    return _placeRepository.getPlacesByCategory(
-      categoryId,
-    );
+    return _placeRepository.getPlacesByCategory(categoryId);
   }
-
-  // ===============================================================
-  // GET OPEN PLACES
-  // ===============================================================
 
   Future<List<Place>> getOpenPlaces() async {
     return _placeRepository.getOpenPlaces();
   }
-
-  // ===============================================================
-  // GET HIGHEST RATED PLACES
-  // ===============================================================
 
   Future<List<Place>> getHighestRatedPlaces({
     int limit = 10,
@@ -84,14 +62,97 @@ class PlaceService {
     );
   }
 
-  // ===============================================================
-  // GET MOST VISITED PLACES
-  // ===============================================================
-
   Future<List<Place>> getMostVisitedPlaces({
     int limit = 10,
   }) async {
     return _placeRepository.getMostVisitedPlaces(
+      limit: limit,
+    );
+  }
+
+  // ===============================================================
+  // PAGINATED API
+  // ===============================================================
+  //
+  // These methods are used by ExplorePage for real pagination.
+  //
+
+  Future<PaginatedPlaces> getPlacesPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return _placeRepository.getPlacesPage(
+      page: page,
+      limit: limit,
+    );
+  }
+
+  Future<PaginatedPlaces> getNearbyPlacesPage({
+    required double latitude,
+    required double longitude,
+    double radius = 5000,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return _placeRepository.getNearbyPlacesPage(
+      latitude: latitude,
+      longitude: longitude,
+      radius: radius,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  Future<PaginatedPlaces> searchPlacesPage(
+    String query, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return _placeRepository.searchPlacesPage(
+      query,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  Future<PaginatedPlaces> getPlacesByCategoryPage(
+    String categoryId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return _placeRepository.getPlacesByCategoryPage(
+      categoryId,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  Future<PaginatedPlaces> getOpenPlacesPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return _placeRepository.getOpenPlacesPage(
+      page: page,
+      limit: limit,
+    );
+  }
+
+  Future<PaginatedPlaces> getHighestRatedPlacesPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return _placeRepository.getHighestRatedPlacesPage(
+      page: page,
+      limit: limit,
+    );
+  }
+
+  Future<PaginatedPlaces> getMostVisitedPlacesPage({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return _placeRepository.getMostVisitedPlacesPage(
+      page: page,
       limit: limit,
     );
   }

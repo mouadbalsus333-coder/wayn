@@ -95,7 +95,11 @@ class PlaceRepository:
                 Place.deleted_at.is_(None),
             ])
 
-        count_query = select(func.count()).select_from(Place).where(*conditions)
+        count_query = (
+            select(func.count())
+            .select_from(Place)
+            .where(*conditions)
+        )
 
         total = (
             await self.session.execute(count_query)
@@ -150,7 +154,11 @@ class PlaceRepository:
                 Place.deleted_at.is_(None),
             ])
 
-        count_query = select(func.count()).select_from(Place).where(*conditions)
+        count_query = (
+            select(func.count())
+            .select_from(Place)
+            .where(*conditions)
+        )
 
         total = (
             await self.session.execute(count_query)
@@ -183,7 +191,11 @@ class PlaceRepository:
             Place.deleted_at.is_(None),
         ]
 
-        count_query = select(func.count()).select_from(Place).where(*conditions)
+        count_query = (
+            select(func.count())
+            .select_from(Place)
+            .where(*conditions)
+        )
 
         total = (
             await self.session.execute(count_query)
@@ -213,7 +225,11 @@ class PlaceRepository:
             Place.deleted_at.is_(None),
         ]
 
-        count_query = select(func.count()).select_from(Place).where(*conditions)
+        count_query = (
+            select(func.count())
+            .select_from(Place)
+            .where(*conditions)
+        )
 
         total = (
             await self.session.execute(count_query)
@@ -243,7 +259,11 @@ class PlaceRepository:
             Place.deleted_at.is_(None),
         ]
 
-        count_query = select(func.count()).select_from(Place).where(*conditions)
+        count_query = (
+            select(func.count())
+            .select_from(Place)
+            .where(*conditions)
+        )
 
         total = (
             await self.session.execute(count_query)
@@ -271,6 +291,16 @@ class PlaceRepository:
         offset: int = 0,
         limit: int = 20,
     ) -> tuple[list[Place], int]:
+        """
+        Return active places within the requested radius.
+
+        ST_DWithin is used for the spatial filter so PostgreSQL/PostGIS
+        can make effective use of the GiST spatial index on Place.location.
+
+        ST_Distance is intentionally kept only for ordering the matching
+        places by their actual distance from the requested point.
+        """
+
         user_location = func.ST_SetSRID(
             func.ST_MakePoint(
                 longitude,
@@ -288,14 +318,24 @@ class PlaceRepository:
             user_geography,
         )
 
+        within_radius = func.ST_DWithin(
+            Place.location,
+            user_geography,
+            radius_meters,
+        )
+
         conditions = [
             Place.is_active.is_(True),
             Place.location.is_not(None),
             Place.deleted_at.is_(None),
-            distance <= radius_meters,
+            within_radius,
         ]
 
-        count_query = select(func.count()).select_from(Place).where(*conditions)
+        count_query = (
+            select(func.count())
+            .select_from(Place)
+            .where(*conditions)
+        )
 
         total = (
             await self.session.execute(count_query)
@@ -305,7 +345,7 @@ class PlaceRepository:
             select(Place)
             .where(*conditions)
             .order_by(
-                distance.asc()
+                distance.asc(),
             )
             .offset(offset)
             .limit(limit)
@@ -330,7 +370,11 @@ class PlaceRepository:
             Place.deleted_at.is_(None),
         ]
 
-        count_query = select(func.count()).select_from(Place).where(*conditions)
+        count_query = (
+            select(func.count())
+            .select_from(Place)
+            .where(*conditions)
+        )
 
         total = (
             await self.session.execute(count_query)

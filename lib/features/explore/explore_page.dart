@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../services/category_service.dart';
 import '../../services/place_service.dart';
+import '../../services/repositories/place_repository.dart';
 import '../places/place_details_page.dart';
 import '../home/models/place.dart';
 import '../../core/widgets/wayn_header.dart';
@@ -27,8 +28,11 @@ class _ExplorePageState extends State<ExplorePage> {
   final PlaceService _placeService = PlaceService();
   final CategoryService _categoryService = CategoryService();
   final FavoriteService _favoriteService = FavoriteService();
+  final ScrollController _scrollController = ScrollController();
 
   final Set<String> _favoriteIds = <String>{};
+
+  static const int _pageSize = 20;
 
   int _selectedFilterIndex = 0;
 
@@ -36,10 +40,15 @@ class _ExplorePageState extends State<ExplorePage> {
   List<Category> _categories = [];
 
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   bool _isLoadingLocation = false;
   bool _hasLocationPermission = false;
 
-  CategoryLoadStatus _categoriesStatus = CategoryLoadStatus.loading;
+  int _currentPage = 1;
+  int _totalPages = 0;
+
+  CategoryLoadStatus _categoriesStatus =
+      CategoryLoadStatus.loading;
 
   String? _errorMessage;
 
@@ -48,7 +57,19 @@ class _ExplorePageState extends State<ExplorePage> {
   String? _selectedCategory;
   String _selectedCategoryLabel = 'كل الأماكن';
 
-    Position? _currentPosition;
+  Position? _currentPosition;
+
+  bool _showingAllPlaces = true;
+
+  ({double latitude, double longitude})?
+      _lastLoadedReference;
+
+  // ================================================================
+  // PAGINATION
+  // ================================================================
+
+  bool get _hasMorePages =>
+      _totalPages > 0 && _currentPage < _totalPages;
 
   // ================================================================
   // INIT
@@ -57,13 +78,31 @@ class _ExplorePageState extends State<ExplorePage> {
   @override
   void initState() {
     super.initState();
-    SavedLocationsStore.instance.addListener(_onSavedLocationChanged);
+
+    _scrollController.addListener(_onScroll);
+
+    SavedLocationsStore.instance.addListener(
+      _onSavedLocationChanged,
+    );
+
     _initializeExplore();
   }
 
-  /// آخر نقطة مرجعية استُخدمت في تحميل الأماكن، لتجنب إعادة التحميل
-  /// إذا لم يتغيّر الموقع فعليًا.
-  ({double latitude, double longitude})? _lastLoadedReference;
+  void _onScroll() {
+    if (!_scrollController.hasClients ||
+        _isLoading ||
+        _isLoadingMore ||
+        !_hasMorePages) {
+      return;
+    }
+
+    final position = _scrollController.position;
+
+    if (position.pixels >=
+        position.maxScrollExtent - 600) {
+      _loadNextPage();
+    }
+  }
 
   void _onSavedLocationChanged() {
     if (!mounted) return;
@@ -78,8 +117,6 @@ class _ExplorePageState extends State<ExplorePage> {
                 ref.longitude != last.longitude));
 
     if (changed) {
-      // الموقع المرجعي تغيّر (اختيار موقع محفوظ أو العودة إلى GPS)
-      // نعيد تحميل الأماكن القريبة والمسافات من النقطة الجديدة.
       _loadNearbyPlaces();
     } else {
       setState(() {});
@@ -88,12 +125,19 @@ class _ExplorePageState extends State<ExplorePage> {
 
   @override
   void dispose() {
-    SavedLocationsStore.instance.removeListener(_onSavedLocationChanged);
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+
+    SavedLocationsStore.instance.removeListener(
+      _onSavedLocationChanged,
+    );
+
     super.dispose();
   }
 
   Future<void> _initializeExplore() async {
     await _loadCurrentLocation();
+
     await Future.wait([
       _loadPlaces(),
       _loadCategories(),
@@ -125,14 +169,17 @@ class _ExplorePageState extends State<ExplorePage> {
         return;
       }
 
-      var permission = await Geolocator.checkPermission();
+      var permission =
+          await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission =
+            await Geolocator.requestPermission();
       }
 
       if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
+          permission ==
+              LocationPermission.deniedForever) {
         if (mounted) {
           setState(() {
             _isLoadingLocation = false;
@@ -142,7 +189,8 @@ class _ExplorePageState extends State<ExplorePage> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
+      final position =
+          await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
         ),
@@ -156,7 +204,9 @@ class _ExplorePageState extends State<ExplorePage> {
         _hasLocationPermission = true;
       });
     } catch (error) {
-      debugPrint('Explore location error: $error');
+      debugPrint(
+        'Explore location error: $error',
+      );
 
       if (!mounted) return;
 
@@ -168,62 +218,264 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   // ================================================================
-  // LOAD PLACES
+  // LOAD ALL PLACES
   // ================================================================
 
-  Future<void> _loadPlaces() async {
+  Future<void> _loadPlaces({
+    bool reset = true,
+  }) async {
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (reset) {
+      setState(() {
+        _isLoading = true;
+        _isLoadingMore = false;
+        _errorMessage = null;
+        _currentPage = 1;
+        _totalPages = 0;
+        _places = [];
+        _showingAllPlaces = true;
+      });
+    }
 
     try {
-      final places = await _placeService.getPlaces();
+      final result =
+          await _placeService.getPlacesPage(
+        page: reset ? 1 : _currentPage,
+        limit: _pageSize,
+      );
 
       if (!mounted) return;
 
+      final prepared =
+          _preparePlaces(result.items);
+
       setState(() {
-        _places = _preparePlaces(places);
+        if (reset) {
+          _places = prepared;
+        } else {
+          _places = [
+            ..._places,
+            ...prepared,
+          ];
+        }
+
+        _currentPage = result.page;
+        _totalPages = result.pages;
         _isLoading = false;
+        _isLoadingMore = false;
       });
     } catch (error) {
       if (!mounted) return;
 
       setState(() {
-        _places = [];
-        _isLoading = false;
+        if (reset) {
+          _places = [];
+          _isLoading = false;
+        }
+
+        _isLoadingMore = false;
         _errorMessage = error.toString();
       });
 
-            debugPrint('Failed to load places: $error');
+      debugPrint(
+        'Failed to load places: $error',
+      );
     }
   }
 
   // ================================================================
-  // REFERENCE POINT (GPS OR SAVED LOCATION)
+  // LOAD NEXT PAGE
   // ================================================================
 
-  /// يرجّع النقطة المرجعية الحالية: إحداثيات موقع محفوظ إذا كان
-  /// مختارًا، وإلا إحداثيات GPS.
-  ({double latitude, double longitude})? get _referencePoint {
-    final saved = SavedLocationsStore.instance.referencePoint;
-    if (saved != null) return saved;
+  Future<void> _loadNextPage() async {
+    if (!mounted ||
+        _isLoading ||
+        _isLoadingMore ||
+        !_hasMorePages) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    final nextPage = _currentPage + 1;
+
+    try {
+      final result =
+          await _loadPageForCurrentState(
+        page: nextPage,
+      );
+
+      if (!mounted) return;
+
+      final prepared =
+          _preparePlaces(result.items);
+
+      var combinedPlaces = [
+        ..._places,
+        ...prepared,
+      ];
+
+      if (_selectedFilterIndex == 0 &&
+          !_showingAllPlaces) {
+        final ref = _referencePoint;
+
+        if (ref != null) {
+          final refPos = _positionFromReference(
+            ref,
+          );
+
+          combinedPlaces = _sortByDistance(
+            combinedPlaces,
+            refPos,
+          );
+        }
+      }
+
+      setState(() {
+        _places = combinedPlaces;
+        _currentPage = result.page;
+        _totalPages = result.pages;
+        _isLoadingMore = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingMore = false;
+      });
+
+      debugPrint(
+        'Failed to load next Explore page: $error',
+      );
+    }
+  }
+
+  // ================================================================
+  // LOAD PAGE FOR CURRENT VIEW
+  // ================================================================
+
+  Future<PaginatedPlaces>
+      _loadPageForCurrentState({
+    required int page,
+  }) async {
+    if (_showingAllPlaces) {
+      return _placeService.getPlacesPage(
+        page: page,
+        limit: _pageSize,
+      );
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      return _placeService.searchPlacesPage(
+        _searchQuery,
+        page: page,
+        limit: _pageSize,
+      );
+    }
+
+    if (_selectedCategory != null) {
+      return _placeService.getPlacesByCategoryPage(
+        _selectedCategory!,
+        page: page,
+        limit: _pageSize,
+      );
+    }
+
+    switch (_selectedFilterIndex) {
+      case 0:
+        final ref = _referencePoint;
+
+        if (ref != null) {
+          return _placeService.getNearbyPlacesPage(
+            latitude: ref.latitude,
+            longitude: ref.longitude,
+            radius: 5000,
+            page: page,
+            limit: _pageSize,
+          );
+        }
+
+        return _placeService.getPlacesPage(
+          page: page,
+          limit: _pageSize,
+        );
+
+      case 1:
+        return _placeService.getOpenPlacesPage(
+          page: page,
+          limit: _pageSize,
+        );
+
+      case 2:
+        return _placeService.getHighestRatedPlacesPage(
+          page: page,
+          limit: _pageSize,
+        );
+
+      case 3:
+        return _placeService.getMostVisitedPlacesPage(
+          page: page,
+          limit: _pageSize,
+        );
+
+      default:
+        return _placeService.getPlacesPage(
+          page: page,
+          limit: _pageSize,
+        );
+    }
+  }
+
+  // ================================================================
+  // REFERENCE POINT
+  // ================================================================
+
+  ({double latitude, double longitude})?
+      get _referencePoint {
+    final saved =
+        SavedLocationsStore.instance.referencePoint;
+
+    if (saved != null) {
+      return saved;
+    }
 
     final gps = _currentPosition;
+
     if (gps != null) {
-      return (latitude: gps.latitude, longitude: gps.longitude);
+      return (
+        latitude: gps.latitude,
+        longitude: gps.longitude,
+      );
     }
 
     return null;
+  }
+
+  Position _positionFromReference(
+    ({double latitude, double longitude}) ref,
+  ) {
+    return Position(
+      latitude: ref.latitude,
+      longitude: ref.longitude,
+      timestamp: DateTime.now(),
+      accuracy: 0,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
   }
 
   // ================================================================
   // LOAD NEARBY PLACES
   // ================================================================
 
-    Future<void> _loadNearbyPlaces() async {
+  Future<void> _loadNearbyPlaces() async {
     final ref = _referencePoint;
 
     if (ref == null) {
@@ -243,6 +495,7 @@ class _ExplorePageState extends State<ExplorePage> {
           ),
         );
       }
+
       return;
     }
 
@@ -250,45 +503,51 @@ class _ExplorePageState extends State<ExplorePage> {
 
     setState(() {
       _isLoading = true;
+      _isLoadingMore = false;
       _errorMessage = null;
       _selectedFilterIndex = 0;
       _selectedCategory = null;
       _selectedCategoryLabel = 'كل الأماكن';
       _searchQuery = '';
+      _currentPage = 1;
+      _totalPages = 0;
+      _places = [];
+      _showingAllPlaces = false;
     });
 
     try {
-            final places = await _placeService.getNearbyPlaces(
+      final result =
+          await _placeService.getNearbyPlacesPage(
         latitude: currentRef.latitude,
         longitude: currentRef.longitude,
         radius: 5000,
-        limit: 50,
+        page: 1,
+        limit: _pageSize,
       );
 
       if (!mounted) return;
 
-            setState(() {
-        final refPos = Position(
-          latitude: currentRef.latitude,
-          longitude: currentRef.longitude,
-          timestamp: DateTime.now(),
-          accuracy: 0,
-          altitude: 0,
-          altitudeAccuracy: 0,
-          heading: 0,
-          headingAccuracy: 0,
-          speed: 0,
-          speedAccuracy: 0,
-        );
+      final refPos =
+          _positionFromReference(
+        currentRef,
+      );
+
+      setState(() {
         _places = _sortByDistance(
-          _preparePlaces(places),
+          _preparePlaces(result.items),
           refPos,
         );
+
+        _currentPage = result.page;
+        _totalPages = result.pages;
+
         _lastLoadedReference = (
           latitude: currentRef.latitude,
           longitude: currentRef.longitude,
         );
+
         _isLoading = false;
+        _isLoadingMore = false;
       });
     } catch (error) {
       if (!mounted) return;
@@ -296,10 +555,13 @@ class _ExplorePageState extends State<ExplorePage> {
       setState(() {
         _places = [];
         _isLoading = false;
+        _isLoadingMore = false;
         _errorMessage = error.toString();
       });
 
-      debugPrint('Nearby places error: $error');
+      debugPrint(
+        'Nearby places error: $error',
+      );
     }
   }
 
@@ -307,7 +569,9 @@ class _ExplorePageState extends State<ExplorePage> {
   // PREPARE PLACES
   // ================================================================
 
-  List<Place> _preparePlaces(List<Place> places) {
+  List<Place> _preparePlaces(
+    List<Place> places,
+  ) {
     return places
         .where(
           (place) =>
@@ -325,7 +589,9 @@ class _ExplorePageState extends State<ExplorePage> {
   // DISTANCE
   // ================================================================
 
-    double? _distanceToPlace(Place place) {
+  double? _distanceToPlace(
+    Place place,
+  ) {
     final ref = _referencePoint;
 
     if (ref == null ||
@@ -346,7 +612,8 @@ class _ExplorePageState extends State<ExplorePage> {
     List<Place> places,
     Position position,
   ) {
-    final sorted = List<Place>.from(places);
+    final sorted =
+        List<Place>.from(places);
 
     sorted.sort((a, b) {
       if (a.latitude == null ||
@@ -359,27 +626,33 @@ class _ExplorePageState extends State<ExplorePage> {
         return -1;
       }
 
-      final distanceA = Geolocator.distanceBetween(
+      final distanceA =
+          Geolocator.distanceBetween(
         position.latitude,
         position.longitude,
         a.latitude!,
         a.longitude!,
       );
 
-      final distanceB = Geolocator.distanceBetween(
+      final distanceB =
+          Geolocator.distanceBetween(
         position.latitude,
         position.longitude,
         b.latitude!,
         b.longitude!,
       );
 
-      return distanceA.compareTo(distanceB);
+      return distanceA.compareTo(
+        distanceB,
+      );
     });
 
     return sorted;
   }
 
-  String _formatDistance(double? meters) {
+  String _formatDistance(
+    double? meters,
+  ) {
     if (meters == null) {
       return '';
     }
@@ -404,40 +677,59 @@ class _ExplorePageState extends State<ExplorePage> {
   Future<void> _loadCategories() async {
     if (mounted) {
       setState(() {
-        _categoriesStatus = CategoryLoadStatus.loading;
+        _categoriesStatus =
+            CategoryLoadStatus.loading;
       });
     }
 
-    final result = await _categoryService.getCategories();
+    final result =
+        await _categoryService.getCategories();
 
     if (!mounted) return;
 
-    final uniqueCategories = <String, Category>{};
+    final uniqueCategories =
+        <String, Category>{};
 
-    for (final category in result.categories) {
-      final key = category.nameAr.trim().toLowerCase();
+    for (final category
+        in result.categories) {
+      final key = category.nameAr
+          .trim()
+          .toLowerCase();
 
       if (key.isEmpty) {
         continue;
       }
 
-      final existing = uniqueCategories[key];
+      final existing =
+          uniqueCategories[key];
 
       if (existing == null ||
           ((existing.icon == null ||
-                  existing.icon!.trim().isEmpty) &&
+                  existing.icon!
+                      .trim()
+                      .isEmpty) &&
               category.icon != null &&
-              category.icon!.trim().isNotEmpty)) {
-        uniqueCategories[key] = category;
+              category.icon!
+                  .trim()
+                  .isNotEmpty)) {
+        uniqueCategories[key] =
+            category;
       }
     }
 
-    final categories = uniqueCategories.values.toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final categories =
+        uniqueCategories.values.toList()
+          ..sort(
+            (a, b) =>
+                a.sortOrder.compareTo(
+              b.sortOrder,
+            ),
+          );
 
     setState(() {
       _categories = categories;
-      _categoriesStatus = result.status;
+      _categoriesStatus =
+          result.status;
     });
   }
 
@@ -445,7 +737,9 @@ class _ExplorePageState extends State<ExplorePage> {
   // SEARCH
   // ================================================================
 
-  Future<void> _searchPlaces(String query) async {
+  Future<void> _searchPlaces(
+    String query,
+  ) async {
     final search = query.trim();
 
     if (search.isEmpty) {
@@ -453,23 +747,39 @@ class _ExplorePageState extends State<ExplorePage> {
       return;
     }
 
+    if (!mounted) return;
+
     setState(() {
       _searchQuery = search;
       _selectedCategory = null;
       _selectedCategoryLabel = 'كل الأماكن';
       _selectedFilterIndex = -1;
+      _showingAllPlaces = false;
       _isLoading = true;
+      _isLoadingMore = false;
       _errorMessage = null;
+      _currentPage = 1;
+      _totalPages = 0;
+      _places = [];
     });
 
     try {
-      final places = await _placeService.searchPlaces(search);
+      final result =
+          await _placeService.searchPlacesPage(
+        search,
+        page: 1,
+        limit: _pageSize,
+      );
 
       if (!mounted) return;
 
       setState(() {
-        _places = _preparePlaces(places);
+        _places =
+            _preparePlaces(result.items);
+        _currentPage = result.page;
+        _totalPages = result.pages;
         _isLoading = false;
+        _isLoadingMore = false;
       });
     } catch (error) {
       if (!mounted) return;
@@ -477,10 +787,13 @@ class _ExplorePageState extends State<ExplorePage> {
       setState(() {
         _places = [];
         _isLoading = false;
+        _isLoadingMore = false;
         _errorMessage = error.toString();
       });
 
-      debugPrint('Search failed: $error');
+      debugPrint(
+        'Search failed: $error',
+      );
     }
   }
 
@@ -488,79 +801,59 @@ class _ExplorePageState extends State<ExplorePage> {
   // FILTER
   // ================================================================
 
-  Future<void> _onFilterSelected(int index) async {
+  Future<void> _onFilterSelected(
+    int index,
+  ) async {
+    if (!mounted) return;
+
     setState(() {
       _selectedFilterIndex = index;
       _selectedCategory = null;
       _selectedCategoryLabel = 'كل الأماكن';
       _searchQuery = '';
+      _showingAllPlaces = false;
       _isLoading = true;
+      _isLoadingMore = false;
       _errorMessage = null;
+      _currentPage = 1;
+      _totalPages = 0;
+      _places = [];
     });
 
     try {
-      List<Place> places;
-
-      switch (index) {
-                case 0:
-          final ref = _referencePoint;
-
-          if (ref != null) {
-            final nearby = await _placeService.getNearbyPlaces(
-              latitude: ref.latitude,
-              longitude: ref.longitude,
-              radius: 5000,
-              limit: 50,
-            );
-
-            final refPos = Position(
-              latitude: ref.latitude,
-              longitude: ref.longitude,
-              timestamp: DateTime.now(),
-              accuracy: 0,
-              altitude: 0,
-              altitudeAccuracy: 0,
-              heading: 0,
-              headingAccuracy: 0,
-              speed: 0,
-              speedAccuracy: 0,
-            );
-
-            places = _sortByDistance(
-              _preparePlaces(nearby),
-              refPos,
-            );
-          } else {
-            places = await _placeService.getPlaces();
-            places = _preparePlaces(places);
-          }
-          break;
-
-        case 1:
-          places = await _placeService.getOpenPlaces();
-          places = _preparePlaces(places);
-          break;
-
-        case 2:
-          places = await _placeService.getHighestRatedPlaces();
-          places = _preparePlaces(places);
-          break;
-
-        case 3:
-          places = await _placeService.getMostVisitedPlaces();
-          places = _preparePlaces(places);
-          break;
-
-        default:
-          places = await _placeService.getPlaces();
-          places = _preparePlaces(places);
-      }
+      final result =
+          await _loadPageForCurrentState(
+        page: 1,
+      );
 
       if (!mounted) return;
 
+      var places =
+          _preparePlaces(result.items);
+
+      if (index == 0) {
+        final ref = _referencePoint;
+
+        if (ref != null) {
+          final refPos =
+              _positionFromReference(
+            ref,
+          );
+
+          places =
+              _sortByDistance(
+            places,
+            refPos,
+          );
+        }
+      }
+
       setState(() {
         _places = places;
+        _currentPage = result.page;
+        _totalPages = result.pages;
         _isLoading = false;
+        _isLoadingMore = false;
       });
     } catch (error) {
       if (!mounted) return;
@@ -568,10 +861,13 @@ class _ExplorePageState extends State<ExplorePage> {
       setState(() {
         _places = [];
         _isLoading = false;
+        _isLoadingMore = false;
         _errorMessage = error.toString();
       });
 
-      debugPrint('Filter failed: $error');
+      debugPrint(
+        'Filter failed: $error',
+      );
     }
   }
 
@@ -579,26 +875,42 @@ class _ExplorePageState extends State<ExplorePage> {
   // CATEGORY
   // ================================================================
 
-  Future<void> _onCategorySelected(Category category) async {
+  Future<void> _onCategorySelected(
+    Category category,
+  ) async {
+    if (!mounted) return;
+
     setState(() {
       _selectedCategory = category.id;
       _selectedCategoryLabel = category.nameAr;
       _selectedFilterIndex = -1;
       _searchQuery = '';
+      _showingAllPlaces = false;
       _isLoading = true;
+      _isLoadingMore = false;
       _errorMessage = null;
+      _currentPage = 1;
+      _totalPages = 0;
+      _places = [];
     });
 
     try {
-      final places = await _placeService.getPlacesByCategory(
+      final result =
+          await _placeService.getPlacesByCategoryPage(
         category.id,
+        page: 1,
+        limit: _pageSize,
       );
 
       if (!mounted) return;
 
       setState(() {
-        _places = _preparePlaces(places);
+        _places =
+            _preparePlaces(result.items);
+        _currentPage = result.page;
+        _totalPages = result.pages;
         _isLoading = false;
+        _isLoadingMore = false;
       });
     } catch (error) {
       if (!mounted) return;
@@ -606,11 +918,13 @@ class _ExplorePageState extends State<ExplorePage> {
       setState(() {
         _places = [];
         _isLoading = false;
+        _isLoadingMore = false;
         _errorMessage = error.toString();
       });
 
       debugPrint(
-        'Failed to load category ${category.nameAr}: $error',
+        'Failed to load category '
+        '${category.nameAr}: $error',
       );
     }
   }
@@ -620,16 +934,53 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Future<void> _selectAllPlaces() async {
+    if (!mounted) return;
+
     setState(() {
       _selectedCategory = null;
       _selectedCategoryLabel = 'كل الأماكن';
-      _selectedFilterIndex = 0;
+      _selectedFilterIndex = -1;
       _searchQuery = '';
+      _showingAllPlaces = true;
       _isLoading = true;
+      _isLoadingMore = false;
       _errorMessage = null;
+      _currentPage = 1;
+      _totalPages = 0;
+      _places = [];
     });
 
-    await _loadPlaces();
+    try {
+      final result =
+          await _placeService.getPlacesPage(
+        page: 1,
+        limit: _pageSize,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _places =
+            _preparePlaces(result.items);
+        _currentPage = result.page;
+        _totalPages = result.pages;
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _places = [];
+        _isLoading = false;
+        _isLoadingMore = false;
+        _errorMessage = error.toString();
+      });
+
+      debugPrint(
+        'Failed to load all places: $error',
+      );
+    }
   }
 
   // ================================================================
@@ -649,12 +1000,21 @@ class _ExplorePageState extends State<ExplorePage> {
             status: _categoriesStatus,
             selectedCategory: _selectedCategory,
             onAllPressed: () async {
-              Navigator.of(sheetContext).pop();
+              Navigator.of(
+                sheetContext,
+              ).pop();
+
               await _selectAllPlaces();
             },
-            onCategoryPressed: (category) async {
-              Navigator.of(sheetContext).pop();
-              await _onCategorySelected(category);
+            onCategoryPressed:
+                (category) async {
+              Navigator.of(
+                sheetContext,
+              ).pop();
+
+              await _onCategorySelected(
+                category,
+              );
             },
             iconFromName: _iconFromName,
           ),
@@ -675,116 +1035,200 @@ class _ExplorePageState extends State<ExplorePage> {
   // BUILD
   // ================================================================
 
-    @override
+  @override
   Widget build(BuildContext context) {
-    final colors = context.waynColors;
+    final colors =
+        context.waynColors;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection:
+          TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: colors.background,
-        resizeToAvoidBottomInset: false,
+        backgroundColor:
+            colors.background,
+        resizeToAvoidBottomInset:
+            false,
         body: SafeArea(
           child: Column(
             children: [
               WaynHeader(
-                onMenuPressed: _onMenuPressed,
-                onNotificationsPressed: _onNotificationsPressed,
+                onMenuPressed:
+                    _onMenuPressed,
+                onNotificationsPressed:
+                    _onNotificationsPressed,
               ),
               HomeSearchBar(
-                selectedCategory: _selectedCategoryLabel,
-                onCategoryPressed: _onCategoryPressed,
-                onSearchChanged: _searchPlaces,
+                selectedCategory:
+                    _selectedCategoryLabel,
+                onCategoryPressed:
+                    _onCategoryPressed,
+                onSearchChanged:
+                    _searchPlaces,
               ),
               Expanded(
-                child: RefreshIndicator(
+                child:
+                    RefreshIndicator(
                   onRefresh: () async {
                     await Future.wait([
                       _loadCurrentLocation(),
                       _loadCategories(),
                     ]);
-                    await _loadPlaces();
+
+                    await _reloadCurrentView();
                   },
                   color: colors.brand,
                   child: ListView(
-                    physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
+                    controller:
+                        _scrollController,
+                    physics:
+                        const BouncingScrollPhysics(
+                      parent:
+                          AlwaysScrollableScrollPhysics(),
                     ),
-                    padding: EdgeInsets.zero,
+                    padding:
+                        EdgeInsets.zero,
                     children: [
                       HomeFilters(
-                        selectedIndex: _selectedFilterIndex,
-                        onFilterSelected: _onFilterSelected,
+                        selectedIndex:
+                            _selectedFilterIndex,
+                        onFilterSelected:
+                            _onFilterSelected,
                       ),
                       _buildExploreCategoriesSection(),
                       _buildSuggestionsSection(),
                       SectionHeader(
-                        title: _buildResultsTitle(),
-                        action: 'عرض الكل',
-                        onActionPressed: _onViewAllPressed,
+                        title:
+                            _buildResultsTitle(),
+                        action:
+                            'عرض الكل',
+                        onActionPressed:
+                            _onViewAllPressed,
                       ),
                       if (_isLoading)
                         const _LoadingPlaces()
-                      else if (_errorMessage != null)
+                      else if (_errorMessage !=
+                          null)
                         _buildErrorState()
                       else if (_places.isEmpty)
                         _buildEmptyState()
                       else
-                        ...List.generate(_places.length, (index) {
-                          final place = _places[index];
-                          final distance = _distanceToPlace(place);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
-                            ),
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.stretch,
-                              children: [
-                                PlaceCard(
-                                  place: place,
-                                  onFavoritePressed: () {
-                                    _onFavoritePressed(place);
-                                  },
-                                  onPressed: () {
-                                    _onPlacePressed(place);
-                                  },
-                                ),
-                                if (distance != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      top: 5,
-                                      right: 8,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      children: [
-                                        const Icon(
-                                          Icons.near_me_rounded,
-                                          size: 14,
-                                          color: Color(0xFF18A99A),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          _formatDistance(distance),
-                                          textDirection:
-                                              TextDirection.rtl,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: colors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                        ...List.generate(
+                          _places.length,
+                          (index) {
+                            final place =
+                                _places[index];
+
+                            final distance =
+                                _distanceToPlace(
+                              place,
+                            );
+
+                            return Padding(
+                              padding:
+                                  const EdgeInsets
+                                      .symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              child:
+                                  Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment
+                                        .stretch,
+                                children: [
+                                  PlaceCard(
+                                    place:
+                                        place,
+                                    onFavoritePressed:
+                                        () {
+                                      _onFavoritePressed(
+                                        place,
+                                      );
+                                    },
+                                    onPressed:
+                                        () {
+                                      _onPlacePressed(
+                                        place,
+                                      );
+                                    },
                                   ),
-                              ],
+                                  if (distance !=
+                                      null)
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets
+                                              .only(
+                                        top: 5,
+                                        right: 8,
+                                      ),
+                                      child:
+                                          Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment
+                                                .start,
+                                        children: [
+                                          const Icon(
+                                            Icons
+                                                .near_me_rounded,
+                                            size:
+                                                14,
+                                            color:
+                                                Color(
+                                              0xFF18A99A,
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            width:
+                                                4,
+                                          ),
+                                          Text(
+                                            _formatDistance(
+                                              distance,
+                                            ),
+                                            textDirection:
+                                                TextDirection
+                                                    .rtl,
+                                            style:
+                                                TextStyle(
+                                              fontSize:
+                                                  11,
+                                              fontWeight:
+                                                  FontWeight
+                                                      .w700,
+                                              color:
+                                                  colors
+                                                      .textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      if (_isLoadingMore)
+                        const Padding(
+                          padding:
+                              EdgeInsets.symmetric(
+                            vertical: 20,
+                          ),
+                          child: Center(
+                            child:
+                                CircularProgressIndicator(
+                              strokeWidth:
+                                  2.2,
+                              color:
+                                  Color(
+                                0xFF18A99A,
+                              ),
                             ),
-                          );
-                        }),
-                      const SizedBox(height: 100),
+                          ),
+                        ),
+                      const SizedBox(
+                        height: 100,
+                      ),
                     ],
                   ),
                 ),
@@ -797,10 +1241,63 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   // ================================================================
+  // RELOAD CURRENT VIEW
+  // ================================================================
+
+  Future<void> _reloadCurrentView() async {
+    if (!mounted) return;
+
+    if (_showingAllPlaces) {
+      await _selectAllPlaces();
+      return;
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      await _searchPlaces(
+        _searchQuery,
+      );
+      return;
+    }
+
+    if (_selectedCategory != null) {
+      final categoryId =
+          _selectedCategory!;
+
+      final category = _categories
+          .where(
+            (item) =>
+                item.id == categoryId,
+          )
+          .firstOrNull;
+
+      if (category != null) {
+        await _onCategorySelected(
+          category,
+        );
+      }
+
+      return;
+    }
+
+    if (_selectedFilterIndex == 0) {
+      await _loadNearbyPlaces();
+      return;
+    }
+
+    await _onFilterSelected(
+      _selectedFilterIndex,
+    );
+  }
+
+  // ================================================================
   // RESULTS TITLE
   // ================================================================
 
   String _buildResultsTitle() {
+    if (_showingAllPlaces) {
+      return 'كل الأماكن';
+    }
+
     if (_searchQuery.isNotEmpty) {
       return 'نتائج البحث';
     }
@@ -823,7 +1320,7 @@ class _ExplorePageState extends State<ExplorePage> {
         return 'الأكثر زيارة';
 
       default:
-        return 'الأكثر زيارة';
+        return 'كل الأماكن';
     }
   }
 
@@ -832,17 +1329,20 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildExploreCategoriesSection() {
-    final colors = context.waynColors;
+    final colors =
+        context.waynColors;
 
     if (_categories.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
+          padding:
+              const EdgeInsets.fromLTRB(
             20,
             24,
             20,
@@ -850,93 +1350,149 @@ class _ExplorePageState extends State<ExplorePage> {
           ),
           child: Text(
             'استكشف حسب الفئة',
-            textDirection: TextDirection.rtl,
+            textDirection:
+                TextDirection.rtl,
             style: TextStyle(
               fontSize: 19,
-              fontWeight: FontWeight.w800,
-              color: colors.textPrimary,
+              fontWeight:
+                  FontWeight.w800,
+              color:
+                  colors.textPrimary,
             ),
           ),
         ),
         SizedBox(
           height: 108,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(
+          child:
+              ListView.separated(
+            padding:
+                const EdgeInsets.symmetric(
               horizontal: 20,
             ),
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: _categories.length,
-            separatorBuilder: (_, _) {
-              return const SizedBox(width: 12);
+            scrollDirection:
+                Axis.horizontal,
+            physics:
+                const BouncingScrollPhysics(),
+            itemCount:
+                _categories.length,
+            separatorBuilder:
+                (_, _) {
+              return const SizedBox(
+                width: 12,
+              );
             },
-            itemBuilder: (context, index) {
-              final category = _categories[index];
+            itemBuilder:
+                (context, index) {
+              final category =
+                  _categories[index];
 
               final isSelected =
-                  _selectedCategory == category.id;
+                  _selectedCategory ==
+                      category.id;
 
               return GestureDetector(
-                behavior: HitTestBehavior.opaque,
+                behavior:
+                    HitTestBehavior.opaque,
                 onTap: () {
-                  _onCategorySelected(category);
+                  _onCategorySelected(
+                    category,
+                  );
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(
+                child:
+                    AnimatedContainer(
+                  duration:
+                      const Duration(
                     milliseconds: 180,
                   ),
                   width: 82,
-                  decoration: BoxDecoration(
+                  decoration:
+                      BoxDecoration(
                     color: isSelected
                         ? colors.surfaceAlt
                         : colors.surface,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
+                    borderRadius:
+                        BorderRadius
+                            .circular(
+                      18,
+                    ),
+                    border:
+                        Border.all(
                       color: isSelected
                           ? colors.brand
                           : colors.divider,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: colors.shadow,
+                        color:
+                            colors.shadow,
                         blurRadius: 10,
-                        offset: const Offset(0, 3),
+                        offset:
+                            const Offset(
+                          0,
+                          3,
+                        ),
                       ),
                     ],
                   ),
-                  child: Column(
+                  child:
+                      Column(
                     mainAxisAlignment:
-                        MainAxisAlignment.center,
+                        MainAxisAlignment
+                            .center,
                     children: [
                       Container(
                         width: 48,
                         height: 48,
-                        decoration: BoxDecoration(
-                          color: colors.surfaceAlt,
+                        decoration:
+                            BoxDecoration(
+                          color:
+                              colors.surfaceAlt,
                           borderRadius:
-                              BorderRadius.circular(15),
+                              BorderRadius
+                                  .circular(
+                            15,
+                          ),
                         ),
                         child: Icon(
-                          _iconFromName(category.icon),
-                          color: colors.brand,
+                          _iconFromName(
+                            category.icon,
+                          ),
+                          color:
+                              colors.brand,
                           size: 24,
                         ),
                       ),
-                      const SizedBox(height: 7),
+                      const SizedBox(
+                        height: 7,
+                      ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(
+                        padding:
+                            const EdgeInsets
+                                .symmetric(
                           horizontal: 5,
                         ),
                         child: Text(
-                          category.nameAr,
-                          textDirection: TextDirection.rtl,
+                          category
+                              .nameAr,
+                          textDirection:
+                              TextDirection
+                                  .rtl,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: colors.textSecondary,
+                          overflow:
+                              TextOverflow
+                                  .ellipsis,
+                          textAlign:
+                              TextAlign
+                                  .center,
+                          style:
+                              TextStyle(
+                            fontSize:
+                                11,
+                            fontWeight:
+                                FontWeight
+                                    .w700,
+                            color: colors
+                                .textSecondary,
                           ),
                         ),
                       ),
@@ -955,48 +1511,87 @@ class _ExplorePageState extends State<ExplorePage> {
   // CATEGORY ICON
   // ================================================================
 
-  IconData _iconFromName(String? iconName) {
+  IconData _iconFromName(
+    String? iconName,
+  ) {
     switch (iconName) {
       case 'restaurant':
-        return Icons.restaurant_rounded;
+        return Icons
+            .restaurant_rounded;
+
       case 'park':
         return Icons.park_rounded;
+
       case 'beach_access':
-        return Icons.beach_access_rounded;
+        return Icons
+            .beach_access_rounded;
+
       case 'hotel':
-        return Icons.hotel_rounded;
+        return Icons
+            .hotel_rounded;
+
       case 'shopping_bag':
-        return Icons.shopping_bag_rounded;
+        return Icons
+            .shopping_bag_rounded;
+
       case 'sports_soccer':
-        return Icons.sports_soccer_rounded;
+        return Icons
+            .sports_soccer_rounded;
+
       case 'mosque':
-        return Icons.mosque_rounded;
+        return Icons
+            .mosque_rounded;
+
       case 'local_hospital':
-        return Icons.local_hospital_rounded;
+        return Icons
+            .local_hospital_rounded;
+
       case 'school':
         return Icons.school_rounded;
+
       case 'local_cafe':
-        return Icons.local_cafe_rounded;
+        return Icons
+            .local_cafe_rounded;
+
       case 'local_gas_station':
-        return Icons.local_gas_station_rounded;
+        return Icons
+            .local_gas_station_rounded;
+
       case 'pharmacy':
-        return Icons.local_pharmacy_rounded;
+        return Icons
+            .local_pharmacy_rounded;
+
       case 'museum':
-        return Icons.museum_rounded;
+        return Icons
+            .museum_rounded;
+
       case 'store':
         return Icons.store_rounded;
+
       case 'shopping_cart':
-        return Icons.shopping_cart_rounded;
+        return Icons
+            .shopping_cart_rounded;
+
       case 'local_parking':
-        return Icons.local_parking_rounded;
+        return Icons
+            .local_parking_rounded;
+
       case 'fitness_center':
-        return Icons.fitness_center_rounded;
+        return Icons
+            .fitness_center_rounded;
+
       case 'local_atm':
-        return Icons.local_atm_rounded;
+        return Icons
+            .local_atm_rounded;
+
       case 'bank':
-        return Icons.account_balance_rounded;
+        return Icons
+            .account_balance_rounded;
+
       case 'government':
-        return Icons.account_balance_rounded;
+        return Icons
+            .account_balance_rounded;
+
       default:
         return Icons.place_rounded;
     }
@@ -1007,13 +1602,16 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildSuggestionsSection() {
-    final colors = context.waynColors;
+    final colors =
+        context.waynColors;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
+          padding:
+              const EdgeInsets.fromLTRB(
             20,
             28,
             20,
@@ -1021,55 +1619,70 @@ class _ExplorePageState extends State<ExplorePage> {
           ),
           child: Text(
             'اقتراحات لك',
-            textDirection: TextDirection.rtl,
+            textDirection:
+                TextDirection.rtl,
             style: TextStyle(
               fontSize: 19,
-              fontWeight: FontWeight.w800,
-              color: colors.textPrimary,
+              fontWeight:
+                  FontWeight.w800,
+              color:
+                  colors.textPrimary,
             ),
           ),
         ),
-
         _buildSuggestionCard(
           title: 'أماكن قريبة منك',
-          subtitle: _hasLocationPermission
-              ? 'أماكن مميزة حول موقعك الحالي'
-              : 'فعّل موقعك لاكتشاف الأماكن القريبة',
-          icon: Icons.near_me_rounded,
-          iconColor: const Color(0xFF18A99A),
-          onPressed: _loadNearbyPlaces,
+          subtitle:
+              _hasLocationPermission
+                  ? 'أماكن مميزة حول موقعك الحالي'
+                  : 'فعّل موقعك لاكتشاف الأماكن القريبة',
+          icon:
+              Icons.near_me_rounded,
+          iconColor:
+              const Color(0xFF18A99A),
+          onPressed:
+              _loadNearbyPlaces,
         ),
-
         _buildSuggestionCard(
           title: 'أماكن مناسبة لك',
-          subtitle: 'اقتراحات بناءً على اهتماماتك',
-          icon: Icons.auto_awesome_rounded,
-          iconColor: const Color(0xFF7B61D9),
+          subtitle:
+              'اقتراحات بناءً على اهتماماتك',
+          icon:
+              Icons.auto_awesome_rounded,
+          iconColor:
+              const Color(0xFF7B61D9),
           onPressed: () {
-            debugPrint('Personalized places pressed');
+            debugPrint(
+              'Personalized places pressed',
+            );
           },
         ),
-
         _buildSuggestionCard(
           title: 'أماكن مفتوحة الآن',
-          subtitle: 'اكتشف الأماكن المتاحة حاليًا',
-          icon: Icons.access_time_rounded,
-          iconColor: const Color(0xFF2997FF),
-          onPressed: _openPlacesSuggestion,
+          subtitle:
+              'اكتشف الأماكن المتاحة حاليًا',
+          icon:
+              Icons.access_time_rounded,
+          iconColor:
+              const Color(0xFF2997FF),
+          onPressed:
+              _openPlacesSuggestion,
         ),
-
         if (_isLoadingLocation)
           Padding(
-            padding: const EdgeInsets.only(
+            padding:
+                const EdgeInsets.only(
               top: 6,
             ),
             child: Center(
               child: SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(
+                child:
+                    CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: colors.brand,
+                  color:
+                      colors.brand,
                 ),
               ),
             ),
@@ -1089,26 +1702,35 @@ class _ExplorePageState extends State<ExplorePage> {
     required Color iconColor,
     required VoidCallback onPressed,
   }) {
-    final colors = context.waynColors;
+    final colors =
+        context.waynColors;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
+      padding:
+          const EdgeInsets.symmetric(
         horizontal: 20,
         vertical: 6,
       ),
       child: GestureDetector(
         onTap: onPressed,
-        behavior: HitTestBehavior.opaque,
+        behavior:
+            HitTestBehavior.opaque,
         child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
+          padding:
+              const EdgeInsets.all(16),
+          decoration:
+              BoxDecoration(
             color: colors.surface,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius:
+                BorderRadius.circular(
+              20,
+            ),
             boxShadow: [
               BoxShadow(
                 color: colors.shadow,
                 blurRadius: 14,
-                offset: const Offset(0, 5),
+                offset:
+                    const Offset(0, 5),
               ),
             ],
           ),
@@ -1117,11 +1739,16 @@ class _ExplorePageState extends State<ExplorePage> {
               Container(
                 width: 52,
                 height: 52,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(
+                decoration:
+                    BoxDecoration(
+                  color:
+                      iconColor.withValues(
                     alpha: 0.10,
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius:
+                      BorderRadius.circular(
+                    16,
+                  ),
                 ),
                 child: Icon(
                   icon,
@@ -1129,39 +1756,60 @@ class _ExplorePageState extends State<ExplorePage> {
                   size: 25,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(
+                width: 14,
+              ),
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      CrossAxisAlignment
+                          .start,
                   children: [
                     Text(
                       title,
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
+                      textDirection:
+                          TextDirection
+                              .rtl,
+                      style:
+                          TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: colors.textPrimary,
+                        fontWeight:
+                            FontWeight
+                                .w800,
+                        color: colors
+                            .textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(
+                      height: 4,
+                    ),
                     Text(
                       subtitle,
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
+                      textDirection:
+                          TextDirection
+                              .rtl,
+                      style:
+                          TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: colors.textSecondary,
+                        fontWeight:
+                            FontWeight
+                                .w500,
+                        color: colors
+                            .textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(
+                width: 10,
+              ),
               Icon(
-                Icons.arrow_back_ios_new_rounded,
+                Icons
+                    .arrow_back_ios_new_rounded,
                 size: 15,
-                color: colors.textMuted,
+                color:
+                    colors.textMuted,
               ),
             ],
           ),
@@ -1175,10 +1823,12 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildErrorState() {
-    final colors = context.waynColors;
+    final colors =
+        context.waynColors;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding:
+          const EdgeInsets.fromLTRB(
         20,
         20,
         20,
@@ -1186,10 +1836,15 @@ class _ExplorePageState extends State<ExplorePage> {
       ),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
+        padding:
+            const EdgeInsets.all(22),
+        decoration:
+            BoxDecoration(
           color: colors.surface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius:
+              BorderRadius.circular(
+            20,
+          ),
           border: Border.all(
             color: colors.divider,
           ),
@@ -1199,44 +1854,68 @@ class _ExplorePageState extends State<ExplorePage> {
             Icon(
               Icons.cloud_off_rounded,
               size: 42,
-              color: colors.textMuted,
+              color:
+                  colors.textMuted,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 12,
+            ),
             Text(
               'تعذر تحميل الأماكن',
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
+              textDirection:
+                  TextDirection.rtl,
+              style:
+                  TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: colors.textPrimary,
+                fontWeight:
+                    FontWeight.w800,
+                color:
+                    colors.textPrimary,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(
+              height: 6,
+            ),
             Text(
               'تحقق من اتصال الإنترنت وحاول مرة أخرى.',
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.center,
-              style: TextStyle(
+              textDirection:
+                  TextDirection.rtl,
+              textAlign:
+                  TextAlign.center,
+              style:
+                  TextStyle(
                 fontSize: 12,
-                color: colors.textSecondary,
+                color:
+                    colors.textSecondary,
               ),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(
+              height: 15,
+            ),
             ElevatedButton(
-              onPressed: _loadPlaces,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.brand,
-                foregroundColor: Colors.white,
+              onPressed:
+                  _reloadCurrentView,
+              style:
+                  ElevatedButton.styleFrom(
+                backgroundColor:
+                    colors.brand,
+                foregroundColor:
+                    Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(13),
+                shape:
+                    RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(
+                    13,
+                  ),
                 ),
               ),
               child: const Text(
                 'إعادة المحاولة',
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontWeight:
+                      FontWeight.w800,
                 ),
               ),
             ),
@@ -1251,23 +1930,33 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildEmptyState() {
-    String message = 'لا توجد أماكن متاحة حاليًا';
+    String message =
+        'لا توجد أماكن متاحة حاليًا';
 
     if (_searchQuery.isNotEmpty) {
-      message = 'لم نجد أماكن تطابق بحثك';
-    } else if (_selectedCategory != null) {
-      message = 'لا توجد أماكن في هذه الفئة';
-    } else if (_selectedFilterIndex == 1) {
-      message = 'لا توجد أماكن مفتوحة الآن';
-    } else if (_selectedFilterIndex == 0 &&
+      message =
+          'لم نجد أماكن تطابق بحثك';
+    } else if (_selectedCategory !=
+        null) {
+      message =
+          'لا توجد أماكن في هذه الفئة';
+    } else if (_selectedFilterIndex ==
+        1) {
+      message =
+          'لا توجد أماكن مفتوحة الآن';
+    } else if (_selectedFilterIndex ==
+            0 &&
         _hasLocationPermission) {
-      message = 'لا توجد أماكن قريبة منك حاليًا';
+      message =
+          'لا توجد أماكن قريبة منك حاليًا';
     }
 
-    final colors = context.waynColors;
+    final colors =
+        context.waynColors;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding:
+          const EdgeInsets.fromLTRB(
         20,
         20,
         20,
@@ -1275,10 +1964,15 @@ class _ExplorePageState extends State<ExplorePage> {
       ),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
+        padding:
+            const EdgeInsets.all(22),
+        decoration:
+            BoxDecoration(
           color: colors.surface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius:
+              BorderRadius.circular(
+            20,
+          ),
           border: Border.all(
             color: colors.divider,
           ),
@@ -1286,19 +1980,28 @@ class _ExplorePageState extends State<ExplorePage> {
         child: Column(
           children: [
             Icon(
-              Icons.location_off_rounded,
+              Icons
+                  .location_off_rounded,
               size: 42,
-              color: colors.textMuted,
+              color:
+                  colors.textMuted,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 12,
+            ),
             Text(
               message,
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.center,
-              style: TextStyle(
+              textDirection:
+                  TextDirection.rtl,
+              textAlign:
+                  TextAlign.center,
+              style:
+                  TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: colors.textPrimary,
+                fontWeight:
+                    FontWeight.w800,
+                color:
+                    colors.textPrimary,
               ),
             ),
           ],
@@ -1331,28 +2034,40 @@ class _ExplorePageState extends State<ExplorePage> {
   // FAVORITE
   // ================================================================
 
-  Future<void> _onFavoritePressed(Place place) async {
+  Future<void> _onFavoritePressed(
+    Place place,
+  ) async {
     try {
-      if (_favoriteIds.contains(place.id)) {
-        await _favoriteService.remove(place.id);
+      if (_favoriteIds.contains(
+        place.id,
+      )) {
+        await _favoriteService
+            .remove(place.id);
 
         if (mounted) {
           setState(() {
-            _favoriteIds.remove(place.id);
+            _favoriteIds.remove(
+              place.id,
+            );
           });
         }
       } else {
-        await _favoriteService.add(place.id);
+        await _favoriteService
+            .add(place.id);
 
         if (mounted) {
           setState(() {
-            _favoriteIds.add(place.id);
+            _favoriteIds.add(
+              place.id,
+            );
           });
         }
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(
           SnackBar(
             content: Text(
               'تعذر تحديث المفضلة: $error',
@@ -1367,10 +2082,13 @@ class _ExplorePageState extends State<ExplorePage> {
   // PLACE DETAILS
   // ================================================================
 
-  void _onPlacePressed(Place place) {
+  void _onPlacePressed(
+    Place place,
+  ) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PlaceDetailsPage(
+        builder: (_) =>
+            PlaceDetailsPage(
           place: place,
         ),
       ),
@@ -1382,15 +2100,18 @@ class _ExplorePageState extends State<ExplorePage> {
 // CATEGORY BOTTOM SHEET
 // ==================================================================
 
-class _CategoryBottomSheet extends StatelessWidget {
+class _CategoryBottomSheet
+    extends StatelessWidget {
   final List<Category> categories;
   final CategoryLoadStatus status;
   final String? selectedCategory;
 
   final VoidCallback onAllPressed;
-  final ValueChanged<Category> onCategoryPressed;
+  final ValueChanged<Category>
+      onCategoryPressed;
 
-  final IconData Function(String?) iconFromName;
+  final IconData Function(String?)
+      iconFromName;
 
   const _CategoryBottomSheet({
     required this.categories,
@@ -1402,18 +2123,24 @@ class _CategoryBottomSheet extends StatelessWidget {
   });
 
   bool get isLoading =>
-      status == CategoryLoadStatus.loading;
+      status ==
+      CategoryLoadStatus.loading;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(
         maxHeight:
-            MediaQuery.of(context).size.height * 0.75,
+            MediaQuery.of(context)
+                    .size
+                    .height *
+                0.75,
       ),
-      decoration: const BoxDecoration(
+      decoration:
+          const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(
+        borderRadius:
+            BorderRadius.vertical(
           top: Radius.circular(28),
         ),
       ),
@@ -1421,45 +2148,69 @@ class _CategoryBottomSheet extends StatelessWidget {
         top: false,
         child: Column(
           children: [
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 12,
+            ),
             Container(
               width: 42,
               height: 5,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD9DEE7),
-                borderRadius: BorderRadius.circular(10),
+              decoration:
+                  BoxDecoration(
+                color:
+                    const Color(
+                  0xFFD9DEE7,
+                ),
+                borderRadius:
+                    BorderRadius.circular(
+                  10,
+                ),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(
+              height: 18,
+            ),
             const Padding(
-              padding: EdgeInsets.symmetric(
+              padding:
+                  EdgeInsets.symmetric(
                 horizontal: 20,
               ),
               child: Align(
-                alignment: Alignment.centerRight,
+                alignment:
+                    Alignment.centerRight,
                 child: Text(
                   'اختر الفئة',
-                  textDirection: TextDirection.rtl,
+                  textDirection:
+                      TextDirection.rtl,
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF172033),
+                    fontWeight:
+                        FontWeight.w800,
+                    color:
+                        Color(0xFF172033),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(
+              height: 14,
+            ),
             Expanded(
-              child: status == CategoryLoadStatus.error
+              child: status ==
+                      CategoryLoadStatus
+                          .error
                   ? const _CategoryStateMessage(
-                      icon: Icons.cloud_off_rounded,
+                      icon: Icons
+                          .cloud_off_rounded,
                       message:
                           'تعذر تحميل الفئات. تحقق من الاتصال وحاول مرة أخرى.',
                     )
                   : isLoading
                       ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF18A99A),
+                          child:
+                              CircularProgressIndicator(
+                            color: Color(
+                              0xFF18A99A,
+                            ),
                           ),
                         )
                       : categories.isEmpty
@@ -1467,7 +2218,8 @@ class _CategoryBottomSheet extends StatelessWidget {
                                   CategoryLoadStatus
                                       .permissionDenied
                               ? const _CategoryStateMessage(
-                                  icon: Icons.lock_outline_rounded,
+                                  icon: Icons
+                                      .lock_outline_rounded,
                                   message:
                                       'تعذر الوصول إلى الفئات بسبب الصلاحيات.',
                                 )
@@ -1475,17 +2227,19 @@ class _CategoryBottomSheet extends StatelessWidget {
                                       CategoryLoadStatus
                                           .failure
                                   ? const _CategoryStateMessage(
-                                      icon:
-                                          Icons.cloud_off_rounded,
+                                      icon: Icons
+                                          .cloud_off_rounded,
                                       message:
                                           'تعذر تحميل الفئات. حاول مرة أخرى.',
                                     )
                                   : const Center(
-                                      child: Text(
+                                      child:
+                                          Text(
                                         'لا توجد فئات متاحة',
                                         textDirection:
                                             TextDirection.rtl,
-                                        style: TextStyle(
+                                        style:
+                                            TextStyle(
                                           color:
                                               Color(0xFF8993A3),
                                         ),
@@ -1501,7 +2255,9 @@ class _CategoryBottomSheet extends StatelessWidget {
                               ),
                               children: [
                                 _buildAllTile(),
-                                const SizedBox(height: 8),
+                                const SizedBox(
+                                  height: 8,
+                                ),
                                 ...categories.map(
                                   (category) =>
                                       _buildCategoryTile(
@@ -1523,43 +2279,67 @@ class _CategoryBottomSheet extends StatelessWidget {
   // ================================================================
 
   Widget _buildAllTile() {
-    final selected = selectedCategory == null;
+    final selected =
+        selectedCategory == null;
 
     return InkWell(
       onTap: onAllPressed,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius:
+          BorderRadius.circular(
+        18,
+      ),
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
+        padding:
+            const EdgeInsets.all(14),
+        decoration:
+            BoxDecoration(
           color: selected
-              ? const Color(0xFFE8F8F6)
+              ? const Color(
+                  0xFFE8F8F6,
+                )
               : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius:
+              BorderRadius.circular(
+            18,
+          ),
           border: Border.all(
             color: selected
-                ? const Color(0xFF18A99A)
-                : const Color(0xFFE8EBF0),
+                ? const Color(
+                    0xFF18A99A,
+                  )
+                : const Color(
+                    0xFFE8EBF0,
+                  ),
           ),
         ),
         child: Row(
           children: [
-            _iconContainer(Icons.apps_rounded),
-            const SizedBox(width: 14),
+            _iconContainer(
+              Icons.apps_rounded,
+            ),
+            const SizedBox(
+              width: 14,
+            ),
             const Expanded(
               child: Text(
                 'كل الأماكن',
-                textDirection: TextDirection.rtl,
+                textDirection:
+                    TextDirection.rtl,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF283247),
+                  fontWeight:
+                      FontWeight.w700,
+                  color:
+                      Color(0xFF283247),
                 ),
               ),
             ),
             if (selected)
               const Icon(
-                Icons.check_circle_rounded,
-                color: Color(0xFF18A99A),
+                Icons
+                    .check_circle_rounded,
+                color:
+                    Color(0xFF18A99A),
                 size: 22,
               ),
           ],
@@ -1577,56 +2357,88 @@ class _CategoryBottomSheet extends StatelessWidget {
     Category category,
   ) {
     final selected =
-        selectedCategory == category.id;
+        selectedCategory ==
+            category.id;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding:
+          const EdgeInsets.only(
+        bottom: 8,
+      ),
       child: InkWell(
         onTap: () {
-          onCategoryPressed(category);
+          onCategoryPressed(
+            category,
+          );
         },
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+            BorderRadius.circular(
+          18,
+        ),
         child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
+          padding:
+              const EdgeInsets.all(14),
+          decoration:
+              BoxDecoration(
             color: selected
-                ? const Color(0xFFE8F8F6)
+                ? const Color(
+                    0xFFE8F8F6,
+                  )
                 : Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius:
+                BorderRadius.circular(
+              18,
+            ),
             border: Border.all(
               color: selected
-                  ? const Color(0xFF18A99A)
-                  : const Color(0xFFE8EBF0),
+                  ? const Color(
+                      0xFF18A99A,
+                    )
+                  : const Color(
+                      0xFFE8EBF0,
+                    ),
             ),
           ),
           child: Row(
             children: [
               _iconContainer(
-                iconFromName(category.icon),
+                iconFromName(
+                  category.icon,
+                ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(
+                width: 14,
+              ),
               Expanded(
                 child: Text(
                   category.nameAr,
-                  textDirection: TextDirection.rtl,
-                  style: const TextStyle(
+                  textDirection:
+                      TextDirection.rtl,
+                  style:
+                      const TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF283247),
+                    fontWeight:
+                        FontWeight.w700,
+                    color:
+                        Color(0xFF283247),
                   ),
                 ),
               ),
               if (selected)
                 const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF18A99A),
+                  Icons
+                      .check_circle_rounded,
+                  color:
+                      Color(0xFF18A99A),
                   size: 22,
                 )
               else
                 const Icon(
-                  Icons.arrow_back_ios_new_rounded,
+                  Icons
+                      .arrow_back_ios_new_rounded,
                   size: 14,
-                  color: Color(0xFFB0B7C3),
+                  color:
+                      Color(0xFFB0B7C3),
                 ),
             ],
           ),
@@ -1639,17 +2451,25 @@ class _CategoryBottomSheet extends StatelessWidget {
   // ICON CONTAINER
   // ================================================================
 
-  Widget _iconContainer(IconData icon) {
+  Widget _iconContainer(
+    IconData icon,
+  ) {
     return Container(
       width: 46,
       height: 46,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F8F6),
-        borderRadius: BorderRadius.circular(14),
+      decoration:
+          BoxDecoration(
+        color:
+            const Color(0xFFE8F8F6),
+        borderRadius:
+            BorderRadius.circular(
+          14,
+        ),
       ),
       child: Icon(
         icon,
-        color: const Color(0xFF18A99A),
+        color:
+            const Color(0xFF18A99A),
         size: 23,
       ),
     );
@@ -1660,7 +2480,8 @@ class _CategoryBottomSheet extends StatelessWidget {
 // CATEGORY STATE
 // ==================================================================
 
-class _CategoryStateMessage extends StatelessWidget {
+class _CategoryStateMessage
+    extends StatelessWidget {
   final IconData icon;
   final String message;
 
@@ -1673,23 +2494,34 @@ class _CategoryStateMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(
+        padding:
+            const EdgeInsets.symmetric(
           horizontal: 28,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize:
+              MainAxisSize.min,
           children: [
             Icon(
               icon,
-              color: const Color(0xFF8993A3),
+              color:
+                  const Color(
+                0xFF8993A3,
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(
+              height: 10,
+            ),
             Text(
               message,
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF8993A3),
+              textDirection:
+                  TextDirection.rtl,
+              textAlign:
+                  TextAlign.center,
+              style:
+                  const TextStyle(
+                color:
+                    Color(0xFF8993A3),
               ),
             ),
           ],
@@ -1703,19 +2535,23 @@ class _CategoryStateMessage extends StatelessWidget {
 // LOADING
 // ==================================================================
 
-class _LoadingPlaces extends StatelessWidget {
+class _LoadingPlaces
+    extends StatelessWidget {
   const _LoadingPlaces();
 
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.symmetric(
+      padding:
+          EdgeInsets.symmetric(
         vertical: 45,
       ),
       child: Center(
-        child: CircularProgressIndicator(
+        child:
+            CircularProgressIndicator(
           strokeWidth: 2.5,
-          color: Color(0xFF18A99A),
+          color:
+              Color(0xFF18A99A),
         ),
       ),
     );

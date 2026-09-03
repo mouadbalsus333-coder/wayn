@@ -18,7 +18,6 @@ from app.api.dependencies.auth import (
 from app.core.config import settings
 from app.core.database import get_session
 from app.models.user import User
-from app.repositories.social_repository import SocialRepository
 from app.schemas.community import (
     CommunityCommentCreate,
     CommunityCommentRead,
@@ -41,10 +40,16 @@ router = APIRouter()
 def _format_image_url(image_url: str | None) -> str | None:
     if not image_url:
         return None
+
     if image_url.startswith(("http://", "https://")):
         return image_url
+
     if settings.r2_public_url:
-        return f"{settings.r2_public_url.rstrip('/')}/{image_url.lstrip('/')}"
+        return (
+            f"{settings.r2_public_url.rstrip('/')}/"
+            f"{image_url.lstrip('/')}"
+        )
+
     return f"/api/v1/media/{image_url.lstrip('/')}"
 
 
@@ -52,45 +57,59 @@ async def _build_post_response(
     service: CommunityService,
     post,
     user_id: UUID | None,
-    session,
+    session: AsyncSession,
+    feed_data: dict[UUID, dict[str, object]] | None = None,
 ) -> CommunityPostRead:
-    if user_id is not None:
-        state = await service.get_post_state(
-            post=post,
+    """
+    Build a Community post response.
+
+    When feed_data is provided, all related data is taken from
+    the batch-loaded result instead of executing database queries
+    for the individual post.
+
+    For single-post endpoints, the helper loads batch data for
+    that single post.
+    """
+
+    if feed_data is None:
+        feed_data = await service.get_posts_feed_data(
+            posts=[post],
             user_id=user_id,
         )
-    else:
-        likes_count, saves_count, comments_count = (
-            await service.repository.get_post_counts(post.id)
-        )
-        state = {
-            "likes_count": likes_count,
-            "saves_count": saves_count,
-            "comments_count": comments_count,
+
+    data = feed_data.get(post.id)
+
+    if data is None:
+        data = {
+            "author": None,
+            "place": None,
+            "author_points": 0,
+            "author_followers_count": 0,
+            "is_following_author": False,
+            "likes_count": 0,
+            "saves_count": 0,
+            "comments_count": 0,
             "is_liked": False,
             "is_saved": False,
         }
 
-    author = await service.repository.get_user(post.user_id)
-    place = await service.repository.get_place(post.place_id)
+    author = data["author"]
+    place = data["place"]
 
-    author_points = 0
-    author_followers_count = 0
-    is_following_author = False
+    author_points = int(data["author_points"])
+    author_followers_count = int(
+        data["author_followers_count"]
+    )
+    is_following_author = bool(
+        data["is_following_author"]
+    )
 
-    if author is not None:
-        author_points = int(author.points) if author.points else 0
+    likes_count = int(data["likes_count"])
+    saves_count = int(data["saves_count"])
+    comments_count = int(data["comments_count"])
 
-        social = SocialRepository(session)
-        author_followers_count = await social.count_followers(
-            author.id
-        )
-
-        if user_id is not None:
-            is_following_author = await social.is_following(
-                user_id,
-                author.id,
-            )
+    is_liked = bool(data["is_liked"])
+    is_saved = bool(data["is_saved"])
 
     return CommunityPostRead(
         id=post.id,
@@ -114,11 +133,11 @@ async def _build_post_response(
             user_id is not None
             and post.user_id == user_id
         ),
-        likes_count=state["likes_count"],
-        saves_count=state["saves_count"],
-        comments_count=state["comments_count"],
-        is_liked=state["is_liked"],
-        is_saved=state["is_saved"],
+        likes_count=likes_count,
+        saves_count=saves_count,
+        comments_count=comments_count,
+        is_liked=is_liked,
+        is_saved=is_saved,
     )
 
 
@@ -126,7 +145,9 @@ async def _build_comment_response(
     service: CommunityService,
     comment,
 ) -> CommunityCommentRead:
-    author = await service.repository.get_user(comment.user_id)
+    author = await service.repository.get_user(
+        comment.user_id
+    )
 
     return CommunityCommentRead(
         id=comment.id,
@@ -287,6 +308,9 @@ async def list_posts(
     Guests can read posts and paginate normally.
     Authenticated users additionally receive their personal
     interaction state such as like/save/follow/owner.
+
+    Related post data is loaded in batches to avoid N+1
+    database queries.
     """
 
     service = CommunityService(session)
@@ -304,12 +328,18 @@ async def list_posts(
         else None
     )
 
+    feed_data = await service.get_posts_feed_data(
+        posts=posts,
+        user_id=current_user_id,
+    )
+
     return [
         await _build_post_response(
             service,
             post,
             current_user_id,
             session,
+            feed_data,
         )
         for post in posts
     ]
@@ -340,12 +370,18 @@ async def list_saved_posts(
         limit=limit,
     )
 
+    feed_data = await service.get_posts_feed_data(
+        posts=posts,
+        user_id=current_user.id,
+    )
+
     return [
         await _build_post_response(
             service,
             post,
             current_user.id,
             session,
+            feed_data,
         )
         for post in posts
     ]
@@ -601,7 +637,10 @@ async def create_comment(
             user_id=current_user.id,
             text=data.text,
         )
-        return await _build_comment_response(service, comment)
+        return await _build_comment_response(
+            service,
+            comment,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -641,7 +680,10 @@ async def list_comments(
     )
 
     return [
-        await _build_comment_response(service, comment)
+        await _build_comment_response(
+            service,
+            comment,
+        )
         for comment in comments
     ]
 
