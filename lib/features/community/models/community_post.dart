@@ -11,6 +11,7 @@ class CommunityPost {
   final String? authorUsername;
   final String? authorAvatar;
   final String? placeName;
+  final String? placeCity;
 
   final int authorPoints;
   final int authorFollowersCount;
@@ -40,6 +41,7 @@ class CommunityPost {
     this.authorUsername,
     this.authorAvatar,
     this.placeName,
+    this.placeCity,
     this.authorPoints = 0,
     this.authorFollowersCount = 0,
     this.isFollowingAuthor = false,
@@ -85,6 +87,9 @@ class CommunityPost {
       ),
       placeName: _nullableString(
         json['place_name'] ?? json['place']?['name'],
+      ),
+      placeCity: _nullableString(
+        json['place_city'],
       ),
       authorPoints: _intValue(
         json['author_points'],
@@ -139,6 +144,7 @@ class CommunityPost {
     String? authorUsername,
     String? authorAvatar,
     String? placeName,
+    String? placeCity,
     int? authorPoints,
     int? authorFollowersCount,
     bool? isFollowingAuthor,
@@ -162,6 +168,7 @@ class CommunityPost {
       authorUsername: authorUsername ?? this.authorUsername,
       authorAvatar: authorAvatar ?? this.authorAvatar,
       placeName: placeName ?? this.placeName,
+      placeCity: placeCity ?? this.placeCity,
       authorPoints: authorPoints ?? this.authorPoints,
       authorFollowersCount:
           authorFollowersCount ?? this.authorFollowersCount,

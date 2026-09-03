@@ -106,6 +106,7 @@ async def _build_post_response(
         author_username=author.username if author else None,
         author_avatar=author.avatar_id if author else None,
         place_name=place.name if place else None,
+        place_city=place.city if place else None,
         author_points=author_points,
         author_followers_count=author_followers_count,
         is_following_author=is_following_author,

@@ -10,12 +10,15 @@ import '../models/community_post.dart';
 
 /// بطاقة منشور المجتمع الموحّدة.
 ///
-/// تستخدم في مجتمع والصفحات التي تعرض منشورات (مثل تقييمات حسابي) لضمان
-/// تجربة موحّدة:
-/// - اسم الحساب بلون مميز، واسم المكان بلون مختلف.
-/// - نجوم التقييم تحت اسم المستخدم من البيانات الفعلية.
-/// - نقاط المستخدم + زر متابعة لمن ليس هو المنشئ.
-/// - بدون عرض التاريخ/الوقت.
+/// تستخدم في مجتمع والصفحات التي تعرض منشورات مثل:
+/// - المجتمع
+/// - آراء الزوار داخل الخريطة
+/// - تقييمات الحساب
+///
+/// القواعد:
+/// - السحب = إخفاء المنشور عن المستخدم الحالي فقط.
+/// - حذف المنشور نهائيًا متاح من قائمة الخيارات لصاحب المنشور فقط.
+/// - منشور شخص آخر يحتوي في الخيارات على الإخفاء والإبلاغ.
 class CommunityPostCard extends StatefulWidget {
   final CommunityPost post;
 
@@ -30,11 +33,10 @@ class CommunityPostCard extends StatefulWidget {
   /// يستقبل placeId المكان المرتبط.
   final ValueChanged<String>? onPlaceTap;
 
-  /// نص يصف نوع المنشور (مثل: "قام فلان بالنشر" أو "قام فلان بتقييم المكان").
-  /// يمكن تخصيصه حسب السياق.
+  /// نص يصف نوع المنشور.
   final String? postDescriptionText;
 
-  ///  callback لإخفاء المنشور (السحب يمين).
+  /// callback لإخفاء المنشور عن المستخدم الحالي فقط.
   final VoidCallback? onHide;
 
   const CommunityPostCard({
@@ -91,7 +93,11 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           behavior: SnackBarBehavior.floating,
           content: Row(
             children: [
-              const Icon(Icons.login_rounded, color: Colors.white, size: 20),
+              const Icon(
+                Icons.login_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -116,7 +122,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                 ),
                 child: const Text(
                   'تسجيل الدخول',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
@@ -125,48 +133,61 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           duration: const Duration(seconds: 4),
         ),
       );
-    }
+  }
 
   // ============================================================
-  // OPTIONS MENU (ثلاث نقاط — مثبت على اليسار، يظهر للكل)
+  // OPTIONS MENU
   // ============================================================
 
-  /// يبني زر الثلاث نقاط مع القائمة المنسدلة.
+  /// قائمة الخيارات:
   ///
-  /// - المالك: حذف المنشور.
-  /// - غير المالك: الإبلاغ عن المنشور.
+  /// صاحب المنشور:
+  /// - حذف المنشور نهائيًا.
   ///
-  /// الزر ثابت على اليسار ولا يتأثر بطول الاسم أو المكان.
+  /// منشور شخص آخر:
+  /// - إخفاء المنشور عني.
+  /// - إبلاغ عن المنشور.
   Widget _buildOptionsMenu(WaynColors colors) {
-    final isOwnerWithDelete =
-        post.isOwner && widget.onDelete != null;
-
     final List<PopupMenuEntry<String>> items = [];
 
-    if (isOwnerWithDelete) {
+    if (post.isOwner) {
+      if (widget.onDelete != null) {
+        items.add(
+          PopupMenuItem(
+            value: 'delete',
+            child: _buildMenuItem(
+              'حذف المنشور',
+              Icons.delete_outline_rounded,
+              Colors.redAccent,
+            ),
+          ),
+        );
+      }
+    } else {
       items.add(
         PopupMenuItem(
-          value: 'delete',
+          value: 'hide',
           child: _buildMenuItem(
-            'حذف المنشور',
-            Icons.delete_outline_rounded,
-            Colors.redAccent,
+            'إخفاء المنشور',
+            Icons.visibility_off_outlined,
+            colors.textSecondary,
           ),
         ),
       );
-    } else if (!post.isOwner) {
+
       items.add(
         PopupMenuItem(
           value: 'report',
           child: _buildMenuItem(
-            'طعن في منشور',
-            Icons.report_rounded,
+            'إبلاغ عن المنشور',
+            Icons.flag_outlined,
             Colors.redAccent,
           ),
         ),
       );
-    } else {
-      // المنشور الخاص بالمالك لكن بدون onDelete — لا نعرض شيئًا.
+    }
+
+    if (items.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -177,29 +198,46 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         size: 20,
       ),
       onSelected: (value) {
-        if (value == 'delete') {
-          widget.onDelete?.call();
-        } else if (value == 'report') {
-          _showMessage('تم الإبلاغ عن المنشور');
+        switch (value) {
+          case 'delete':
+            widget.onDelete?.call();
+            break;
+
+          case 'hide':
+            _hidePost();
+            break;
+
+          case 'report':
+            _showReportDialog(colors);
+            break;
         }
       },
       itemBuilder: (context) => items,
-      constraints: const BoxConstraints(minWidth: 150),
+      constraints: const BoxConstraints(
+        minWidth: 165,
+      ),
       padding: EdgeInsets.zero,
       menuPadding: EdgeInsets.zero,
     );
   }
 
-  Widget _buildMenuItem(String label, IconData icon, Color color) {
+  Widget _buildMenuItem(
+    String label,
+    IconData icon,
+    Color color,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+        Expanded(
+          child: Text(
+            label,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -212,13 +250,34 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     );
   }
 
+  // ============================================================
+  // HIDE POST
+  // ============================================================
+
+  /// يخفي المنشور عن المستخدم الحالي فقط.
+  ///
+  /// لا يحذف المنشور من قاعدة البيانات ولا يؤثر على ظهوره
+  /// عند بقية المستخدمين.
+  void _hidePost() {
+    widget.onHide?.call();
+
+    if (mounted) {
+      _showMessage('تم إخفاء المنشور عنك');
+    }
+  }
+
+  // ============================================================
+  // FOLLOW
+  // ============================================================
+
   Future<void> _toggleFollow() async {
     if (_followBusy) return;
 
-    // الزائر لا يملك حسابًا: نطلب تسجيل الدخول دون إرسال أي طلب للـ backend.
     try {
       final user = await AuthService().getCurrentUser();
+
       if (!mounted) return;
+
       if (user == null) {
         _promptLogin();
         return;
@@ -234,17 +293,23 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     try {
       if (_isFollowing) {
         await _socialService.unfollow(post.userId);
+
         if (!mounted) return;
+
         setState(() {
           _isFollowing = false;
         });
+
         _showMessage('تم إلغاء المتابعة');
       } else {
         await _socialService.follow(post.userId);
+
         if (!mounted) return;
+
         setState(() {
           _isFollowing = true;
         });
+
         _showMessage('تمت متابعة المستخدم');
       }
     } catch (_) {
@@ -258,10 +323,13 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   }
 
   // ============================================================
-  // Image viewer
+  // IMAGE VIEWER
   // ============================================================
 
-  void _openFullImage(BuildContext context, String imageUrl) {
+  void _openFullImage(
+    BuildContext context,
+    String imageUrl,
+  ) {
     showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.94),
@@ -280,8 +348,13 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     imageUrl,
                     fit: BoxFit.contain,
                     gaplessPlayback: true,
-                    loadingBuilder: (context, child, progress) {
+                    loadingBuilder: (
+                      context,
+                      child,
+                      progress,
+                    ) {
                       if (progress == null) return child;
+
                       return const SizedBox(
                         width: 48,
                         height: 48,
@@ -291,7 +364,11 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                         ),
                       );
                     },
-                    errorBuilder: (context, error, stackTrace) {
+                    errorBuilder: (
+                      context,
+                      error,
+                      stackTrace,
+                    ) {
                       return const Icon(
                         Icons.image_not_supported_outlined,
                         color: Colors.white70,
@@ -329,20 +406,27 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   }
 
   // ============================================================
-  // Build
+  // BUILD
   // ============================================================
 
   @override
   Widget build(BuildContext context) {
     final colors = context.waynColors;
 
-    final authorName = post.authorName?.trim().isNotEmpty == true
-        ? post.authorName!.trim()
-        : 'مستخدم وين';
+    final authorName =
+        post.authorName?.trim().isNotEmpty == true
+            ? post.authorName!.trim()
+            : 'مستخدم وين';
 
-    final placeName = post.placeName?.trim().isNotEmpty == true
-        ? post.placeName!.trim()
-        : 'مكان مرتبط';
+    final placeName =
+        post.placeName?.trim().isNotEmpty == true
+            ? post.placeName!.trim()
+            : 'مكان مرتبط';
+
+    final placeCity =
+        post.placeCity?.trim().isNotEmpty == true
+            ? post.placeCity!.trim()
+            : null;
 
     final avatarLetter = authorName.substring(0, 1);
 
@@ -350,7 +434,6 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       post.imageUrl,
     );
 
-    // المحتوى الداخلي للبطاقة
     final cardContent = Container(
       decoration: BoxDecoration(
         color: colors.surface,
@@ -369,85 +452,126 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // =========================================================
-            // RATING + PLACE + REPORT SECTION (TOP)
+            // RATING + PLACE + REPORT SECTION
             // =========================================================
-            _buildRatingAndPlaceSection(colors, placeName),
+            _buildRatingAndPlaceSection(
+              colors,
+              placeName,
+            ),
 
-            // =========================================================
-            // DIVIDER BETWEEN TOP SECTION AND USER INFO
-            // =========================================================
             const SizedBox(height: 12),
+
             Divider(
               height: 1,
               color: colors.divider,
             ),
+
             const SizedBox(height: 12),
 
             // =========================================================
-            // USER HEADER (Avatar -> Name -> Points -> Follow -> Options)
+            // USER HEADER
             // =========================================================
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // صورة المستخدم
                 InkWell(
                   onTap: widget.onAuthorTap == null
                       ? null
                       : () => widget.onAuthorTap!(post.userId),
                   customBorder: const CircleBorder(),
                   child: CircleAvatar(
-                    radius: 22,
+                    radius: 18,
                     backgroundColor: colors.surfaceAlt,
                     child: Text(
                       avatarLetter,
                       style: TextStyle(
                         color: colors.brand,
                         fontWeight: FontWeight.w800,
-                        fontSize: 16,
+                        fontSize: 13,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                // صيغة المنشور: "تقييم من (اسم الحساب)"
+
+                const SizedBox(width: 8),
+
                 Expanded(
                   child: InkWell(
                     onTap: widget.onAuthorTap == null
                         ? null
                         : () => widget.onAuthorTap!(post.userId),
                     borderRadius: BorderRadius.circular(6),
-                    child: RichText(
-                      textDirection: TextDirection.rtl,
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'تقييم من ',
-                            style: TextStyle(
-                              color: colors.textSecondary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                            ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RichText(
+                          textDirection: TextDirection.rtl,
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'تقييم من ',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              TextSpan(
+                                text: authorName,
+                                style: TextStyle(
+                                  color: colors.brand,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
-                          TextSpan(
-                            text: authorName,
-                            style: TextStyle(
-                              color: colors.brand,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
+                        ),
+
+                        const SizedBox(height: 2),
+
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          textDirection: TextDirection.rtl,
+                          children: [
+                            Text(
+                              _formatPostTime(post.createdAt),
+                              textDirection: TextDirection.rtl,
+                              style: TextStyle(
+                                color: colors.textMuted,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+
+                            if (placeCity != null) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                placeCity,
+                                textDirection: TextDirection.rtl,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: colors.textMuted,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                // عدد النقاط
+
                 _AuthorPointsChip(
                   points: post.authorPoints,
                   colors: colors,
                 ),
+
                 const SizedBox(width: 8),
-                // زر متابعة (فقط للمستخدمين الاخرين)
+
                 if (!post.isOwner)
                   _FollowButton(
                     isFollowing: _isFollowing,
@@ -455,8 +579,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     onPressed: _toggleFollow,
                     colors: colors,
                   ),
-                // ثلاث نقاط الخيارات
+
                 const SizedBox(width: 8),
+
                 _buildOptionsMenu(colors),
               ],
             ),
@@ -464,22 +589,29 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             // =========================================================
             // TEXT
             // =========================================================
-            if (post.text != null && post.text!.trim().isNotEmpty) ...[
+            if (post.text != null &&
+                post.text!.trim().isNotEmpty) ...[
               const SizedBox(height: 14),
-              _ExpandablePostText(text: post.text!),
+              _ExpandablePostText(
+                text: post.text!,
+              ),
             ],
 
             // =========================================================
             // IMAGE
             // =========================================================
-            if (fullImageUrl != null && fullImageUrl.isNotEmpty) ...[
+            if (fullImageUrl != null &&
+                fullImageUrl.isNotEmpty) ...[
               const SizedBox(height: 14),
               ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: Material(
                   color: colors.surfaceAlt,
                   child: InkWell(
-                    onTap: () => _openFullImage(context, fullImageUrl),
+                    onTap: () => _openFullImage(
+                      context,
+                      fullImageUrl,
+                    ),
                     child: Image.network(
                       fullImageUrl,
                       width: double.infinity,
@@ -487,8 +619,13 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                       cacheWidth: 800,
                       cacheHeight: 800,
                       gaplessPlayback: true,
-                      loadingBuilder: (context, child, progress) {
+                      loadingBuilder: (
+                        context,
+                        child,
+                        progress,
+                      ) {
                         if (progress == null) return child;
+
                         return const SizedBox(
                           height: 180,
                           child: Center(
@@ -499,7 +636,11 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                           ),
                         );
                       },
-                      errorBuilder: (context, error, stackTrace) {
+                      errorBuilder: (
+                        context,
+                        error,
+                        stackTrace,
+                      ) {
                         return const SizedBox(
                           height: 180,
                           child: Center(
@@ -518,10 +659,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             ],
 
             const SizedBox(height: 14),
+
             Divider(
               height: 1,
               color: colors.divider,
             ),
+
             const SizedBox(height: 8),
 
             // =========================================================
@@ -566,69 +709,98 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       ),
     );
 
-    // لف البطاقة بـ Dismissible للسحب يمين (إخفاء) ويسار (حذف)
+    // ==========================================================
+    // SWIPE TO HIDE
+    // ==========================================================
+    //
+    // مهم جدًا:
+    // السحب لم يعد له أي علاقة بالحذف.
+    //
+    // سواء كان المنشور:
+    // - منشور المستخدم الحالي
+    // - منشور مستخدم آخر
+    //
+    // السحب يقوم فقط بإخفائه عن المستخدم الحالي.
+    //
+    // الحذف النهائي موجود فقط في قائمة الخيارات لصاحب المنشور.
     return Dismissible(
       key: Key(post.id),
-      // السحب من اليمين لليسار = حذف (فقط لصاحب المنشور)
-      direction: post.isOwner
-          ? DismissDirection.horizontal
-          : DismissDirection.endToStart,
+
+      // نفس اتجاه الإخفاء المستخدم حاليًا في البطاقة.
+      // لا يوجد اتجاه حذف.
+      direction: DismissDirection.endToStart,
+
       confirmDismiss: (direction) async {
-        if (direction == DismissDirection.endToStart) {
-          // سحب من اليمين لليسار = حذف أو إخفاء
-          if (post.isOwner) {
-            return await _showDeleteConfirmation(colors);
-          } else {
-            return false;
-          }
-        } else if (direction == DismissDirection.startToEnd) {
-          // سحب من اليسار لليمين = إخفاء (فقط لغير صاحب المنشور)
-          if (!post.isOwner) {
-            final result = await _showHideConfirmation(colors);
-            if (result && widget.onHide != null) {
-              widget.onHide!();
-            }
-            return false; // لا نريد إزالة البطاقة من القائمة لأننا نستدعي onHide
-          }
+        if (direction != DismissDirection.endToStart) {
+          return false;
         }
+
+        final result = await _showHideConfirmation(colors);
+
+        if (result && widget.onHide != null) {
+          widget.onHide!();
+        }
+
+        // الإزالة من القائمة تتم عن طريق onHide.
+        // لا نحذف المنشور من backend من هنا.
         return false;
       },
+
       background: Container(
-        decoration: BoxDecoration(
-          color: colors.danger,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 20),
-        child: Icon(
-          Icons.delete_outline_rounded,
-          color: Colors.white,
-          size: 28,
-        ),
-      ),
-      secondaryBackground: Container(
         decoration: BoxDecoration(
           color: colors.textMuted,
           borderRadius: BorderRadius.circular(22),
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        child: Icon(
+        child: const Icon(
           Icons.visibility_off_outlined,
           color: Colors.white,
           size: 28,
         ),
       ),
+
       child: cardContent,
     );
   }
 
   // ============================================================
-  // CONFIRMATION DIALOGS
+  // TIME FORMAT
   // ============================================================
 
-  /// يعرض حوار تأكيد إخفاء المنشور.
-  Future<bool> _showHideConfirmation(WaynColors colors) async {
+  String _formatPostTime(DateTime dateTime) {
+    final localTime = dateTime.toLocal();
+
+    final hour = localTime.hour;
+    final minute = localTime.minute;
+
+    final period = hour < 12 ? 'صباحا' : 'مساء';
+
+    final displayHour =
+        hour > 12
+            ? hour - 12
+            : hour == 0
+                ? 12
+                : hour;
+
+    if (minute == 0) {
+      return '$displayHour $period';
+    }
+
+    final formattedMinute =
+        minute.toString().padLeft(2, '0');
+
+    return '$displayHour:$formattedMinute $period';
+  }
+
+  // ============================================================
+  // HIDE CONFIRMATION
+  // ============================================================
+
+  /// تأكيد إخفاء المنشور عن المستخدم الحالي فقط.
+  Future<bool> _showHideConfirmation(
+    WaynColors colors,
+  ) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -637,7 +809,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           child: AlertDialog(
             title: const Text(
               'إخفاء المنشور',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             content: const Text(
               'هل أنت متأكد أنك تريد إخفاء المنشور؟',
@@ -645,17 +820,24 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(false),
                 child: Text(
                   'إلغاء',
-                  style: TextStyle(color: colors.textSecondary),
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                  ),
                 ),
               ),
               TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(true),
                 child: Text(
-                  'تأكيد',
-                  style: TextStyle(color: colors.danger),
+                  'إخفاء',
+                  style: TextStyle(
+                    color: colors.brand,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -663,11 +845,20 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         );
       },
     );
+
     return result ?? false;
   }
 
-  /// يعرض حوار تأكيد حذف المنشور.
-  Future<bool> _showDeleteConfirmation(WaynColors colors) async {
+  // ============================================================
+  // DELETE CONFIRMATION
+  // ============================================================
+
+  /// حذف المنشور نهائيًا.
+  ///
+  /// هذه العملية تستخدم فقط من قائمة الخيارات الخاصة بصاحب المنشور.
+  Future<bool> _showDeleteConfirmation(
+    WaynColors colors,
+  ) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -676,7 +867,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           child: AlertDialog(
             title: const Text(
               'حذف المنشور',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             content: const Text(
               'هل أنت متأكد أنك تريد الحذف؟',
@@ -684,17 +878,24 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(false),
                 child: Text(
                   'إلغاء',
-                  style: TextStyle(color: colors.textSecondary),
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                  ),
                 ),
               ),
               TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(true),
                 child: const Text(
                   'حذف',
-                  style: TextStyle(color: Colors.redAccent),
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -702,9 +903,11 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         );
       },
     );
+
     if (result == true) {
       widget.onDelete?.call();
     }
+
     return result ?? false;
   }
 
@@ -713,19 +916,34 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   // ============================================================
 
   /// يبني قسم التقييم والمكان والطعن في أعلى البطاقة.
-  /// الترتيب RTL: نجمة التقييم (يمين) → اسم المكان (منتصف) → طعن + خيارات (يسار)
-  Widget _buildRatingAndPlaceSection(WaynColors colors, String placeName) {
+  ///
+  /// الترتيب RTL:
+  /// نجمة التقييم (يمين)
+  /// →
+  /// اسم المكان (منتصف)
+  /// →
+  /// طعن (يسار)
+  Widget _buildRatingAndPlaceSection(
+    WaynColors colors,
+    String placeName,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // نجمة التقييم (أقصى اليمين في RTL)
+        // =========================================================
+        // نجمة التقييم - موقعها ثابت
+        // =========================================================
         if (post.rating != null)
           _CompactRatingBadge(
             rating: post.rating!,
             colors: colors,
           ),
+
         const SizedBox(width: 8),
-        // اسم المكان مع دبوس الموقع (في المنتصف)
+
+        // =========================================================
+        // اسم المكان - المنتصف
+        // =========================================================
         Expanded(
           child: InkWell(
             onTap: widget.onPlaceTap == null
@@ -758,15 +976,21 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             ),
           ),
         ),
+
         const SizedBox(width: 8),
-        // زر طعن فقط (بدون الثلاث نقاط) - أقصى اليسار في RTL
-        // زر طعن (فقط لغير صاحب المنشور)
+
+        // =========================================================
+        // طعن - يظهر فقط في البطاقة الخاصة بغير المالك
+        // =========================================================
         if (!post.isOwner)
           InkWell(
             onTap: () => _showReportDialog(colors),
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 4,
+              ),
               child: Text(
                 'طعن',
                 style: TextStyle(
@@ -782,10 +1006,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   }
 
   // ============================================================
-  // REPORT DIALOG - تم تغيير الاسم إلى "طعن"
+  // REPORT DIALOG
   // ============================================================
 
-  /// يعرض حوار الطعن البسيط.
   void _showReportDialog(WaynColors colors) {
     showDialog<void>(
       context: context,
@@ -794,29 +1017,38 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             title: const Text(
-              'طعن في المنشور',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              'إبلاغ عن المنشور',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             content: const Text(
-              'هل تريد الطعن في هذا المنشور؟',
+              'هل تريد الإبلاغ عن هذا المنشور؟',
               style: TextStyle(fontSize: 14),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(),
                 child: Text(
                   'إلغاء',
-                  style: TextStyle(color: colors.textSecondary),
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                  ),
                 ),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  _showMessage('تم الطعن في المنشور');
+                  _showMessage('تم إرسال البلاغ عن المنشور');
                 },
                 child: const Text(
-                  'طعن',
-                  style: TextStyle(color: Colors.redAccent),
+                  'إبلاغ',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -828,7 +1060,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 }
 
 // ============================================================
-// Author points chip
+// AUTHOR POINTS CHIP
 // ============================================================
 
 class _AuthorPointsChip extends StatelessWidget {
@@ -843,7 +1075,10 @@ class _AuthorPointsChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
         color: colors.surfaceAlt,
         borderRadius: BorderRadius.circular(10),
@@ -872,7 +1107,7 @@ class _AuthorPointsChip extends StatelessWidget {
 }
 
 // ============================================================
-// Follow button
+// FOLLOW BUTTON
 // ============================================================
 
 class _FollowButton extends StatelessWidget {
@@ -896,14 +1131,20 @@ class _FollowButton extends StatelessWidget {
       onTap: busy ? null : onPressed,
       child: Container(
         height: 28,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+        ),
         decoration: BoxDecoration(
           color: following
               ? colors.surfaceAlt
               : colors.brand,
           borderRadius: BorderRadius.circular(10),
           border: following
-              ? Border.all(color: colors.brand.withValues(alpha: 0.4))
+              ? Border.all(
+                  color: colors.brand.withValues(
+                    alpha: 0.4,
+                  ),
+                )
               : null,
         ),
         child: Center(
@@ -923,7 +1164,9 @@ class _FollowButton extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: following ? colors.brand : colors.onBrand,
+                    color: following
+                        ? colors.brand
+                        : colors.onBrand,
                   ),
                 ),
         ),
@@ -933,9 +1176,21 @@ class _FollowButton extends StatelessWidget {
 }
 
 // ============================================================
-// Compact Rating Badge (Star + Number) - تصميم محسّن
+// COMPACT RATING
 // ============================================================
 
+/// نجمة التقييم.
+///
+/// التصميم:
+/// - نجمة واحدة ثابتة الشكل من 1 إلى 5.
+/// - نفس اللون البرتقالي/الأصفر.
+/// - الرقم بجانب النجمة.
+/// - بدون Badge.
+/// - بدون مربع.
+/// - بدون تغيير في موقعها.
+///
+/// لا نستخدم أشكالًا مختلفة لكل مستوى لأن ذلك يجعل البطاقة
+/// غير متناسقة بصريًا.
 class _CompactRatingBadge extends StatelessWidget {
   final double rating;
   final WaynColors colors;
@@ -950,52 +1205,36 @@ class _CompactRatingBadge extends StatelessWidget {
     final ratingValue = rating.clamp(1.0, 5.0);
     final ratingInt = ratingValue.round();
 
-    // اللون الأصفر/البرتقالي للنجمة - ثابت كما طلب المستخدم
+    // اللون الأصلي ثابت.
     const Color starColor = Color(0xFFF59E0B);
 
-    // حجم النجمة - مناسب وواضح
-    const double starSize = 20;
+    // نجمة واحدة ثابتة وجميلة لجميع المستويات.
+    const double starSize = 24;
 
-    // تحديد نوع النجمة
-    IconData getStarIcon() {
-      if (ratingValue >= 4.5) return Icons.star_rounded;
-      if (ratingValue >= 3.5) return Icons.star_rounded;
-      if (ratingValue >= 2.5) return Icons.star_half_rounded;
-      if (ratingValue >= 1.5) return Icons.star_half_rounded;
-      return Icons.star_rounded;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: starColor.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            getStarIcon(),
-            size: starSize,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.star_rounded,
+          size: starSize,
+          color: starColor,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          ratingInt.toString(),
+          style: const TextStyle(
             color: starColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
           ),
-          const SizedBox(width: 4),
-          Text(
-            ratingInt.toString(),
-            style: const TextStyle(
-              color: starColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
 // ============================================================
-// Stars
+// STARS ROW
 // ============================================================
 
 class _StarsRow extends StatelessWidget {
@@ -1030,20 +1269,23 @@ class _StarsRow extends StatelessWidget {
 }
 
 // ============================================================
-// Expandable post text
+// EXPANDABLE POST TEXT
 // ============================================================
 
 class _ExpandablePostText extends StatefulWidget {
   final String text;
 
-  const _ExpandablePostText({required this.text});
+  const _ExpandablePostText({
+    required this.text,
+  });
 
   @override
   State<_ExpandablePostText> createState() =>
       _ExpandablePostTextState();
 }
 
-class _ExpandablePostTextState extends State<_ExpandablePostText> {
+class _ExpandablePostTextState
+    extends State<_ExpandablePostText> {
   static const int _collapsedMaxLines = 4;
   static const String _moreLabel = 'قراءة المزيد';
   static const String _lessLabel = 'عرض أقل';
@@ -1051,18 +1293,27 @@ class _ExpandablePostTextState extends State<_ExpandablePostText> {
   bool _expanded = false;
 
   @override
-  void didUpdateWidget(covariant _ExpandablePostText oldWidget) {
+  void didUpdateWidget(
+    covariant _ExpandablePostText oldWidget,
+  ) {
     super.didUpdateWidget(oldWidget);
+
     if (oldWidget.text != widget.text) {
       _expanded = false;
     }
   }
 
-  bool _overflows(double maxWidth, TextStyle style) {
+  bool _overflows(
+    double maxWidth,
+    TextStyle style,
+  ) {
     if (_expanded) return false;
 
     final painter = TextPainter(
-      text: TextSpan(text: widget.text, style: style),
+      text: TextSpan(
+        text: widget.text,
+        style: style,
+      ),
       textDirection: TextDirection.rtl,
       textAlign: TextAlign.right,
       maxLines: _collapsedMaxLines,
@@ -1090,7 +1341,10 @@ class _ExpandablePostTextState extends State<_ExpandablePostText> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final overflows = _overflows(constraints.maxWidth, textStyle);
+        final overflows = _overflows(
+          constraints.maxWidth,
+          textStyle,
+        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1099,14 +1353,20 @@ class _ExpandablePostTextState extends State<_ExpandablePostText> {
               widget.text,
               textAlign: TextAlign.right,
               textDirection: TextDirection.rtl,
-              maxLines: _expanded ? null : _collapsedMaxLines,
-              overflow: _expanded ? null : TextOverflow.ellipsis,
+              maxLines: _expanded
+                  ? null
+                  : _collapsedMaxLines,
+              overflow: _expanded
+                  ? null
+                  : TextOverflow.ellipsis,
               style: textStyle,
             ),
             if (overflows)
               GestureDetector(
                 onTap: () {
-                  setState(() => _expanded = !_expanded);
+                  setState(() {
+                    _expanded = !_expanded;
+                  });
                 },
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
@@ -1114,7 +1374,9 @@ class _ExpandablePostTextState extends State<_ExpandablePostText> {
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      _expanded ? _lessLabel : _moreLabel,
+                      _expanded
+                          ? _lessLabel
+                          : _moreLabel,
                       textDirection: TextDirection.rtl,
                       style: linkStyle,
                     ),
@@ -1129,7 +1391,7 @@ class _ExpandablePostTextState extends State<_ExpandablePostText> {
 }
 
 // ============================================================
-// Action button
+// ACTION BUTTON
 // ============================================================
 
 class _ActionButton extends StatelessWidget {
@@ -1149,17 +1411,25 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? colors.brand : colors.textSecondary;
+    final color = active
+        ? colors.brand
+        : colors.textSecondary;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          vertical: 8,
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 20, color: color),
+            Icon(
+              icon,
+              size: 20,
+              color: color,
+            ),
             const SizedBox(width: 5),
             Text(
               label,

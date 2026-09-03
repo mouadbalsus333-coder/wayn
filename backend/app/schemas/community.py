@@ -57,6 +57,7 @@ class CommunityPostRead(BaseModel):
     author_username: str | None = None
     author_avatar: str | None = None
     place_name: str | None = None
+    place_city: str | None = None
 
     author_points: int = 0
     author_followers_count: int = 0
