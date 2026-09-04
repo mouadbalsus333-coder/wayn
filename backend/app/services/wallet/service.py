@@ -397,6 +397,7 @@ class WalletService:
         reference_type: str | None = None,
         reference_id: UUID | None = None,
         extra_data: dict | None = None,
+        commit: bool = True,
     ) -> WalletTransaction:
         """
         Change a user's Coins balance.
@@ -449,7 +450,8 @@ class WalletService:
                 transaction
             )
 
-            await self.repository.commit()
+            if commit:
+                await self.repository.commit()
 
         except Exception:
             await self.repository.rollback()
@@ -854,6 +856,7 @@ class WalletService:
         reference_type: str | None = None,
         reference_id: UUID | None = None,
         extra_data: dict | None = None,
+        commit: bool = True,
     ) -> WalletTransaction:
         """
         Remove Coins from the user's wallet.
@@ -874,4 +877,5 @@ class WalletService:
             reference_type=reference_type,
             reference_id=reference_id,
             extra_data=extra_data,
+            commit=commit,
         )

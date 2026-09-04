@@ -1,11 +1,23 @@
 """Store API routes — categories, items, and banners."""
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.admin_auth import require_permission
+from app.api.dependencies.auth import get_current_user
+from app.core.config import settings
 from app.core.database import get_session
 from app.repositories.store_banner_repository import StoreBannerRepository
 from app.repositories.store_category_repository import StoreCategoryRepository
@@ -20,13 +32,21 @@ from app.schemas.store import (
     StoreItemCreate,
     StoreItemRead,
     StoreItemUpdate,
+    StoreOwnershipRead,
+    StorePurchaseRead,
 )
+from app.models.user import User
 from app.services.store_banner_service import StoreBannerService
 from app.services.store_category_service import StoreCategoryService
 from app.services.store_item_service import StoreItemService
+from app.services.store_purchase_service import StorePurchaseService
+from app.services.media.media_service import media_service
 
 
 router = APIRouter()
+
+_STORE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+_STORE_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 
 def _parse_uuid(
@@ -160,6 +180,75 @@ async def get_store_item(
     return item
 
 
+@router.post(
+    "/store/items/{item_id}/purchase",
+    response_model=StorePurchaseRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def purchase_store_item(
+    item_id: UUID,
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+    ),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> StorePurchaseRead:
+    service = StorePurchaseService(session)
+
+    try:
+        result = await service.purchase(
+            current_user.id,
+            item_id,
+            idempotency_key=idempotency_key,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        not_found = message == "Store item not found"
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if not_found
+                else status.HTTP_409_CONFLICT
+            ),
+            detail=message,
+        ) from exc
+
+    return StorePurchaseRead(
+        id=result.purchase.id,
+        item=result.item,
+        currency=result.purchase.currency,
+        amount=result.purchase.amount,
+        quantity=result.purchase.quantity,
+        owned_quantity=result.ownership.quantity,
+        balance_after=result.balance_after,
+        expires_at=result.ownership.expires_at,
+        created_at=result.purchase.created_at,
+    )
+
+
+@router.get(
+    "/store/ownership",
+    response_model=list[StoreOwnershipRead],
+)
+async def list_store_ownership(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[StoreOwnershipRead]:
+    ownerships = await StorePurchaseService(session).list_ownership(
+        current_user.id,
+    )
+
+    return [
+        StoreOwnershipRead(
+            item=ownership.item,
+            quantity=ownership.quantity,
+            expires_at=ownership.expires_at,
+        )
+        for ownership in ownerships
+    ]
+
+
 # ============================================================
 # Public Store Banners
 # ============================================================
@@ -214,6 +303,74 @@ async def get_store_banner(
 # ============================================================
 # Admin Store Categories
 # ============================================================
+
+
+@router.post(
+    "/admin/store/media/image",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(require_permission("store.write")),
+    ],
+)
+async def upload_admin_store_image(
+    request: Request,
+    file: UploadFile = File(...),
+) -> dict[str, str]:
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image filename is required",
+        )
+
+    extension = file.filename.rsplit(".", 1)[-1].lower()
+    if extension not in _STORE_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only JPG, JPEG, PNG, and WEBP images are allowed",
+        )
+
+    file_bytes = await file.read(_STORE_IMAGE_MAX_BYTES + 1)
+    if len(file_bytes) > _STORE_IMAGE_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image size must not exceed 10 MB",
+        )
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image file is empty",
+        )
+
+    object_key = f"store/{uuid4()}.webp"
+
+    try:
+        stored_key = media_service.upload_image(
+            file_bytes=file_bytes,
+            object_key=object_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid image file",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Image upload failed",
+        ) from exc
+
+    if settings.r2_public_url:
+        image_url = (
+            f"{settings.r2_public_url.rstrip('/')}/"
+            f"{stored_key.lstrip('/')}"
+        )
+    else:
+        image_url = (
+            f"{str(request.base_url).rstrip('/')}/"
+            f"api/v1/media/{stored_key.lstrip('/')}"
+        )
+
+    return {"image_url": image_url}
 
 
 @router.post(

@@ -109,6 +109,7 @@ class UserPointService:
         reference_id: UUID | str | None = None,
         admin_id: int | UUID | str | None = None,
         extra_data: dict | None = None,
+        commit: bool = True,
     ) -> UserPointTransaction:
         """
         Change a user's points balance and create the
@@ -208,7 +209,8 @@ class UserPointService:
                 transaction,
             )
 
-            await self.repository.commit()
+            if commit:
+                await self.repository.commit()
 
         except Exception:
             await self.repository.rollback()
@@ -274,6 +276,7 @@ class UserPointService:
         reference_id: UUID | str | None = None,
         admin_id: int | UUID | str | None = None,
         extra_data: dict | None = None,
+        commit: bool = True,
     ) -> UserPointTransaction:
         """
         Remove points from a user.
@@ -296,4 +299,5 @@ class UserPointService:
             reference_id=reference_id,
             admin_id=admin_id,
             extra_data=extra_data,
+            commit=commit,
         )

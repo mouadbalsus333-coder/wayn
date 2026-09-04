@@ -17,6 +17,7 @@ class UserPointTransactionType(str, enum.Enum):
     PENALTY = "PENALTY"
     ADJUSTMENT = "ADJUSTMENT"
     ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT"
+    STORE_PURCHASE = "STORE_PURCHASE"
 
 
 class UserPointTransactionStatus(str, enum.Enum):

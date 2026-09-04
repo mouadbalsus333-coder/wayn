@@ -122,6 +122,14 @@ class StoreItemCreate(BaseModel):
         gt=0,
     )
 
+    available_from: datetime | None = None
+    available_until: datetime | None = None
+
+    ownership_duration_days: int | None = Field(
+        default=None,
+        gt=0,
+    )
+
     stock: int | None = Field(
         default=None,
         ge=0,
@@ -171,6 +179,14 @@ class StoreItemUpdate(BaseModel):
         gt=0,
     )
 
+    available_from: datetime | None = None
+    available_until: datetime | None = None
+
+    ownership_duration_days: int | None = Field(
+        default=None,
+        gt=0,
+    )
+
     stock: int | None = Field(
         default=None,
         ge=0,
@@ -202,6 +218,9 @@ class StoreItemRead(BaseModel):
     image_url: str | None
     asset_id: str | None
     duration_days: int | None
+    available_from: datetime | None
+    available_until: datetime | None
+    ownership_duration_days: int | None
     stock: int | None
 
     sort_order: int
@@ -291,3 +310,21 @@ class StoreBannerRead(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+
+
+class StorePurchaseRead(BaseModel):
+    id: UUID
+    item: StoreItemRead
+    currency: StoreItemCurrency
+    amount: int
+    quantity: int
+    owned_quantity: int
+    balance_after: int
+    expires_at: datetime | None
+    created_at: datetime
+
+
+class StoreOwnershipRead(BaseModel):
+    item: StoreItemRead
+    quantity: int
+    expires_at: datetime | None

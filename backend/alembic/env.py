@@ -65,6 +65,8 @@ from app.models.wallet_transfer import (  # noqa: F401
 from app.models.store_category import StoreCategory  # noqa: F401
 from app.models.store_item import StoreItem  # noqa: F401
 from app.models.store_banner import StoreBanner  # noqa: F401
+from app.models.store_ownership import StoreOwnership  # noqa: F401
+from app.models.store_purchase import StorePurchase  # noqa: F401
 
 config = context.config
 

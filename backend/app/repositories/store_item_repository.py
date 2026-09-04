@@ -1,5 +1,6 @@
 """Store item repository."""
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -25,8 +26,18 @@ class StoreItemRepository:
             )
 
         if active_only:
+            now = datetime.now(timezone.utc)
+
             query = query.where(
-                StoreItem.is_active.is_(True)
+                StoreItem.is_active.is_(True),
+                (
+                    StoreItem.available_from.is_(None)
+                    | (StoreItem.available_from <= now)
+                ),
+                (
+                    StoreItem.available_until.is_(None)
+                    | (StoreItem.available_until >= now)
+                ),
             )
 
         query = query.order_by(

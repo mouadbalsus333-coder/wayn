@@ -33,6 +33,9 @@ PERMISSIONS = [
 
     # Wallet
     ("wallet.recharge", "Recharge user wallets"),
+
+    # Store
+    ("store.write", "Create and update store content"),
 ]
 
 
@@ -76,6 +79,9 @@ ROLE_PERMISSIONS = {
 
         # Wallet
         "wallet.recharge",
+
+        # Store
+        "store.write",
     ],
 
     "admin": [

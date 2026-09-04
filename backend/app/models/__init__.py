@@ -84,6 +84,8 @@ from app.models.store_item import (
     StoreItemCurrency,
     StoreItemType,
 )
+from app.models.store_ownership import StoreOwnership
+from app.models.store_purchase import StorePurchase
 
 
 __all__ = [
@@ -157,4 +159,6 @@ __all__ = [
     "StoreItemCurrency",
     "StoreItemType",
     "StoreBanner",
+    "StoreOwnership",
+    "StorePurchase",
 ]

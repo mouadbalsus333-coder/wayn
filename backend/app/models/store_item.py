@@ -22,6 +22,7 @@ class StoreItemType(str, Enum):
 class StoreItemCurrency(str, Enum):
     POINTS = "POINTS"
     COINS = "COINS"
+    FREE = "FREE"
 
 
 class StoreItem(Base):
@@ -102,6 +103,23 @@ class StoreItem(Base):
     )
 
     duration_days: Mapped[int | None] = mapped_column(
+        sa.Integer,
+        nullable=True,
+    )
+
+    available_from: Mapped[sa.DateTime | None] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+
+    available_until: Mapped[sa.DateTime | None] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+
+    ownership_duration_days: Mapped[int | None] = mapped_column(
         sa.Integer,
         nullable=True,
     )

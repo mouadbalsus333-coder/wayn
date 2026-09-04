@@ -4,9 +4,15 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/wayn_api.dart';
 import '../../../models/contribution.dart';
 import '../../../core/widgets/wayn_network_image.dart';
+import '../store/admin_store_dialogs.dart';
+import '../store/admin_store_models.dart';
+import '../store/admin_store_service.dart';
 
 import '../wallet/admin_wallet_recharge_page.dart';
 import 'place_edit_screen.dart';
+
+const _storeBrandColor = Color(0xFF18A99A);
+const _storeMutedColor = Color(0xFF8B94A3);
 
 /// Real WAYN admin dashboard.
 ///
@@ -16,10 +22,7 @@ import 'place_edit_screen.dart';
 class AdminDashboardPage extends StatefulWidget {
   final String adminName;
 
-  const AdminDashboardPage({
-    super.key,
-    required this.adminName,
-  });
+  const AdminDashboardPage({super.key, required this.adminName});
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
@@ -44,7 +47,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   String? _contributionsError;
 
   // Store items (/api/v1/store/items)
-  List<dynamic> _storeItems = [];
+  final _storeService = AdminStoreService();
+  List<AdminStoreItem> _storeItems = [];
+  List<AdminStoreCategory> _storeCategories = [];
   String? _storeError;
 
   // Permissions (/api/v1/admin/permissions)
@@ -91,9 +96,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
 
   bool get _hasLoading => _initialLoading;
 
-  Future<List<dynamic>> _readList(
-    Future<dynamic> call,
-  ) async {
+  Future<List<dynamic>> _readList(Future<dynamic> call) async {
     final result = await call;
 
     if (result is List) {
@@ -108,15 +111,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
       }
     }
 
-    throw ApiClientException(
-      'تجاوب غير متوقع من الخادم (متوقع قائمة بيانات).',
-    );
+    throw ApiClientException('تجاوب غير متوقع من الخادم (متوقع قائمة بيانات).');
   }
 
-  void _setError(
-    void Function(String error) apply, {
-    required Object error,
-  }) {
+  void _setError(void Function(String error) apply, {required Object error}) {
     final message = switch (error) {
       ApiClientException api =>
         'HTTP ${api.statusCode ?? '؟'} — ${api.message}',
@@ -125,13 +123,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     apply(message);
   }
 
+  String _errorMessage(Object error) {
+    if (error is ApiClientException) {
+      return 'HTTP ${error.statusCode ?? '؟'} — ${error.message}';
+    }
+    return '$error';
+  }
+
   Future<void> _loadUsers() async {
     setState(() => _usersError = null);
 
     try {
-      final list = await _readList(
-        waynAdminApi.get('/api/v1/admin/users'),
-      );
+      final list = await _readList(waynAdminApi.get('/api/v1/admin/users'));
       if (!mounted) return;
       setState(() => _users = list);
     } catch (error) {
@@ -149,10 +152,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     try {
       final response = await waynAdminApi.get(
         '/api/v1/places',
-        queryParams: {
-          'page': 1,
-          'limit': 100,
-        },
+        queryParams: {'page': 1, 'limit': 100},
       );
       final data = response is Map ? response : <String, dynamic>{};
       final items = data['items'];
@@ -176,19 +176,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     try {
       final response = await waynAdminApi.get(
         '/api/v1/admin/contributions',
-        queryParams: {
-          'offset': 0,
-          'limit': 100,
-        },
+        queryParams: {'offset': 0, 'limit': 100},
       );
       final data = response is Map ? response : <String, dynamic>{};
       final items = data['items'];
 
       if (!mounted) return;
       setState(() {
-        _contributions = items is List
-            ? List<dynamic>.from(items)
-            : [];
+        _contributions = items is List ? List<dynamic>.from(items) : [];
       });
     } catch (error) {
       if (!mounted) return;
@@ -204,20 +199,92 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     setState(() => _storeError = null);
 
     try {
-      final list = await _readList(
-        waynAdminApi.get(
-          '/api/v1/store/items',
-          queryParams: {'active_only': false},
-        ),
-      );
+      final results = await Future.wait([
+        _storeService.getItems(),
+        _storeService.getCategories(),
+      ]);
       if (!mounted) return;
-      setState(() => _storeItems = list);
+      setState(() {
+        _storeItems = results[0] as List<AdminStoreItem>;
+        _storeCategories = results[1] as List<AdminStoreCategory>;
+      });
     } catch (error) {
       if (!mounted) return;
       _setError(
         (m) => setState(() => _storeError = 'تعذر تحميل عناصر المتجر ($m)'),
         error: error,
       );
+    }
+  }
+
+  Future<void> _createCategory() async {
+    final saved = await showAdminStoreCategoryEditor(
+      context,
+      onSave: _storeService.createCategory,
+    );
+    if (saved == true && mounted) await _loadStore();
+  }
+
+  Future<void> _editCategory(AdminStoreCategory category) async {
+    final saved = await showAdminStoreCategoryEditor(
+      context,
+      category: category,
+      onSave: (body) => _storeService.updateCategory(category.id, body),
+    );
+    if (saved == true && mounted) await _loadStore();
+  }
+
+  Future<void> _toggleCategory(AdminStoreCategory category) async {
+    await _runStoreAction(
+      () => _storeService.updateCategory(category.id, {
+        'is_active': !category.isActive,
+      }),
+      successMessage: 'تم تحديث حالة التصنيف.',
+    );
+  }
+
+  Future<void> _createStoreItem() async {
+    if (_storeCategories.isEmpty) {
+      _showSnack('أضف تصنيفًا واحدًا على الأقل قبل إنشاء عنصر.');
+      return;
+    }
+    final saved = await showAdminStoreItemEditor(
+      context,
+      categories: _storeCategories,
+      onSave: _storeService.createItem,
+      onUploadImage: _storeService.uploadImage,
+    );
+    if (saved == true && mounted) await _loadStore();
+  }
+
+  Future<void> _editStoreItem(AdminStoreItem item) async {
+    final saved = await showAdminStoreItemEditor(
+      context,
+      item: item,
+      categories: _storeCategories,
+      onSave: (body) => _storeService.updateItem(item.id, body),
+      onUploadImage: _storeService.uploadImage,
+    );
+    if (saved == true && mounted) await _loadStore();
+  }
+
+  Future<void> _toggleStoreItem(AdminStoreItem item) async {
+    await _runStoreAction(
+      () => _storeService.updateItem(item.id, {'is_active': !item.isActive}),
+      successMessage: 'تم تحديث حالة العنصر.',
+    );
+  }
+
+  Future<void> _runStoreAction(
+    Future<dynamic> Function() request, {
+    required String successMessage,
+  }) async {
+    try {
+      await request();
+      await _loadStore();
+      if (mounted) _showSnack(successMessage);
+    } catch (error) {
+      if (mounted) _showSnack('فشل تنفيذ العملية (${_errorMessage(error)})');
     }
   }
 
@@ -367,9 +434,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _logout() async {
@@ -535,10 +602,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
               ),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF7A8494),
-                ),
+                style: const TextStyle(fontSize: 10, color: Color(0xFF7A8494)),
               ),
             ],
           ),
@@ -1001,11 +1065,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: fg,
-        ),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: fg),
       ),
     );
   }
@@ -1083,12 +1143,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
         padding: const EdgeInsets.all(18),
         itemCount: _contributions.length,
         itemBuilder: (context, index) {
-          final map = Map<String, dynamic>.from(
-            _contributions[index] as Map,
-          );
+          final map = Map<String, dynamic>.from(_contributions[index] as Map);
           final contribution = Contribution.fromMap(map);
-          final pending =
-              contribution.status == ContributionStatus.pending;
+          final pending = contribution.status == ContributionStatus.pending;
 
           return Card(
             elevation: 0,
@@ -1214,43 +1271,170 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   }
 
   Widget _storeSection() {
-    return _sectionBody(
-      loading: _hasLoading,
-      hasData: _storeItems.isNotEmpty,
-      empty: 'لا توجد عناصر في المتجر.',
-      error: _storeError,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(18),
-        itemCount: _storeItems.length,
-        itemBuilder: (context, index) {
-          final item = Map<String, dynamic>.from(_storeItems[index] as Map);
+    if (_hasLoading && _storeItems.isEmpty && _storeCategories.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-          return Card(
-            elevation: 0,
-            child: ListTile(
-              leading: const Icon(
-                Icons.shopping_bag_outlined,
-                color: Color(0xFF18A99A),
-              ),
-              title: Text(
-                item['name_ar']?.toString() ?? '—',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              subtitle: Text(
-                '${item['price'] ?? ''} ${item['currency'] ?? ''}',
-              ),
-              trailing: Icon(
-                item['is_active'] == true
-                    ? Icons.visibility_rounded
-                    : Icons.visibility_off_rounded,
-                color: item['is_active'] == true
-                    ? const Color(0xFF18A99A)
-                    : const Color(0xFF8B94A3),
+    return ListView(
+      padding: const EdgeInsets.all(18),
+      children: [
+        if (_storeError != null) _storeErrorCard(_storeError!),
+        Row(
+          children: [
+            const Text(
+              'التصنيفات',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const Spacer(),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: _storeBrandColor),
+              onPressed: _createCategory,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('إضافة تصنيف'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (_storeCategories.isEmpty)
+          const Text('لا توجد تصنيفات.')
+        else
+          for (final category in _storeCategories)
+            Card(
+              elevation: 0,
+              child: ListTile(
+                leading: Icon(
+                  category.isActive
+                      ? Icons.category_rounded
+                      : Icons.category_outlined,
+                  color: category.isActive
+                      ? _storeBrandColor
+                      : _storeMutedColor,
+                ),
+                title: Text(
+                  category.nameAr,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text(
+                  '${category.nameEn}  •  ترتيب ${category.sortOrder}',
+                ),
+                trailing: Wrap(
+                  spacing: 2,
+                  children: [
+                    IconButton(
+                      tooltip: 'تعديل التصنيف',
+                      onPressed: () => _editCategory(category),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                    IconButton(
+                      tooltip: category.isActive ? 'تعطيل' : 'تفعيل',
+                      onPressed: () => _toggleCategory(category),
+                      icon: Icon(
+                        category.isActive
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          );
-        },
-      ),
+        const SizedBox(height: 22),
+        Row(
+          children: [
+            Text(
+              'العناصر (${_storeItems.length})',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const Spacer(),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: _storeBrandColor),
+              onPressed: _createStoreItem,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('إضافة عنصر'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (_storeItems.isEmpty)
+          const Text('لا توجد عناصر في المتجر.')
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _storeItems.length,
+            itemBuilder: (context, index) {
+              final item = _storeItems[index];
+              final category = _storeCategories
+                  .cast<AdminStoreCategory?>()
+                  .firstWhere(
+                    (value) => value?.id == item.categoryId,
+                    orElse: () => null,
+                  );
+              final price = item.currency == 'FREE'
+                  ? 'مجاني'
+                  : '${item.price} ${item.currency}';
+
+              return Card(
+                elevation: 0,
+                child: ListTile(
+                  leading: item.imageUrl == null
+                      ? const Icon(
+                          Icons.shopping_bag_outlined,
+                          color: _storeBrandColor,
+                        )
+                      : SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: WaynNetworkImage(
+                              imageUrl: item.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const Icon(
+                                Icons.shopping_bag_outlined,
+                                color: _storeBrandColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                  title: Text(
+                    item.nameAr,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(
+                    '$price  •  ${category?.nameAr ?? 'بدون تصنيف'}',
+                  ),
+                  trailing: Wrap(
+                    spacing: 2,
+                    children: [
+                      IconButton(
+                        tooltip: 'تعديل العنصر',
+                        onPressed: () => _editStoreItem(item),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        tooltip: item.isActive ? 'تعطيل' : 'تفعيل',
+                        onPressed: () => _toggleStoreItem(item),
+                        icon: Icon(
+                          item.isActive
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _storeErrorCard(String message) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(message, style: const TextStyle(color: Color(0xFFD95757))),
     );
   }
 
@@ -1264,8 +1448,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
         padding: const EdgeInsets.all(18),
         itemCount: _permissions.length,
         itemBuilder: (context, index) {
-          final permission =
-              Map<String, dynamic>.from(_permissions[index] as Map);
+          final permission = Map<String, dynamic>.from(
+            _permissions[index] as Map,
+          );
 
           return Card(
             elevation: 0,
