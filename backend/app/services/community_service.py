@@ -70,6 +70,30 @@ class CommunityService:
             limit=limit,
         )
 
+    async def list_admin_posts(self, **filters):
+        return await self.repository.list_admin_posts(**filters)
+
+    async def set_post_visibility(
+        self,
+        post: CommunityPost,
+        is_visible: bool,
+    ) -> CommunityPost:
+        post.is_visible = is_visible
+        return await self.repository.update_post(post)
+
+    async def list_admin_comments(self, post_id: UUID, **filters):
+        return await self.repository.list_admin_comments(post_id, **filters)
+
+    async def set_comment_visibility(
+        self,
+        comment: CommunityComment,
+        is_visible: bool,
+    ) -> CommunityComment:
+        comment.is_visible = is_visible
+        await self.session.commit()
+        await self.session.refresh(comment)
+        return comment
+
     async def list_saved_posts(
         self,
         *,

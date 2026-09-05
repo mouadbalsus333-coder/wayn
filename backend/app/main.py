@@ -12,8 +12,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.routers import (
     admin_auth,
+    admin_community,
+    admin_dashboard,
     admin_permissions,
     admin_places,
+    admin_regular_users,
+    admin_reviews,
     admin_user_permissions,
     admin_users,
     admin_wallet,
@@ -50,7 +54,6 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -241,6 +244,21 @@ app.include_router(
 )
 
 
+app.include_router(
+    admin_community.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
+# Admin Dashboard
+# ============================================================
+app.include_router(
+    admin_dashboard.router,
+    prefix="/api/v1",
+)
+
+
 # ============================================================
 # Admin Permissions
 # ============================================================
@@ -264,6 +282,18 @@ app.include_router(
 # ============================================================
 app.include_router(
     admin_places.router,
+    prefix="/api/v1",
+)
+
+
+app.include_router(
+    admin_regular_users.router,
+    prefix="/api/v1",
+)
+
+
+app.include_router(
+    admin_reviews.router,
     prefix="/api/v1",
 )
 

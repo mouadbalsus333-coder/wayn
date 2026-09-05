@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, status
+﻿from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.admin_auth import (
@@ -6,6 +6,7 @@ from app.api.dependencies.admin_auth import (
     get_admin_permissions,
     require_permission,
 )
+from app.core.config import settings
 from app.api.dependencies.auth import get_current_user
 from app.core.database import get_session
 from app.core.security import (
@@ -18,6 +19,7 @@ from app.repositories.admin_user_repository import AdminUserRepository
 from app.schemas.admin_auth import (
     AdminLoginRequest,
     AdminLoginResponse,
+    AdminWebLoginResponse,
     AdminSessionRequest,
 )
 
@@ -28,22 +30,39 @@ router = APIRouter(
 )
 
 
-@router.post(
-    "/login",
-    response_model=AdminLoginResponse,
-)
-async def admin_login(
-    data: AdminLoginRequest,
-    session: AsyncSession = Depends(get_session),
-) -> AdminLoginResponse:
+def _admin_roles_and_permissions(
+    admin_user: AdminUser,
+) -> tuple[list[str], list[str]]:
+    roles = sorted(
+        {
+            role.name
+            for role in admin_user.roles
+            if role.is_active
+        }
+    )
+    permissions = sorted(get_admin_permissions(admin_user))
+    return roles, permissions
 
-    repository = AdminUserRepository(session)
 
-    admin_user = await repository.get_by_email(
-        data.email.lower()
+def _create_admin_token(admin_user: AdminUser) -> str:
+    return create_access_token(
+        subject=str(admin_user.id),
+        token_version=admin_user.token_version,
+        token_type="admin",
     )
 
-    if admin_user is None:
+
+async def _authenticate_admin(
+    data: AdminLoginRequest,
+    session: AsyncSession,
+) -> AdminUser:
+    repository = AdminUserRepository(session)
+    admin_user = await repository.get_by_email(data.email.lower())
+
+    if admin_user is None or not verify_password(
+        data.password,
+        admin_user.password_hash if admin_user else "",
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -55,35 +74,56 @@ async def admin_login(
             detail="Admin account is inactive",
         )
 
-    if not verify_password(
-        data.password,
-        admin_user.password_hash,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
+    return admin_user
 
-    roles = sorted(
-        {
-            role.name
-            for role in admin_user.roles
-            if role.is_active
-        }
-    )
 
-    permissions = sorted(
-        get_admin_permissions(admin_user)
-    )
+@router.post(
+    "/login",
+    response_model=AdminLoginResponse,
+)
+async def admin_login(
+    data: AdminLoginRequest,
+    session: AsyncSession = Depends(get_session),
+) -> AdminLoginResponse:
 
-    access_token = create_access_token(
-        subject=str(admin_user.id),
-        token_type="admin",
-    )
+    admin_user = await _authenticate_admin(data, session)
+    roles, permissions = _admin_roles_and_permissions(admin_user)
+    access_token = _create_admin_token(admin_user)
 
     return AdminLoginResponse(
         access_token=access_token,
         token_type="bearer",
+        admin_id=admin_user.id,
+        email=admin_user.email,
+        full_name=admin_user.full_name,
+        roles=roles,
+        permissions=permissions,
+    )
+
+
+@router.post(
+    "/web-login",
+    response_model=AdminWebLoginResponse,
+)
+async def admin_web_login(
+    data: AdminLoginRequest,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> AdminWebLoginResponse:
+    admin_user = await _authenticate_admin(data, session)
+    roles, permissions = _admin_roles_and_permissions(admin_user)
+
+    response.set_cookie(
+        key=settings.admin_cookie_name,
+        value=_create_admin_token(admin_user),
+        max_age=settings.jwt_access_token_expire_minutes * 60,
+        httponly=True,
+        secure=settings.admin_cookie_secure,
+        samesite=settings.admin_cookie_samesite,
+        path="/",
+    )
+
+    return AdminWebLoginResponse(
         admin_id=admin_user.id,
         email=admin_user.email,
         full_name=admin_user.full_name,
@@ -143,10 +183,7 @@ async def create_admin_session(
         get_admin_permissions(admin_user)
     )
 
-    access_token = create_access_token(
-        subject=str(admin_user.id),
-        token_type="admin",
-    )
+    access_token = _create_admin_token(admin_user)
 
     return AdminLoginResponse(
         access_token=access_token,
@@ -178,6 +215,24 @@ async def admin_me(
             get_admin_permissions(admin_user)
         ),
     }
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def admin_logout(
+    response: Response,
+    admin_user: AdminUser = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    admin_user.token_version += 1
+    await session.commit()
+
+    response.delete_cookie(
+        key=settings.admin_cookie_name,
+        path="/",
+    )
 
 
 @router.get(

@@ -103,7 +103,7 @@ def _recharge_response(
     response_model=WalletLookupResponse,
     status_code=status.HTTP_200_OK,
     dependencies=[
-        Depends(require_permission("wallet.recharge")),
+        Depends(require_permission("wallet.read")),
     ],
 )
 async def lookup_wallet(
@@ -230,7 +230,7 @@ class WalletRechargeStatsResponse(BaseModel):
     response_model=WalletRechargeStatsResponse,
     status_code=status.HTTP_200_OK,
     dependencies=[
-        Depends(require_permission("wallet.recharge")),
+        Depends(require_permission("wallet.read")),
     ],
 )
 async def get_recharge_stats(
@@ -269,7 +269,7 @@ class WalletRechargeListResponse(BaseModel):
     response_model=WalletRechargeListResponse,
     status_code=status.HTTP_200_OK,
     dependencies=[
-        Depends(require_permission("wallet.recharge")),
+        Depends(require_permission("wallet.read")),
     ],
 )
 async def list_recharges(
@@ -365,7 +365,7 @@ class WalletRechargeDetailResponse(WalletRechargeResponse):
     response_model=WalletRechargeDetailResponse,
     status_code=status.HTTP_200_OK,
     dependencies=[
-        Depends(require_permission("wallet.recharge")),
+        Depends(require_permission("wallet.read")),
     ],
 )
 async def get_recharge(

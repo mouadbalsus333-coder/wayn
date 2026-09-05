@@ -38,6 +38,13 @@ class AdminUser(Base):
         default=True,
     )
 
+    token_version: Mapped[int] = mapped_column(
+        sa.Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+
     last_login_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True),
         nullable=True,

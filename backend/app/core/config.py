@@ -98,7 +98,11 @@ class Settings:
                 if origin.strip()
             ]
         else:
-            self.cors_origins = []
+            self.cors_origins = (
+                ["http://localhost:5173"]
+                if self.env in {"development", "dev", "test"}
+                else ["https://admin.wayn.ly"]
+            )
 
         self.cors_allow_credentials = (
             os.environ.get(
@@ -107,6 +111,41 @@ class Settings:
             ).strip().lower()
             == "true"
         )
+
+        if (
+            "*" in self.cors_origins
+            and self.cors_allow_credentials
+        ):
+            raise ValueError(
+                "Wildcard CORS origins are incompatible with credentials"
+            )
+
+        self.admin_cookie_name = os.environ.get(
+            "ADMIN_AUTH_COOKIE_NAME",
+            "wayn_admin_session",
+        )
+
+        self.admin_cookie_secure = (
+            os.environ.get(
+                "ADMIN_AUTH_COOKIE_SECURE",
+                "true" if self.env == "production" else "false",
+            ).strip().lower()
+            == "true"
+        )
+
+        self.admin_cookie_samesite = os.environ.get(
+            "ADMIN_AUTH_COOKIE_SAMESITE",
+            "strict",
+        ).strip().lower()
+
+        if self.admin_cookie_samesite not in {
+            "strict",
+            "lax",
+            "none",
+        }:
+            raise ValueError(
+                "ADMIN_AUTH_COOKIE_SAMESITE must be strict, lax, or none"
+            )
 
         # ----------------------------------------------------
         # OSRM Routing

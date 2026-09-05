@@ -3,7 +3,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.place import Place
@@ -54,6 +54,48 @@ class ReviewRepository:
         query = query.order_by(PlaceReview.created_at.desc()).offset(offset).limit(limit)
         result = await self.session.execute(query)
         return result.scalars().all()
+
+    async def list_admin_reviews(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+        place_id: str | None = None,
+        rating: Decimal | None = None,
+        is_visible: bool | None = None,
+        search: str | None = None,
+        created_from=None,
+        created_to=None,
+    ) -> tuple[list[PlaceReview], int]:
+        conditions = []
+        if place_id is not None:
+            conditions.append(PlaceReview.place_id == str(place_id))
+        if rating is not None:
+            conditions.append(PlaceReview.rating == rating)
+        if is_visible is not None:
+            conditions.append(PlaceReview.is_visible == is_visible)
+        if search:
+            conditions.append(PlaceReview.comment.ilike(f"%{search.strip()}%"))
+        if created_from is not None:
+            conditions.append(PlaceReview.created_at >= created_from)
+        if created_to is not None:
+            conditions.append(PlaceReview.created_at <= created_to)
+
+        total = int(
+            (
+                await self.session.execute(
+                    select(func.count()).select_from(PlaceReview).where(*conditions)
+                )
+            ).scalar_one()
+        )
+        result = await self.session.execute(
+            select(PlaceReview)
+            .where(*conditions)
+            .order_by(PlaceReview.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.scalars().all()), total
 
     async def create_review(self, review: PlaceReview) -> PlaceReview:
         self.session.add(review)

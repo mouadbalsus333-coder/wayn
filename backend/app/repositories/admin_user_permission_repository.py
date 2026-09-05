@@ -1,4 +1,4 @@
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -85,6 +85,12 @@ class AdminUserPermissionRepository:
                 )
             )
 
+        await self.session.execute(
+            update(AdminUser)
+            .where(AdminUser.id == admin_user_id)
+            .values(token_version=AdminUser.token_version + 1)
+        )
+
         await self.session.commit()
 
     async def remove_permission_from_user(
@@ -99,6 +105,12 @@ class AdminUserPermissionRepository:
                 admin_user_permissions.c.permission_id
                 == permission_id,
             )
+        )
+
+        await self.session.execute(
+            update(AdminUser)
+            .where(AdminUser.id == admin_user_id)
+            .values(token_version=AdminUser.token_version + 1)
         )
 
         await self.session.commit()
@@ -126,5 +138,11 @@ class AdminUserPermissionRepository:
                     for permission_id in permission_ids
                 ],
             )
+
+        await self.session.execute(
+            update(AdminUser)
+            .where(AdminUser.id == admin_user_id)
+            .values(token_version=AdminUser.token_version + 1)
+        )
 
         await self.session.commit()

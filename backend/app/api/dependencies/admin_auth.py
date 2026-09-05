@@ -1,10 +1,13 @@
-﻿from fastapi import Depends, HTTPException, status
+﻿from urllib.parse import urlparse
+
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_session
+from app.core.config import settings
 from app.core.security import decode_access_token
 from app.models.admin_user import AdminUser
 from app.models.role import Role
@@ -14,18 +17,29 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_admin(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     session: AsyncSession = Depends(get_session),
 ) -> AdminUser:
 
-    if credentials is None:
+    cookie_token = request.cookies.get(settings.admin_cookie_name)
+    using_cookie = credentials is None and bool(cookie_token)
+
+    if credentials is None and not cookie_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = credentials.credentials
+    token = credentials.credentials if credentials else cookie_token
+
+    if using_cookie and request.method not in {
+        "GET",
+        "HEAD",
+        "OPTIONS",
+    }:
+        _validate_cookie_request_origin(request)
 
     try:
         payload = decode_access_token(token)
@@ -38,8 +52,9 @@ async def get_current_admin(
 
     if payload.get("type") != "admin":
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin token required",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid admin session",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     subject = payload.get("sub")
@@ -88,7 +103,42 @@ async def get_current_admin(
             detail="Admin account is inactive",
         )
 
+    token_version = payload.get("ver")
+
+    if token_version != admin_user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been invalidated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return admin_user
+
+
+def _validate_cookie_request_origin(request: Request) -> None:
+    allowed_origins = set(settings.cors_origins)
+    origin = request.headers.get("origin")
+
+    if origin in allowed_origins:
+        return
+
+    referer = request.headers.get("referer")
+
+    if referer:
+        parsed = urlparse(referer)
+        referer_origin = (
+            f"{parsed.scheme}://{parsed.netloc}"
+            if parsed.scheme and parsed.netloc
+            else ""
+        )
+
+        if referer_origin in allowed_origins:
+            return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Invalid request origin",
+    )
 
 
 def get_admin_permissions(

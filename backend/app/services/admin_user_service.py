@@ -53,10 +53,24 @@ class AdminUserService:
             permissions=permission_names,
         )
 
-    async def list_admin_users(self) -> list[AdminUserRead]:
-        users = await self.admin_user_repository.list_admin_users()
+    async def list_admin_users_page(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        is_active: bool | None = None,
+        role: str | None = None,
+    ) -> tuple[list[AdminUserRead], int]:
+        users, total = await self.admin_user_repository.list_admin_users_page(
+            offset=offset,
+            limit=limit,
+            search=search,
+            is_active=is_active,
+            role=role,
+        )
 
-        return [self._to_read(user) for user in users]
+        return [self._to_read(user) for user in users], total
 
     async def get_admin_user(
         self,
@@ -248,11 +262,13 @@ class AdminUserService:
             return None
 
         update_data = data.model_dump(exclude_unset=True)
+        invalidate_tokens = False
 
         if "password" in update_data:
             password = update_data.pop("password")
 
             if password is not None:
+                invalidate_tokens = True
                 password_hash = hash_password(password)
 
                 admin_user.password_hash = password_hash
@@ -272,7 +288,12 @@ class AdminUserService:
                     self.session.add(user)
 
         for field, value in update_data.items():
+            if field == "is_active" and value != admin_user.is_active:
+                invalidate_tokens = True
             setattr(admin_user, field, value)
+
+        if invalidate_tokens:
+            admin_user.token_version += 1
 
         admin_user = await self.admin_user_repository.update_admin_user(
             admin_user
@@ -301,6 +322,7 @@ class AdminUserService:
             return None
 
         admin_user.is_active = True
+        admin_user.token_version += 1
 
         admin_user = await self.admin_user_repository.update_admin_user(
             admin_user
@@ -334,6 +356,7 @@ class AdminUserService:
             raise ValueError("Super Admin cannot be deactivated")
 
         admin_user.is_active = False
+        admin_user.token_version += 1
 
         admin_user = await self.admin_user_repository.update_admin_user(
             admin_user

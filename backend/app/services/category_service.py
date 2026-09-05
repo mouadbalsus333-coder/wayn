@@ -46,4 +46,8 @@ class CategoryService:
         self,
         category: Category,
     ) -> None:
+        if await self.repository.has_places(category.id):
+            raise ValueError(
+                "Category cannot be deleted while places are assigned"
+            )
         await self.repository.delete_category(category)

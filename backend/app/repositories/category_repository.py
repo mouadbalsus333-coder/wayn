@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.category import Category
@@ -52,3 +52,11 @@ class CategoryRepository:
         await self.session.delete(category)
 
         await self.session.commit()
+
+    async def has_places(self, category_id: str) -> bool:
+        from app.models.place import Place
+
+        result = await self.session.execute(
+            select(exists().where(Place.category_id == category_id))
+        )
+        return bool(result.scalar())

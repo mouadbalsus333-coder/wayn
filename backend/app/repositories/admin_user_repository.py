@@ -1,4 +1,4 @@
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -66,6 +66,61 @@ class AdminUserRepository:
         )
 
         return list(result.scalars().all())
+
+    async def list_admin_users_page(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        is_active: bool | None = None,
+        role: str | None = None,
+    ) -> tuple[list[AdminUser], int]:
+        conditions = []
+
+        if search:
+            pattern = f"%{search.strip()}%"
+            conditions.append(
+                or_(
+                    AdminUser.email.ilike(pattern),
+                    AdminUser.full_name.ilike(pattern),
+                )
+            )
+
+        if is_active is not None:
+            conditions.append(AdminUser.is_active == is_active)
+
+        base_query = select(AdminUser).where(*conditions)
+        count_query = select(func.count(AdminUser.id)).where(*conditions)
+
+        if role:
+            base_query = base_query.join(
+                admin_user_roles,
+                admin_user_roles.c.admin_user_id == AdminUser.id,
+            ).join(Role, Role.id == admin_user_roles.c.role_id).where(
+                Role.name == role
+            )
+            count_query = count_query.join(
+                admin_user_roles,
+                admin_user_roles.c.admin_user_id == AdminUser.id,
+            ).join(Role, Role.id == admin_user_roles.c.role_id).where(
+                Role.name == role
+            )
+
+        total = int((await self.session.execute(count_query)).scalar_one())
+        result = await self.session.execute(
+            base_query
+            .options(
+                selectinload(AdminUser.roles).selectinload(Role.permissions),
+                selectinload(AdminUser.direct_permissions),
+            )
+            .distinct()
+            .order_by(AdminUser.id.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+
+        return list(result.scalars().all()), total
 
     async def create_admin_user(
         self,
@@ -216,6 +271,12 @@ class AdminUserRepository:
                 )
             )
 
+        await self.session.execute(
+            update(AdminUser)
+            .where(AdminUser.id == admin_user_id)
+            .values(token_version=AdminUser.token_version + 1)
+        )
+
         await self.session.commit()
 
     async def remove_role_from_user(
@@ -228,6 +289,12 @@ class AdminUserRepository:
                 admin_user_roles.c.admin_user_id == admin_user_id,
                 admin_user_roles.c.role_id == role_id,
             )
+        )
+
+        await self.session.execute(
+            update(AdminUser)
+            .where(AdminUser.id == admin_user_id)
+            .values(token_version=AdminUser.token_version + 1)
         )
 
         await self.session.commit()
@@ -254,5 +321,11 @@ class AdminUserRepository:
                     for role_id in role_ids
                 ],
             )
+
+        await self.session.execute(
+            update(AdminUser)
+            .where(AdminUser.id == admin_user_id)
+            .values(token_version=AdminUser.token_version + 1)
+        )
 
         await self.session.commit()

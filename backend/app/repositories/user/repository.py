@@ -91,6 +91,8 @@ class UserRepository:
         account_status: AccountStatus | None = None,
         is_active: bool | None = None,
         is_verified: bool | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
     ) -> list[User]:
         query = select(User)
 
@@ -121,11 +123,24 @@ class UserRepository:
                 User.is_verified == is_verified
             )
 
+        sort_columns = {
+            "created_at": User.created_at,
+            "updated_at": User.updated_at,
+            "full_name": User.full_name,
+            "username": User.username,
+            "last_login_at": User.last_login_at,
+            "points": User.points,
+        }
+        sort_column = sort_columns[sort_by]
+        order_expression = (
+            sort_column.asc()
+            if sort_order == "asc"
+            else sort_column.desc()
+        )
+
         query = (
             query
-            .order_by(
-                User.created_at.desc()
-            )
+            .order_by(order_expression, User.id.asc())
             .offset(offset)
             .limit(limit)
         )

@@ -1,7 +1,7 @@
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.place import Place
+from app.models.place import Place, VerificationStatus
 
 
 class PlaceRepository:
@@ -63,6 +63,77 @@ class PlaceRepository:
         result = await self.session.execute(query)
 
         return result.scalars().all(), total
+
+    async def list_admin_places(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        category_id: str | None = None,
+        verification_status: VerificationStatus | None = None,
+        owner_user_id: str | None = None,
+        is_active: bool | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> tuple[list[Place], int]:
+        sort_columns = {
+            "created_at": Place.created_at,
+            "updated_at": Place.updated_at,
+            "name": Place.name,
+            "rating": Place.rating,
+            "reviews_count": Place.reviews_count,
+            "visits_count": Place.visits_count,
+        }
+        sort_column = sort_columns[sort_by]
+        order_expression = (
+            sort_column.asc()
+            if sort_order == "asc"
+            else sort_column.desc()
+        )
+
+        conditions = []
+
+        if search:
+            pattern = f"%{search.strip()}%"
+            conditions.append(
+                or_(
+                    Place.name.ilike(pattern),
+                    Place.city.ilike(pattern),
+                    Place.category_name.ilike(pattern),
+                    Place.description.ilike(pattern),
+                    Place.address.ilike(pattern),
+                )
+            )
+
+        if category_id is not None:
+            conditions.append(Place.category_id == category_id)
+
+        if verification_status is not None:
+            conditions.append(
+                Place.verification_status == verification_status
+            )
+
+        if owner_user_id is not None:
+            conditions.append(Place.owner_user_id == owner_user_id)
+
+        if is_active is not None:
+            conditions.append(Place.is_active == is_active)
+
+        count_query = (
+            select(func.count()).select_from(Place).where(*conditions)
+        )
+        total = int((await self.session.execute(count_query)).scalar_one())
+
+        result = await self.session.execute(
+            select(Place)
+            .where(*conditions)
+            .order_by(order_expression, Place.id.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+
+        return list(result.scalars().all()), total
 
     async def get_place(
         self,

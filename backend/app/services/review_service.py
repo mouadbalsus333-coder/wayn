@@ -102,3 +102,14 @@ class ReviewService:
             offset=offset,
             limit=limit,
         )
+
+    async def list_admin_reviews(self, **filters):
+        return await self.repo.list_admin_reviews(**filters)
+
+    async def set_visibility(
+        self,
+        review: PlaceReview,
+        is_visible: bool,
+    ) -> PlaceReview:
+        review.is_visible = is_visible
+        return await self.repo.update_review(review)

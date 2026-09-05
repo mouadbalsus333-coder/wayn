@@ -37,6 +37,8 @@ PERMISSIONS = [
     # Community moderation
     ("community.read", "View community posts"),
     ("community.moderate", "Manage community posts and reports"),
+    ("reviews.read", "View reviews"),
+    ("reviews.moderate", "Manage review visibility"),
 
     # Place contributions
     ("contributions.read", "View place contributions"),
@@ -99,6 +101,8 @@ ROLE_PERMISSIONS = {
         "reports.resolve",
         "community.read",
         "community.moderate",
+        "reviews.read",
+        "reviews.moderate",
 
         # Place contributions
         "contributions.read",
@@ -133,6 +137,7 @@ ROLE_PERMISSIONS = {
         "reports.write",
         "reports.resolve",
         "community.read",
+        "reviews.read",
 
         # Place contributions
         "contributions.read",
@@ -148,6 +153,8 @@ ROLE_PERMISSIONS = {
         "reports.resolve",
         "community.read",
         "community.moderate",
+        "reviews.read",
+        "reviews.moderate",
 
         # Place contributions
         "contributions.read",

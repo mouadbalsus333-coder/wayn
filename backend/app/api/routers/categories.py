@@ -109,7 +109,7 @@ async def update_admin_category(
     "/admin/categories/{category_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[
-        Depends(require_permission("categories.write")),
+        Depends(require_permission("categories.delete")),
     ],
 )
 async def delete_admin_category(
@@ -127,4 +127,10 @@ async def delete_admin_category(
             detail="Category not found",
         )
 
-    await service.delete_category(category)
+    try:
+        await service.delete_category(category)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc

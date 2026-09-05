@@ -1,4 +1,5 @@
-﻿from uuid import UUID
+﻿from datetime import datetime, timezone
+from uuid import UUID
 
 from geoalchemy2.elements import WKTElement
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password, verify_password
 from app.models.user import User
 from app.repositories.user.repository import UserRepository
+from app.schemas.admin_regular_user import AdminRegularUserRead
 from app.services.wallet.service import WalletService
 
 
@@ -51,6 +53,66 @@ class UserService:
         google_id: str,
     ) -> User | None:
         return await self.repository.get_by_google_id(google_id)
+
+    async def list_admin_users(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        account_status=None,
+        is_active: bool | None = None,
+        is_verified: bool | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> tuple[list[AdminRegularUserRead], int]:
+        users = await self.repository.list_users(
+            offset=offset,
+            limit=limit,
+            search=search,
+            account_status=account_status,
+            is_active=is_active,
+            is_verified=is_verified,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+        total = await self.repository.count_users(
+            search=search,
+            account_status=account_status,
+            is_active=is_active,
+            is_verified=is_verified,
+        )
+        return [AdminRegularUserRead.model_validate(user) for user in users], total
+
+    async def get_admin_user(
+        self,
+        user_id: UUID,
+    ) -> AdminRegularUserRead | None:
+        user = await self.repository.get_by_id(user_id)
+        return AdminRegularUserRead.model_validate(user) if user else None
+
+    async def update_admin_user_status(
+        self,
+        user: User,
+        *,
+        account_status,
+        is_active: bool | None,
+        reason: str | None,
+        changed_by: int,
+        suspended_until=None,
+    ) -> AdminRegularUserRead:
+        if account_status is not None:
+            user.account_status = account_status
+        if is_active is not None:
+            user.is_active = is_active
+        user.status_reason = reason
+        user.suspended_until = suspended_until
+        user.status_changed_by = changed_by
+        user.status_changed_at = datetime.now(timezone.utc)
+        user.token_version += 1
+        await self.session.commit()
+        await self.session.refresh(user)
+        return AdminRegularUserRead.model_validate(user)
 
     # ============================================================
     # Registration

@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import math
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.admin_auth import require_role
@@ -12,6 +14,7 @@ from app.schemas.admin_user import (
     AdminUserRoleUpdate,
 )
 from app.schemas.admin_user_permission import AdminUserPermissionRead
+from app.schemas.pagination import PaginatedResponse
 from app.schemas.role import RoleRead
 from app.services.admin_user_service import AdminUserService
 
@@ -39,17 +42,38 @@ def _build_service(
 
 @router.get(
     "",
-    response_model=list[AdminUserRead],
+    response_model=PaginatedResponse[AdminUserRead],
     dependencies=[
         Depends(require_role("super_admin")),
     ],
 )
 async def list_admin_users(
+    response: Response,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=255),
+    is_active: bool | None = Query(default=None),
+    role: str | None = Query(default=None, max_length=100),
     session: AsyncSession = Depends(get_session),
-) -> list[AdminUserRead]:
+) -> PaginatedResponse[AdminUserRead]:
     service = _build_service(session)
+    items, total = await service.list_admin_users_page(
+        offset=(page - 1) * limit,
+        limit=limit,
+        search=search,
+        is_active=is_active,
+        role=role,
+    )
+    pages = math.ceil(total / limit) if total else 0
+    response.headers["X-Total-Count"] = str(total)
 
-    return await service.list_admin_users()
+    return PaginatedResponse[AdminUserRead](
+        items=items,
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages,
+    )
 
 
 @router.post(

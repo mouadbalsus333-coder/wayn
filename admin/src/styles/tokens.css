@@ -1,0 +1,22 @@
+:root {
+  font-family: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif;
+  color: #162321;
+  background: #f4f8f7;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --color-bg: #f4f8f7;
+  --color-surface: #ffffff;
+  --color-surface-soft: #eaf3f1;
+  --color-border: #d9e6e3;
+  --color-text: #162321;
+  --color-muted: #71817f;
+  --color-primary: #0f766e;
+  --color-primary-deep: #095b55;
+  --color-accent: #d9f1eb;
+  --color-danger: #b42318;
+  --radius-sm: 10px;
+  --radius-md: 18px;
+  --radius-lg: 28px;
+  --shadow-soft: 0 18px 60px rgba(21, 75, 68, 0.09);
+}

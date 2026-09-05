@@ -76,6 +76,60 @@ class CommunityRepository:
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
+    async def list_admin_posts(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        is_visible: bool | None = None,
+        place_id: UUID | str | None = None,
+    ) -> tuple[list[CommunityPost], int]:
+        conditions = []
+        if search:
+            conditions.append(CommunityPost.text.ilike(f"%{search.strip()}%"))
+        if is_visible is not None:
+            conditions.append(CommunityPost.is_visible == is_visible)
+        if place_id is not None:
+            conditions.append(CommunityPost.place_id == place_id)
+
+        count = await self.session.execute(
+            select(func.count()).select_from(CommunityPost).where(*conditions)
+        )
+        total = int(count.scalar_one())
+        result = await self.session.execute(
+            select(CommunityPost)
+            .where(*conditions)
+            .order_by(CommunityPost.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.scalars().all()), total
+
+    async def list_admin_comments(
+        self,
+        post_id: UUID | str,
+        *,
+        offset: int = 0,
+        limit: int = 50,
+        is_visible: bool | None = None,
+    ) -> tuple[list[CommunityComment], int]:
+        conditions = [CommunityComment.post_id == post_id]
+        if is_visible is not None:
+            conditions.append(CommunityComment.is_visible == is_visible)
+        count = await self.session.execute(
+            select(func.count()).select_from(CommunityComment).where(*conditions)
+        )
+        total = int(count.scalar_one())
+        result = await self.session.execute(
+            select(CommunityComment)
+            .where(*conditions)
+            .order_by(CommunityComment.created_at.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.scalars().all()), total
+
     async def update_post(
         self,
         post: CommunityPost,

@@ -1,6 +1,6 @@
 from geoalchemy2.elements import WKTElement
 
-from app.models.place import Place
+from app.models.place import Place, VerificationStatus
 from app.repositories.category_repository import CategoryRepository
 from app.repositories.place_repository import PlaceRepository
 from app.schemas.place import PlaceCreate, PlaceUpdate
@@ -30,6 +30,31 @@ class PlaceService:
             offset=offset,
             limit=limit,
             active_only=active_only,
+        )
+
+    async def get_admin_places(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        category_id: str | None = None,
+        verification_status: VerificationStatus | None = None,
+        owner_user_id: str | None = None,
+        is_active: bool | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> tuple[list[Place], int]:
+        return await self.repository.list_admin_places(
+            offset=offset,
+            limit=limit,
+            search=search,
+            category_id=category_id,
+            verification_status=verification_status,
+            owner_user_id=owner_user_id,
+            is_active=is_active,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
 
     async def get_place_by_id(

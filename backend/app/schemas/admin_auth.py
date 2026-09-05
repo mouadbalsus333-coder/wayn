@@ -16,6 +16,14 @@ class AdminLoginResponse(BaseModel):
     permissions: list[str]
 
 
+class AdminWebLoginResponse(BaseModel):
+    admin_id: int
+    email: EmailStr
+    full_name: str
+    roles: list[str]
+    permissions: list[str]
+
+
 class AdminSessionRequest(BaseModel):
     """Body for the admin single-sign-on exchange endpoint.
 

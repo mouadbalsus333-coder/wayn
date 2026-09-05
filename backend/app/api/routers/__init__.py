@@ -1,7 +1,11 @@
 from . import (
     admin_auth,
+    admin_community,
+    admin_dashboard,
     admin_permissions,
     admin_places,
+    admin_regular_users,
+    admin_reviews,
     admin_user_permissions,
     admin_users,
     auth,
@@ -20,8 +24,12 @@ from . import (
 
 __all__ = [
     "admin_auth",
+    "admin_community",
+    "admin_dashboard",
     "admin_permissions",
     "admin_places",
+    "admin_regular_users",
+    "admin_reviews",
     "admin_user_permissions",
     "admin_users",
     "auth",
