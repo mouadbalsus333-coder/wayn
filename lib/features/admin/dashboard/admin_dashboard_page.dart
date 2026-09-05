@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/wayn_api.dart';
 import '../../../models/contribution.dart';
 import '../../../core/widgets/wayn_network_image.dart';
+import '../manage/admin_manage_page.dart';
 import '../store/admin_store_dialogs.dart';
 import '../store/admin_store_models.dart';
 import '../store/admin_store_service.dart';
@@ -22,15 +23,47 @@ const _storeMutedColor = Color(0xFF8B94A3);
 class AdminDashboardPage extends StatefulWidget {
   final String adminName;
 
-  const AdminDashboardPage({super.key, required this.adminName});
+  /// Resolved permission names the current admin is allowed to use.
+  /// Drives which sections are shown (in addition to the backend guards).
+  final List<String> permissions;
+
+  /// Human-facing role label: ``super_admin`` or ``admin`` (or empty).
+  final String role;
+
+  const AdminDashboardPage({
+    super.key,
+    required this.adminName,
+    this.permissions = const [],
+    this.role = '',
+  });
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
 }
 
+/// A dashboard section definition used to build the dynamic tab bar.
+class _AdminSection {
+  final String id;
+  final String label;
+  final bool superAdminOnly;
+  final List<String> permissions;
+  final Widget Function() body;
+
+  const _AdminSection({
+    required this.id,
+    required this.label,
+    this.superAdminOnly = false,
+    this.permissions = const [],
+    required this.body,
+  });
+}
+
 class _AdminDashboardPageState extends State<AdminDashboardPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
+  /// Visible sections, filtered by the current admin role/permissions.
+  late final List<_AdminSection> _sections;
 
   bool _initialLoading = true;
 
@@ -56,16 +89,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   List<dynamic> _permissions = [];
   String? _permissionsError;
 
-  static const int _tabUsers = 1;
-  static const int _tabPlaces = 2;
-  static const int _tabContributions = 3;
-  static const int _tabStore = 4;
-  static const int _tabPermissions = 5;
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _sections = _buildSections();
+    _tabController = TabController(length: _sections.length, vsync: this);
     _loadAll();
   }
 
@@ -82,19 +110,128 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   Future<void> _loadAll() async {
     setState(() => _initialLoading = true);
 
-    await Future.wait([
-      _loadUsers(),
-      _loadPlaces(),
-      _loadContributions(),
-      _loadStore(),
-      _loadPermissions(),
-    ]);
+    final futures = <Future<void>>[];
+
+    if (_hasSection('admins')) futures.add(_loadUsers());
+    if (_hasSection('places')) futures.add(_loadPlaces());
+    if (_hasSection('contributions')) futures.add(_loadContributions());
+    if (_hasSection('store')) futures.add(_loadStore());
+    if (_hasSection('permissions')) futures.add(_loadPermissions());
+
+    await Future.wait(futures);
 
     if (!mounted) return;
     setState(() => _initialLoading = false);
   }
 
   bool get _hasLoading => _initialLoading;
+
+  // ================================================================
+  // Permission-aware sections
+  // ================================================================
+
+  bool get _isSuperAdmin => widget.role == 'super_admin';
+
+  bool _hasPermission(String name) {
+    return widget.permissions.contains(name);
+  }
+
+  bool _hasAnyPermission(List<String> names) {
+    for (final name in names) {
+      if (widget.permissions.contains(name)) return true;
+    }
+    return false;
+  }
+
+  bool _hasSection(String id) {
+    for (final section in _sections) {
+      if (section.id == id) return true;
+    }
+    return false;
+  }
+
+  int _indexOfSection(String id) {
+    for (var i = 0; i < _sections.length; i++) {
+      if (_sections[i].id == id) return i;
+    }
+    return 0;
+  }
+
+  List<_AdminSection> _buildSections() {
+    final sections = <_AdminSection>[];
+
+    sections.add(_AdminSection(
+      id: 'overview',
+      label: 'الرئيسية',
+      body: _overviewSection,
+    ));
+
+    if (_isSuperAdmin) {
+      sections.add(_AdminSection(
+        id: 'admins',
+        label: 'إدارة المشرفين',
+        superAdminOnly: true,
+        body: _usersSection,
+      ));
+    }
+
+    if (_hasAnyPermission(const ['places.read', 'places.write'])) {
+      sections.add(_AdminSection(
+        id: 'places',
+        label: 'الأماكن',
+        permissions: const ['places.read', 'places.write'],
+        body: _placesSection,
+      ));
+    }
+
+    if (_hasPermission('contributions.read')) {
+      sections.add(_AdminSection(
+        id: 'contributions',
+        label: 'المساهمات',
+        permissions: const ['contributions.read'],
+        body: _contributionsSection,
+      ));
+    }
+
+    if (_hasAnyPermission(const ['store.read', 'store.write'])) {
+      sections.add(_AdminSection(
+        id: 'store',
+        label: 'المتجر',
+        permissions: const ['store.read', 'store.write'],
+        body: _storeSection,
+      ));
+    }
+
+    if (_isSuperAdmin) {
+      sections.add(_AdminSection(
+        id: 'permissions',
+        label: 'الصلاحيات',
+        superAdminOnly: true,
+        body: _permissionsSection,
+      ));
+    }
+
+    if (_hasAnyPermission(const [
+      'wallet.read',
+      'wallet.recharge',
+      'wallet.adjust',
+      'wallet.transactions',
+    ])) {
+      sections.add(_AdminSection(
+        id: 'wallet',
+        label: 'المحافظ',
+        permissions: const [
+          'wallet.read',
+          'wallet.recharge',
+          'wallet.adjust',
+          'wallet.transactions',
+        ],
+        body: () => const AdminWalletRechargePage(),
+      ));
+    }
+
+    return sections;
+  }
 
   Future<List<dynamic>> _readList(Future<dynamic> call) async {
     final result = await call;
@@ -577,12 +714,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     required String title,
     required int count,
     required IconData icon,
-    required int tabIndex,
+    required String sectionId,
   }) {
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => _goToTab(tabIndex),
+        onTap: () => _goToTab(_indexOfSection(sectionId)),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -633,48 +770,60 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
         const SizedBox(height: 14),
         Row(
           children: [
-            _statTile(
-              title: 'مستخدمون إداريون',
-              count: _users.length,
-              icon: Icons.people_rounded,
-              tabIndex: _tabUsers,
-            ),
-            const SizedBox(width: 10),
-            _statTile(
-              title: 'أماكن',
-              count: _places.length,
-              icon: Icons.place_rounded,
-              tabIndex: _tabPlaces,
-            ),
-            const SizedBox(width: 10),
-            _statTile(
-              title: 'مساهمات',
-              count: _contributions.length,
-              icon: Icons.rate_review_rounded,
-              tabIndex: _tabContributions,
-            ),
+            if (_hasSection('admins'))
+              _statTile(
+                title: 'مشرفون',
+                count: _users.length,
+                icon: Icons.people_rounded,
+                sectionId: 'admins',
+              ),
+            if (_hasSection('places'))
+              _statTile(
+                title: 'أماكن',
+                count: _places.length,
+                icon: Icons.place_rounded,
+                sectionId: 'places',
+              ),
+            if (_hasSection('contributions'))
+              _statTile(
+                title: 'مساهمات',
+                count: _contributions.length,
+                icon: Icons.rate_review_rounded,
+                sectionId: 'contributions',
+              ),
           ],
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _statTile(
-              title: 'عناصر المتجر',
-              count: _storeItems.length,
-              icon: Icons.storefront_rounded,
-              tabIndex: _tabStore,
+        if (_hasSection('store') ||
+            _hasSection('permissions') ||
+            _hasSection('wallet'))
+          ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (_hasSection('store'))
+                  _statTile(
+                    title: 'عناصر المتجر',
+                    count: _storeItems.length,
+                    icon: Icons.storefront_rounded,
+                    sectionId: 'store',
+                  ),
+                if (_hasSection('permissions'))
+                  _statTile(
+                    title: 'صلاحيات',
+                    count: _permissions.length,
+                    icon: Icons.security_rounded,
+                    sectionId: 'permissions',
+                  ),
+                if (_hasSection('wallet'))
+                  _statTile(
+                    title: 'محافظ',
+                    count: 0,
+                    icon: Icons.add_card_rounded,
+                    sectionId: 'wallet',
+                  ),
+              ],
             ),
-            const SizedBox(width: 10),
-            _statTile(
-              title: 'صلاحيات',
-              count: _permissions.length,
-              icon: Icons.security_rounded,
-              tabIndex: _tabPermissions,
-            ),
-            const SizedBox(width: 10),
-            const Expanded(child: SizedBox()),
           ],
-        ),
         const SizedBox(height: 20),
         const Card(
           elevation: 0,
@@ -691,14 +840,52 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     );
   }
 
+  Future<void> _openAdminManage() async {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminManagePage(
+          onChanged: _loadUsers,
+        ),
+      ),
+    );
+  }
+
   Widget _usersSection() {
     return _sectionBody(
       loading: _hasLoading,
       hasData: _users.isNotEmpty,
-      empty: 'لا يوجد مستخدمون إداريون.',
+      empty: 'لا يوجد مشرفون بعد.',
       error: _usersError,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'إدارة المشرفين (${_users.length})',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF18A99A),
+                  ),
+                  onPressed: _openAdminManage,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('إضافة مشرف'),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(18),
         itemCount: _users.length,
         itemBuilder: (context, index) {
           final user = Map<String, dynamic>.from(_users[index] as Map);
@@ -729,6 +916,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
             ),
           );
         },
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1477,6 +1667,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
 
   @override
   Widget build(BuildContext context) {
+    final tabs = <Tab>[];
+    final views = <Widget>[];
+    for (final section in _sections) {
+      tabs.add(Tab(text: section.label));
+      views.add(section.body());
+    }
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -1520,28 +1717,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
             unselectedLabelColor: const Color(0xFF596273),
             indicatorColor: const Color(0xFF18A99A),
             dividerColor: Colors.transparent,
-            tabs: const [
-              Tab(text: 'الرئيسية'),
-              Tab(text: 'المستخدمون'),
-              Tab(text: 'الأماكن'),
-              Tab(text: 'المساهمات'),
-              Tab(text: 'المتجر'),
-              Tab(text: 'الصلاحيات'),
-              Tab(text: 'المحافظ'),
-            ],
+            tabs: tabs,
           ),
         ),
         body: TabBarView(
           controller: _tabController,
-          children: [
-            _overviewSection(),
-            _usersSection(),
-            _placesSection(),
-            _contributionsSection(),
-            _storeSection(),
-            _permissionsSection(),
-            const AdminWalletRechargePage(),
-          ],
+          children: views,
         ),
       ),
     );

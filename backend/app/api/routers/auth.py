@@ -23,9 +23,11 @@ from app.schemas.user_auth import (
     UserRead,
     UserRegisterRequest,
     VerificationResponse,
+    UserAdminInfo,
 )
 from app.services.email.service import EmailService
 from app.services.user.service import UserService
+from app.services.user_admin_context import get_user_admin_context
 from app.services.verification_code_service import (
     VerificationCodeService,
     VerificationPurpose,
@@ -36,6 +38,17 @@ router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
+
+
+def _user_read_with_admin(
+    user: User,
+    admin_context: UserAdminInfo | None,
+) -> UserRead:
+    """Build a :class:`UserRead` carrying the resolved admin context."""
+
+    payload = UserRead.model_validate(user)
+    payload.admin = admin_context
+    return payload
 
 
 # ============================================================
@@ -170,10 +183,12 @@ async def login(
         token_type="user",
     )
 
+    admin_context = await get_user_admin_context(session, user.email)
+
     return AuthResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserRead.model_validate(user),
+        user=_user_read_with_admin(user, admin_context),
     )
 
 
@@ -244,10 +259,12 @@ async def verify_email(
         token_type="user",
     )
 
+    admin_context = await get_user_admin_context(session, user.email)
+
     return VerificationResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserRead.model_validate(user),
+        user=_user_read_with_admin(user, admin_context),
     )
 
 
@@ -479,8 +496,14 @@ async def reset_password(
 )
 async def get_me(
     current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    return current_user
+    admin_context = await get_user_admin_context(
+        session,
+        current_user.email,
+    )
+
+    return _user_read_with_admin(current_user, admin_context)
 
 
 # ============================================================
@@ -515,7 +538,9 @@ async def update_my_profile(
             detail=str(exc),
         ) from exc
 
-    return UserRead.model_validate(user)
+    admin_context = await get_user_admin_context(session, user.email)
+
+    return _user_read_with_admin(user, admin_context)
 
 
 # ============================================================
@@ -571,4 +596,6 @@ async def update_my_location(
         source=data.source,
     )
 
-    return UserRead.model_validate(user)
+    admin_context = await get_user_admin_context(session, user.email)
+
+    return _user_read_with_admin(user, admin_context)

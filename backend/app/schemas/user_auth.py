@@ -173,6 +173,12 @@ class PasswordResetRequest(BaseModel):
 # ============================================================
 
 
+class UserAdminInfo(BaseModel):
+    role: str | None = None
+    admin_status: str | None = None
+    permissions: list[str] = Field(default_factory=list)
+
+
 class UserRead(BaseModel):
     id: UUID
     email: EmailStr
@@ -186,6 +192,23 @@ class UserRead(BaseModel):
     location_source: str | None
     is_active: bool
     is_verified: bool
+
+    # ============================================================
+    # Admin context
+    # ============================================================
+    #
+    # Present only when the email linked to this user also matches an
+    # AdminUser account. Regular users keep this as ``None`` so the API
+    # stays backwards compatible. When present it lets the Flutter app
+    # decide whether/how to surface the "لوحة الإدارة" (admin panel)
+    # entry point. The backend is always the source of truth: every
+    # admin endpoint independently re-checks role, active status and
+    # the required permission on each request.
+    #
+    # ``admin_status`` is ``"active"`` or ``"disabled"`` (an admin account
+    # that is not active is disabled). ``permissions`` is the resolved,
+    # de-duplicated set of permission names (roles + direct assignments).
+    admin: UserAdminInfo | None = None
 
     model_config = {
         "from_attributes": True,

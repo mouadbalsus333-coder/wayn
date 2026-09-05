@@ -28,6 +28,7 @@ def _build_service(
     return AdminUserService(
         admin_user_repository=AdminUserRepository(session),
         role_repository=RoleRepository(session),
+        session=session,
     )
 
 
@@ -171,15 +172,69 @@ async def deactivate_admin_user(
 ) -> AdminUserRead:
     service = _build_service(session)
 
-    admin_user = await service.deactivate_admin_user(admin_user_id)
-
-    if admin_user is None:
+    try:
+        admin_user = await service.deactivate_admin_user(admin_user_id)
+    except ValueError as exc:
+        message = str(exc)
+        if "Admin user not found" in message:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            ) from exc
+        if "Super Admin cannot be deactivated" in message:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=message,
+            ) from exc
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Admin user not found",
-        )
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        ) from exc
 
     return admin_user
+
+
+@router.delete(
+    "/{admin_user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(require_role("super_admin")),
+    ],
+)
+async def delete_admin_user(
+    admin_user_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Remove the administrative account only.
+
+    The regular ``users`` account linked by email is intentionally
+    kept: deleting an admin must never destroy the user's normal
+    WAYN account. Role and direct-permission associations are
+    removed with the AdminUser row in a single transaction.
+    """
+    service = _build_service(session)
+
+    try:
+        await service.delete_admin_user(admin_user_id)
+    except ValueError as exc:
+        message = str(exc)
+
+        if "Admin user not found" in message:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=message,
+            ) from exc
+
+        if "Super Admin cannot be deleted" in message:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=message,
+            ) from exc
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        ) from exc
 
 
 # ============================================================

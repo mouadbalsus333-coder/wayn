@@ -18,13 +18,25 @@ PERMISSIONS = [
     ("users.read", "View users"),
     ("users.write", "Create and update users"),
     ("users.delete", "Delete users"),
+    ("users.update", "Update user profiles"),
+    ("users.disable", "Disable user accounts"),
+
     ("places.read", "View places"),
     ("places.write", "Create and update places"),
     ("places.delete", "Delete places"),
+    ("places.approve", "Approve places"),
+
     ("categories.read", "View categories"),
     ("categories.write", "Create and update categories"),
+    ("categories.delete", "Delete categories"),
+
     ("reports.read", "View reports"),
     ("reports.write", "Handle reports"),
+    ("reports.resolve", "Resolve reports"),
+
+    # Community moderation
+    ("community.read", "View community posts"),
+    ("community.moderate", "Manage community posts and reports"),
 
     # Place contributions
     ("contributions.read", "View place contributions"),
@@ -32,10 +44,19 @@ PERMISSIONS = [
     ("contributions.reject", "Reject place contributions"),
 
     # Wallet
+    ("wallet.read", "View user wallets"),
     ("wallet.recharge", "Recharge user wallets"),
+    ("wallet.adjust", "Adjust wallet balances"),
+    ("wallet.transactions", "View wallet transactions"),
 
-    # Store
+    # Store / offers
+    ("store.read", "View store content"),
     ("store.write", "Create and update store content"),
+    ("store.update", "Update store content"),
+    ("store.delete", "Delete store content"),
+
+    # Admin management
+    ("admin.manage_admins", "Manage admin accounts and their permissions"),
 ]
 
 
@@ -64,13 +85,20 @@ ROLE_PERMISSIONS = {
         "users.read",
         "users.write",
         "users.delete",
+        "users.update",
+        "users.disable",
         "places.read",
         "places.write",
         "places.delete",
+        "places.approve",
         "categories.read",
         "categories.write",
+        "categories.delete",
         "reports.read",
         "reports.write",
+        "reports.resolve",
+        "community.read",
+        "community.moderate",
 
         # Place contributions
         "contributions.read",
@@ -78,10 +106,19 @@ ROLE_PERMISSIONS = {
         "contributions.reject",
 
         # Wallet
+        "wallet.read",
         "wallet.recharge",
+        "wallet.adjust",
+        "wallet.transactions",
 
         # Store
+        "store.read",
         "store.write",
+        "store.update",
+        "store.delete",
+
+        # Admin management
+        "admin.manage_admins",
     ],
 
     "admin": [
@@ -89,10 +126,13 @@ ROLE_PERMISSIONS = {
         "users.write",
         "places.read",
         "places.write",
+        "places.approve",
         "categories.read",
         "categories.write",
         "reports.read",
         "reports.write",
+        "reports.resolve",
+        "community.read",
 
         # Place contributions
         "contributions.read",
@@ -105,6 +145,9 @@ ROLE_PERMISSIONS = {
         "places.read",
         "reports.read",
         "reports.write",
+        "reports.resolve",
+        "community.read",
+        "community.moderate",
 
         # Place contributions
         "contributions.read",

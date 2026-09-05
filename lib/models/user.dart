@@ -31,6 +31,11 @@ class User {
   final DateTime? lastActiveAt;
   final DateTime? lastLoginAt;
 
+  /// Admin context returned by the backend (``/auth/me`` etc.) when the
+  /// email of this user also belongs to an active/disabled AdminUser.
+  /// ``null`` for regular users — see [UserAdminAccess].
+  final UserAdminAccess? admin;
+
   const User({
     required this.id,
     required this.email,
@@ -54,6 +59,7 @@ class User {
     this.updatedAt,
     this.lastActiveAt,
     this.lastLoginAt,
+    this.admin,
   });
 
   factory User.fromMap(Map<String, dynamic> data) {
@@ -116,6 +122,8 @@ class User {
 
       lastLoginAt:
           _dateTimeValue(data['last_login_at']),
+
+      admin: _adminAccess(data['admin']),
     );
   }
 
@@ -159,6 +167,17 @@ class User {
 
       'last_login_at':
           lastLoginAt?.toIso8601String(),
+
+      // Keep the admin context alive across session restores so the
+      // "لوحة الإدارة" entry point survives app restarts too. The
+      // backend remains the source of truth on every /auth/me call.
+      'admin': admin == null
+          ? null
+          : {
+              'role': admin!.role,
+              'admin_status': admin!.adminStatus,
+              'permissions': admin!.permissions,
+            },
     }..removeWhere(
         (key, value) => value == null,
       );
@@ -228,5 +247,94 @@ DateTime? _dateTimeValue(dynamic value) {
 
   return DateTime.tryParse(
     value.toString(),
+  );
+}
+
+/// Admin-specific authorization context for a regular [User].
+///
+/// Mirrors the ``admin`` object the backend attaches to the user payload
+/// (see ``UserAdminInfo`` in ``backend/app/schemas/user_auth.py``). It is
+/// **only** UX input — the backend independently re-verifies role, active
+/// status and the required permission on every admin request.
+class UserAdminAccess {
+  final String? role;
+  final String? adminStatus;
+
+  /// Resolved, de-duplicated list of permission names.
+  final List<String> permissions;
+
+  const UserAdminAccess({
+    this.role,
+    this.adminStatus,
+    this.permissions = const [],
+  });
+
+  /// Whether the account is linked to an AdminUser at all.
+  ///
+  /// The backend attaches the ``admin`` object whenever the email
+  /// matches an AdminUser — even when that admin has **no roles**
+  /// (``role`` may be ``null`` while direct permissions are still
+  /// present). Presence of the object / ``admin_status`` is therefore
+  /// what makes an account an admin, not the role string.
+  bool get isAdmin => role != null || adminStatus != null;
+
+  /// An active (enabled) admin account — the only case where the
+  /// "لوحة الإدارة" entry point should be shown.
+  bool get isActiveAdmin => adminStatus == 'active';
+
+  /// A disabled admin account must not see/use the admin panel.
+  bool get isDisabledAdmin => adminStatus != null && adminStatus != 'active';
+
+  bool get isSuperAdmin => role == 'super_admin';
+
+  bool hasPermission(String name) {
+    return permissions.contains(name);
+  }
+
+  bool hasAnyPermission(List<String> names) {
+    for (final name in names) {
+      if (permissions.contains(name)) return true;
+    }
+    return false;
+  }
+}
+
+UserAdminAccess? _adminAccess(dynamic value) {
+  if (value is! Map) {
+    return null;
+  }
+
+  final map = Map<String, dynamic>.from(value);
+
+  // The backend sends the admin object for ANY account linked to an
+  // AdminUser, including admins without roles (role == null). We must
+  // not drop the context in that case — otherwise the "لوحة الإدارة"
+  // entry point silently disappears for permission-only admins.
+  final role = map['role']?.toString();
+  final status = map['admin_status']?.toString();
+
+  if ((role == null || role.isEmpty) &&
+      (status == null || status.isEmpty)) {
+    return null;
+  }
+
+  final permissions = <String>[];
+
+  final raw = map['permissions'];
+
+  if (raw is List) {
+    for (final item in List<dynamic>.from(raw)) {
+      final permission = item?.toString();
+
+      if (permission != null && permission.isNotEmpty) {
+        permissions.add(permission);
+      }
+    }
+  }
+
+  return UserAdminAccess(
+    role: role,
+    adminStatus: status,
+    permissions: permissions,
   );
 }

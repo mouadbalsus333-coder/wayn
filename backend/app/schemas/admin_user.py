@@ -13,6 +13,7 @@ class AdminUserCreate(BaseModel):
     )
     is_active: bool = True
     role_ids: list[int] | None = None
+    permission_ids: list[int] | None = None
 
 
 class AdminUserUpdate(BaseModel):

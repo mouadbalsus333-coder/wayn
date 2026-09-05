@@ -6,6 +6,8 @@ import '../../core/theme/wayn_colors.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
 import '../admin/admin_login_page.dart';
+import '../admin/dashboard/admin_dashboard_page.dart';
+import '../../core/network/wayn_api.dart';
 
 /// صفحة الإعدادات المستقلة.
 ///
@@ -201,8 +203,72 @@ class _SettingsPageState extends State<SettingsPage> {
     _message('WAYN — دليلك المحلي الذكي');
   }
 
-  void _adminPanel() {
-    _push(const AdminLoginPage());
+  Future<void> _adminPanel() async {
+    // =========================================================
+    // Admin single-sign-on
+    // =========================================================
+    // An active admin user is already authenticated with their normal
+    // account. We exchange the *user* token for an *admin* token without
+    // asking for credentials again (no email/password entry). Anything
+    // else falls back to the classic AdminLoginPage.
+    final admin = _user?.admin;
+
+    if (admin?.isActiveAdmin != true) {
+      _push(const AdminLoginPage());
+      return;
+    }
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    try {
+      final data = Map<String, dynamic>.from(
+        await waynApi.post('/api/v1/admin/auth/session'),
+      );
+
+      final token = data['access_token']?.toString();
+
+      if (token == null || token.isEmpty) {
+        _message('تعذر فتح لوحة الإدارة. حاول مرة أخرى.');
+        return;
+      }
+
+      await waynAdminApi.setAuthToken(token);
+
+      if (!mounted) return;
+
+      _push(
+        AdminDashboardPage(
+          adminName:
+              data['full_name']?.toString() ?? _user?.email ?? 'مدير',
+          role: admin?.role ?? '',
+          permissions: _permissionsFrom(data),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      _message('لم يُسمح لك بالدخول إلى لوحة الإدارة.');
+    }
+  }
+
+  List<String> _permissionsFrom(Map<String, dynamic> data) {
+    final raw = data['permissions'];
+
+    if (raw is List) {
+      final result = <String>[];
+
+      for (final item in List<dynamic>.from(raw)) {
+        final value = item?.toString();
+
+        if (value != null && value.isNotEmpty) {
+          result.add(value);
+        }
+      }
+
+      return result;
+    }
+
+    return const [];
   }
 
   // ============================================================
@@ -309,13 +375,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                 onPressed: _about,
                               ),
                               _divider(colors),
-                              _row(
-                                colors,
-                                icon: Icons.admin_panel_settings_outlined,
-                                title: 'دخول لوحة الإدارة',
-                                subtitle: 'للمستخدمين الإداريين فقط',
-                                onPressed: _adminPanel,
-                              ),
+                              if (_user?.admin?.isActiveAdmin == true)
+                                _row(
+                                  colors,
+                                  icon: Icons.admin_panel_settings_outlined,
+                                  title: 'دخول لوحة الإدارة',
+                                  subtitle: 'للمستخدمين الإداريين فقط',
+                                  onPressed: _adminPanel,
+                                ),
                             ],
                           ),
                         ],

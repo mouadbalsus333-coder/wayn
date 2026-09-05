@@ -51,3 +51,6 @@ pubcache.txt
 .venv/
 # Pytest cache
 .pytest_cache/
+
+# Local Gradle caches inside vendored/third-party packages
+third_party/**/.gradle/
