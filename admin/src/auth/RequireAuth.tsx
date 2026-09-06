@@ -1,7 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './useAuth'
+import type { ReactNode } from 'react'
 
-export function RequireAuth() {
+export function RequireAuth({ children }: { children?: ReactNode }) {
   const { status } = useAuth()
   const location = useLocation()
 
@@ -13,5 +14,5 @@ export function RequireAuth() {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
 
-  return <Outlet />
+  return children ?? <Outlet />
 }

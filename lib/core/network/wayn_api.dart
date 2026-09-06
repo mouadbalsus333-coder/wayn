@@ -6,10 +6,3 @@ import 'dart_http_api_client.dart';
 final DartHttpApiClient waynApi = DartHttpApiClient(
   baseUrl: BackendConfig.backendUrl,
 );
-
-/// Separate client for the admin session so an admin login never replaces
-/// the normal user's JWT.
-final DartHttpApiClient waynAdminApi = DartHttpApiClient(
-  baseUrl: BackendConfig.backendUrl,
-  tokenStorageKey: 'wayn_admin_access_token',
-);

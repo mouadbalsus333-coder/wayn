@@ -4,8 +4,12 @@ import { navigationItems } from '../permissions/navigation'
 import { useAuth } from '../auth/useAuth'
 
 export function Sidebar() {
-  const { hasPermission } = useAuth()
-  const visibleItems = navigationItems.filter((item) => !item.permission || hasPermission(item.permission))
+  const { hasPermission, admin } = useAuth()
+  const visibleItems = navigationItems.filter((item) => {
+    if (item.permission && !hasPermission(item.permission)) return false
+    if (item.role && !admin?.roles.includes(item.role)) return false
+    return true
+  })
 
   return (
     <aside className="sidebar">

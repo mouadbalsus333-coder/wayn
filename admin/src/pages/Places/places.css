@@ -1,0 +1,59 @@
+.places-page { max-width: 1200px; }
+.places-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.places-header h2 { margin: 6px 0 4px; font-size: clamp(22px, 3vw, 28px); letter-spacing: 0; }
+.places-header .muted { max-width: 560px; }
+
+.places-toolbar { display: grid; gap: 12px; margin-bottom: 14px; grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(140px, 180px)); }
+.places-sortbar { grid-template-columns: repeat(2, minmax(140px, 200px)); margin-bottom: 20px; }
+
+.search-field { display: flex; align-items: center; gap: 9px; min-height: 46px; padding-inline: 13px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-muted); }
+.search-field:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 4px rgba(15,118,110,.1); }
+.search-field input { flex: 1; min-width: 0; border: 0; outline: 0; color: var(--color-text); background: transparent; }
+
+.filter-field { display: grid; gap: 5px; }
+.filter-label { color: var(--color-muted); font-size: 12px; font-weight: 700; }
+.filter-field select { width: 100%; min-height: 46px; padding-inline: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); }
+
+.card { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-soft); }
+
+.places-table { overflow-x: auto; }
+.places-table table { width: 100%; border-collapse: collapse; min-width: 640px; }
+.places-table th { padding: 13px 16px; text-align: right; color: var(--color-muted); font-size: 12px; font-weight: 800; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+.places-table td { padding: 13px 16px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.places-table tbody tr:last-child td { border-bottom: 0; }
+.places-table tbody tr:hover { background: var(--color-surface-soft); }
+
+.place-name-cell { display: flex; align-items: center; gap: 12px; }
+.place-name-cell a { color: var(--color-text); text-decoration: none; }
+.place-name-cell a:hover { color: var(--color-primary); }
+.place-name-cell .place-name-info a { display: block; }
+.place-thumb { width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; object-fit: cover; }
+.place-thumb-empty { display: grid; place-items: center; background: var(--color-surface-soft); color: var(--color-muted); }
+.place-name-info { display: grid; gap: 2px; min-width: 0; }
+.place-name-info strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+
+.rating-cell { color: #b45309; font-weight: 800; white-space: nowrap; }
+.cell-muted { color: var(--color-muted); }
+
+.badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.badge-verified { color: #065f46; background: #d1fae5; }
+.badge-pending { color: #92400e; background: #fef3c7; }
+.badge-rejected { color: #b42318; background: #fee2e2; }
+.badge-unverified { color: #57534e; background: #e7e5e4; }
+.badge-active { color: #065f46; background: #d1fae5; }
+.badge-inactive { color: #57534e; background: #e7e5e4; }
+
+.pagination-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+.pagination-info { color: var(--color-muted); font-size: 13px; }
+.pagination-controls { display: flex; gap: 8px; }
+.icon-button { min-height: 40px; min-width: 40px; padding: 0; display: inline-grid; place-items: center; }
+.icon-button:disabled { opacity: .4; cursor: not-allowed; }
+
+.skeleton-row { height: 56px; margin: 0; padding: 0; border-bottom: 1px solid var(--color-border); background: linear-gradient(90deg, rgba(15,118,110,.04) 25%, rgba(15,118,110,.1) 50%, rgba(15,118,110,.04) 75%); background-size: 200% 100%; animation: shimmer 1.3s infinite; }
+.skeleton-row:last-child { border-bottom: 0; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+@media (max-width: 820px) {
+  .places-toolbar { grid-template-columns: 1fr; }
+  .places-sortbar { grid-template-columns: 1fr; }
+}
