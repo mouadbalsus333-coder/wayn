@@ -72,11 +72,21 @@ async def validation_exception_handler(
         "Validation error: %s",
         exc.errors(),
     )
+    # exc.errors() ctx can hold non-JSON-serializable values (e.g. ValueError
+    # raised by custom validators), so flatten ctx entries into strings.
+    errors = []
+    for error in exc.errors():
+        safe = {key: value for key, value in error.items() if key != "ctx"}
+        if isinstance(error.get("ctx"), dict):
+            safe["ctx"] = {
+                key: str(value) for key, value in error["ctx"].items()
+            }
+        errors.append(safe)
     return JSONResponse(
         status_code=422,
         content={
             "detail": "Validation error",
-            "errors": exc.errors(),
+            "errors": errors,
         },
     )
 

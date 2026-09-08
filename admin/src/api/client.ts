@@ -9,7 +9,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   headers.set('Accept', 'application/json')
 
   let body: BodyInit | undefined
-  if (options.body !== undefined) {
+  if (options.body instanceof FormData) {
+    // Let the browser set Content-Type (with the correct multipart boundary).
+    body = options.body
+  } else if (options.body !== undefined) {
     headers.set('Content-Type', 'application/json')
     body = JSON.stringify(options.body)
   }

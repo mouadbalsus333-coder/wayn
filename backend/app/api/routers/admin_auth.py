@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.admin_auth import (
     get_current_admin,
-    get_admin_permissions,
     require_permission,
+    resolve_admin_permission_names,
 )
 from app.core.config import settings
 from app.api.dependencies.auth import get_current_user
@@ -30,8 +30,9 @@ router = APIRouter(
 )
 
 
-def _admin_roles_and_permissions(
+async def _admin_roles_and_permissions(
     admin_user: AdminUser,
+    session: AsyncSession,
 ) -> tuple[list[str], list[str]]:
     roles = sorted(
         {
@@ -40,7 +41,7 @@ def _admin_roles_and_permissions(
             if role.is_active
         }
     )
-    permissions = sorted(get_admin_permissions(admin_user))
+    permissions = await resolve_admin_permission_names(admin_user, session)
     return roles, permissions
 
 
@@ -87,7 +88,7 @@ async def admin_login(
 ) -> AdminLoginResponse:
 
     admin_user = await _authenticate_admin(data, session)
-    roles, permissions = _admin_roles_and_permissions(admin_user)
+    roles, permissions = await _admin_roles_and_permissions(admin_user, session)
     access_token = _create_admin_token(admin_user)
 
     return AdminLoginResponse(
@@ -111,7 +112,7 @@ async def admin_web_login(
     session: AsyncSession = Depends(get_session),
 ) -> AdminWebLoginResponse:
     admin_user = await _authenticate_admin(data, session)
-    roles, permissions = _admin_roles_and_permissions(admin_user)
+    roles, permissions = await _admin_roles_and_permissions(admin_user, session)
 
     response.set_cookie(
         key=settings.admin_cookie_name,
@@ -179,8 +180,9 @@ async def create_admin_session(
         }
     )
 
-    permissions = sorted(
-        get_admin_permissions(admin_user)
+    permissions = await resolve_admin_permission_names(
+        admin_user,
+        session,
     )
 
     access_token = _create_admin_token(admin_user)
@@ -199,6 +201,7 @@ async def create_admin_session(
 @router.get("/me")
 async def admin_me(
     admin_user: AdminUser = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
 ):
     return {
         "admin_id": admin_user.id,
@@ -211,8 +214,9 @@ async def admin_me(
                 if role.is_active
             }
         ),
-        "permissions": sorted(
-            get_admin_permissions(admin_user)
+        "permissions": await resolve_admin_permission_names(
+            admin_user,
+            session,
         ),
     }
 

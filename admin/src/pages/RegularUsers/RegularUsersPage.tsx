@@ -77,7 +77,7 @@ export function RegularUsersPage() {
     <div className="rusers-page">
       <header className="rusers-header">
         <div>
-          <h2>المستخدمون العاديون</h2>
+          <h2>المستخدمين</h2>
           <p className="muted">
             إدارة حسابات مستخدمي تطبيق WAYN: البحث، الفلترة، ومتابعة حالة الحسابات.
           </p>

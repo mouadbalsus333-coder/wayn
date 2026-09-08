@@ -33,7 +33,7 @@ export function AdminUserDetailsPage() {
       <div className="users-page">
         <div className="state-panel">
           <Loader2 className="spin" size={28} />
-          <p>جارٍ تحميل بيانات المستخدم…</p>
+          <p>جارٍ تحميل بيانات المشرف…</p>
         </div>
       </div>
     )
@@ -43,9 +43,9 @@ export function AdminUserDetailsPage() {
     const notFound = error instanceof Error && /not found/i.test(error.message)
     return (
       <div className="users-page">
-        <Link className="back-link" to="/users"><ArrowRight size={16} /> العودة إلى مستخدمي الإدارة</Link>
+        <Link className="back-link" to="/users"><ArrowRight size={16} /> العودة إلى المشرفين</Link>
         <div className="state-panel state-panel-error">
-          <p>{notFound ? 'مستخدم الإدارة غير موجود.' : userFacingError(error)}</p>
+          <p>{notFound ? 'المشرف غير موجود.' : userFacingError(error)}</p>
           {!notFound && (
             <button type="button" className="ghost-button" onClick={() => refetch()}>
               <RefreshCw size={16} />
@@ -63,7 +63,7 @@ export function AdminUserDetailsPage() {
 
   return (
     <div className="users-page place-actions-page">
-      <Link className="back-link" to="/users"><ArrowRight size={16} /> العودة إلى مستخدمي الإدارة</Link>
+      <Link className="back-link" to="/users"><ArrowRight size={16} /> العودة إلى المشرفين</Link>
 
       <div className="place-hero-card">
         <span className="user-avatar user-avatar-lg" aria-hidden="true">
@@ -97,22 +97,15 @@ export function AdminUserDetailsPage() {
               <Pencil size={16} /> تعديل البيانات
             </button>
             {user.is_active ? (
-              isSuperAdminTarget ? (
-                <span className="super-admin-note">
-                  <ShieldAlert size={16} />
-                  Super Admin لا يمكن تعطيله (محمي في الـ Backend).
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="danger-button"
-                  onClick={() => setConfirmAction('deactivate')}
-                  disabled={statusMutation.isPending}
-                >
-                  <ShieldAlert size={16} />
-                  تعطيل الحساب
-                </button>
-              )
+              <button
+                type="button"
+                className="danger-button"
+                onClick={() => setConfirmAction('deactivate')}
+                disabled={statusMutation.isPending}
+              >
+                <ShieldAlert size={16} />
+                تعطيل الحساب
+              </button>
             ) : (
               <button
                 type="button"
@@ -136,6 +129,12 @@ export function AdminUserDetailsPage() {
           {isSelf && (
             <p className="self-note">
               هذا حسابك الخاص؛ تغيير الحالة سيُنهي جلستك الحالية فورًا (token_version).
+            </p>
+          )}
+          {isSuperAdminTarget && (
+            <p className="super-admin-note">
+              <ShieldAlert size={16} />
+              آخر مشرف رئيسي نشط محمي في الـ Backend ولا يمكن تعطيله أو إزالة دوره.
             </p>
           )}
           {mutationError && <p className="mutation-error">{mutationError}</p>}

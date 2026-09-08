@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.store_item import (
     StoreItemCurrency,
@@ -260,6 +260,25 @@ class StoreBannerCreate(BaseModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
 
+    @field_validator("target_url")
+    @classmethod
+    def validate_target_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not value.startswith(("http://", "https://")):
+            raise ValueError("target_url must be an http(s) URL")
+        return value
+
+    @model_validator(mode="after")
+    def validate_window(self) -> "StoreBannerCreate":
+        if (
+            self.starts_at is not None
+            and self.ends_at is not None
+            and self.ends_at < self.starts_at
+        ):
+            raise ValueError("ends_at must not be earlier than starts_at")
+        return self
+
 
 class StoreBannerUpdate(BaseModel):
     title_ar: str | None = Field(
@@ -288,6 +307,25 @@ class StoreBannerUpdate(BaseModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
 
+    @field_validator("target_url")
+    @classmethod
+    def validate_target_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not value.startswith(("http://", "https://")):
+            raise ValueError("target_url must be an http(s) URL")
+        return value
+
+    @model_validator(mode="after")
+    def validate_window(self) -> "StoreBannerUpdate":
+        if (
+            self.starts_at is not None
+            and self.ends_at is not None
+            and self.ends_at < self.starts_at
+        ):
+            raise ValueError("ends_at must not be earlier than starts_at")
+        return self
+
 
 class StoreBannerRead(BaseModel):
     model_config = ConfigDict(
@@ -310,6 +348,38 @@ class StoreBannerRead(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+
+
+# ============================================================
+# Store Ads (rotating banners for the app)
+# ============================================================
+
+STORE_ADS_ROTATION_MIN_SECONDS = 2
+STORE_ADS_ROTATION_MAX_SECONDS = 60
+
+
+class StoreAdsSettingsRead(BaseModel):
+    rotation_seconds: int = Field(
+        ge=STORE_ADS_ROTATION_MIN_SECONDS,
+        le=STORE_ADS_ROTATION_MAX_SECONDS,
+    )
+
+
+class StoreAdsSettingsUpdate(BaseModel):
+    rotation_seconds: int = Field(
+        ge=STORE_ADS_ROTATION_MIN_SECONDS,
+        le=STORE_ADS_ROTATION_MAX_SECONDS,
+    )
+
+
+class StoreAdsPublicRead(BaseModel):
+    """Public payload for the Flutter store: active ads only + rotation speed."""
+
+    ads: list[StoreBannerRead]
+    rotation_seconds: int = Field(
+        ge=STORE_ADS_ROTATION_MIN_SECONDS,
+        le=STORE_ADS_ROTATION_MAX_SECONDS,
+    )
 
 
 class StorePurchaseRead(BaseModel):

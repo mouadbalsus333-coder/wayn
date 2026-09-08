@@ -1,3 +1,5 @@
+import '../core/config/backend_config.dart';
+
 class StoreCategory {
   final String id, nameAr, nameEn;
   final String? descriptionAr, descriptionEn, iconUrl, imageUrl;
@@ -129,12 +131,30 @@ class StoreBanner {
     this.titleEn,
     this.targetUrl,
   });
-  factory StoreBanner.fromMap(Map<String, dynamic> m) => StoreBanner(
+    factory StoreBanner.fromMap(Map<String, dynamic> m) => StoreBanner(
     id: m['id'].toString(),
-    imageUrl: m['image_url']?.toString() ?? '',
+    imageUrl:
+        BackendConfig.resolveMediaUrl(m['image_url']?.toString()) ??
+        m['image_url']?.toString() ??
+        '',
     titleAr: m['title_ar']?.toString(),
     titleEn: m['title_en']?.toString(),
     targetUrl: m['target_url']?.toString(),
+  );
+}
+
+/// Response of `GET /api/v1/store-ads`: active ads + rotation speed.
+class StoreAds {
+  final List<StoreBanner> ads;
+  final int rotationSeconds;
+  const StoreAds({required this.ads, required this.rotationSeconds});
+  factory StoreAds.fromMap(Map<String, dynamic> m) => StoreAds(
+    ads: (m['ads'] as List? ?? const [])
+        .map(
+          (e) => StoreBanner.fromMap(Map<String, dynamic>.from(e as Map)),
+        )
+        .toList(growable: false),
+    rotationSeconds: _int(m['rotation_seconds']),
   );
 }
 

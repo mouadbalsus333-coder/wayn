@@ -10,6 +10,7 @@ import { ContributionsPage } from '../pages/Contributions/ContributionsPage'
 import { CategoriesPage } from '../pages/Categories/CategoriesPage'
 import { PermissionsPage } from '../pages/Permissions/PermissionsPage'
 import { StorePage } from '../pages/Store/StorePage'
+import { StoreAdsPage } from '../pages/StoreAds/StoreAdsPage'
 import { WalletPage } from '../pages/Wallet/WalletPage'
 import { RequirePermission } from '../auth/RequirePermission'
 import { AdminLayout } from '../layouts/AdminLayout'
@@ -156,6 +157,14 @@ export function AppRouter() {
           element={
             <RequirePermission permission={permissions.storeRead}>
               <StorePage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/store-ads"
+          element={
+            <RequirePermission permission={permissions.storeRead}>
+              <StoreAdsPage />
             </RequirePermission>
           }
         />

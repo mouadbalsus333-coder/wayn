@@ -19,10 +19,19 @@ from app.api.dependencies.admin_auth import require_permission
 from app.api.dependencies.auth import get_current_user
 from app.core.config import settings
 from app.core.database import get_session
+from app.repositories.app_setting_repository import (
+    STORE_ADS_ROTATION_SECONDS_KEY,
+    AppSettingRepository,
+)
 from app.repositories.store_banner_repository import StoreBannerRepository
 from app.repositories.store_category_repository import StoreCategoryRepository
 from app.repositories.store_item_repository import StoreItemRepository
 from app.schemas.store import (
+    STORE_ADS_ROTATION_MAX_SECONDS,
+    STORE_ADS_ROTATION_MIN_SECONDS,
+    StoreAdsPublicRead,
+    StoreAdsSettingsRead,
+    StoreAdsSettingsUpdate,
     StoreBannerCreate,
     StoreBannerRead,
     StoreBannerUpdate,
@@ -36,11 +45,11 @@ from app.schemas.store import (
     StorePurchaseRead,
 )
 from app.models.user import User
+from app.services.media.media_service import media_service
 from app.services.store_banner_service import StoreBannerService
 from app.services.store_category_service import StoreCategoryService
 from app.services.store_item_service import StoreItemService
 from app.services.store_purchase_service import StorePurchaseService
-from app.services.media.media_service import media_service
 
 
 router = APIRouter()
@@ -205,6 +214,7 @@ async def purchase_store_item(
     except ValueError as exc:
         message = str(exc)
         not_found = message == "Store item not found"
+
         raise HTTPException(
             status_code=(
                 status.HTTP_404_NOT_FOUND
@@ -218,7 +228,7 @@ async def purchase_store_item(
         id=result.purchase.id,
         item=result.item,
         currency=result.purchase.currency,
-        amount=result.purchase.amount,
+        amount=result.amount,
         quantity=result.purchase.quantity,
         owned_quantity=result.ownership.quantity,
         balance_after=result.balance_after,
@@ -301,7 +311,7 @@ async def get_store_banner(
 
 
 # ============================================================
-# Admin Store Categories
+# Admin Store Media
 # ============================================================
 
 
@@ -323,6 +333,7 @@ async def upload_admin_store_image(
         )
 
     extension = file.filename.rsplit(".", 1)[-1].lower()
+
     if extension not in _STORE_IMAGE_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -330,11 +341,13 @@ async def upload_admin_store_image(
         )
 
     file_bytes = await file.read(_STORE_IMAGE_MAX_BYTES + 1)
+
     if len(file_bytes) > _STORE_IMAGE_MAX_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="Image size must not exceed 10 MB",
         )
+
     if not file_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -366,11 +379,15 @@ async def upload_admin_store_image(
         )
     else:
         image_url = (
-            f"{str(request.base_url).rstrip('/')}/"
             f"api/v1/media/{stored_key.lstrip('/')}"
         )
 
     return {"image_url": image_url}
+
+
+# ============================================================
+# Admin Store Categories
+# ============================================================
 
 
 @router.post(
@@ -656,3 +673,152 @@ async def delete_admin_store_banner(
         )
 
     await service.delete_banner(banner)
+
+
+# ============================================================
+# Store Ads (rotating banners for the app)
+# ============================================================
+
+
+def _clamp_rotation_seconds(raw_value: str | None) -> int:
+    """Parse the stored rotation value; fall back to 5s on bad data."""
+    try:
+        value = int(raw_value) if raw_value is not None else 5
+    except (TypeError, ValueError):
+        return 5
+
+    return max(
+        STORE_ADS_ROTATION_MIN_SECONDS,
+        min(STORE_ADS_ROTATION_MAX_SECONDS, value),
+    )
+
+
+def _normalize_media_url(raw_url: str) -> str:
+    """Normalise stored media paths for clients.
+
+    Absolute URLs are preserved. Relative media keys are resolved either
+    against the configured public R2 URL or the backend media endpoint.
+
+    Supported stored formats include:
+    - media/store/<file>.webp
+    - /media/store/<file>.webp
+    - api/v1/media/store/<file>.webp
+    - /api/v1/media/store/<file>.webp
+    - http://localhost:8000/api/v1/media/<file>.webp
+    """
+    if not raw_url:
+        return raw_url
+
+    normalized = raw_url.replace("\\", "/").strip()
+
+    lowered = normalized.lower()
+
+    if lowered.startswith(("http://", "https://")):
+        if (
+            lowered.startswith("http://localhost")
+            or lowered.startswith("https://localhost")
+        ):
+            from urllib.parse import urlparse
+
+            path = urlparse(normalized).path
+
+            if path.startswith("/api/v1/media/"):
+                normalized = path[len("/api/v1/media/") :]
+            elif path.startswith("/media/"):
+                normalized = path[len("/media/") :]
+            else:
+                return normalized
+        else:
+            return normalized
+
+    normalized = normalized.lstrip("/")
+
+    if normalized.startswith("api/v1/media/"):
+        normalized = normalized[len("api/v1/media/") :]
+    elif normalized.startswith("media/"):
+        normalized = normalized[len("media/") :]
+
+    if settings.r2_public_url:
+        return (
+            f"{settings.r2_public_url.rstrip('/')}/"
+            f"{normalized.lstrip('/')}"
+        )
+
+    return f"/api/v1/media/{normalized.lstrip('/')}"
+
+
+@router.get(
+    "/store-ads",
+    response_model=StoreAdsPublicRead,
+)
+async def get_store_ads(
+    session: AsyncSession = Depends(get_session),
+) -> StoreAdsPublicRead:
+    """Public, read-only: active ads sorted by sort_order + rotation speed."""
+    repository = StoreBannerRepository(session)
+    service = StoreBannerService(repository)
+
+    ads = await service.get_banners(active_only=True)
+
+    # Normalise image_url so all clients receive a usable media URL.
+    for ad in ads:
+        ad.image_url = _normalize_media_url(ad.image_url)
+
+    settings_repository = AppSettingRepository(session)
+
+    rotation_seconds = _clamp_rotation_seconds(
+        await settings_repository.get_value(
+            STORE_ADS_ROTATION_SECONDS_KEY,
+        )
+    )
+
+    return StoreAdsPublicRead(
+        ads=ads,
+        rotation_seconds=rotation_seconds,
+    )
+
+
+@router.get(
+    "/admin/store-ads/settings",
+    response_model=StoreAdsSettingsRead,
+    dependencies=[
+        Depends(require_permission("store.read")),
+    ],
+)
+async def get_store_ads_settings(
+    session: AsyncSession = Depends(get_session),
+) -> StoreAdsSettingsRead:
+    repository = AppSettingRepository(session)
+
+    rotation_seconds = _clamp_rotation_seconds(
+        await repository.get_value(
+            STORE_ADS_ROTATION_SECONDS_KEY,
+        )
+    )
+
+    return StoreAdsSettingsRead(
+        rotation_seconds=rotation_seconds,
+    )
+
+
+@router.put(
+    "/admin/store-ads/settings",
+    response_model=StoreAdsSettingsRead,
+    dependencies=[
+        Depends(require_permission("store.write")),
+    ],
+)
+async def update_store_ads_settings(
+    data: StoreAdsSettingsUpdate,
+    session: AsyncSession = Depends(get_session),
+) -> StoreAdsSettingsRead:
+    repository = AppSettingRepository(session)
+
+    await repository.set_value(
+        STORE_ADS_ROTATION_SECONDS_KEY,
+        str(data.rotation_seconds),
+    )
+
+    return StoreAdsSettingsRead(
+        rotation_seconds=data.rotation_seconds,
+    )

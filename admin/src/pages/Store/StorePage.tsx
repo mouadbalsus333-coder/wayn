@@ -267,7 +267,7 @@ function FormModal({
 }
 
 /** Text input for an image URL + real upload via `POST /admin/store/media/image`. */
-function ImageField({
+export function ImageField({
   id,
   label,
   value,
@@ -320,7 +320,7 @@ function ImageField({
   )
 }
 
-function DeleteModal({
+export function DeleteModal({
   title,
   message,
   isPending,

@@ -5,6 +5,7 @@
 # ============================================================
 
 from app.models.admin_user import AdminUser
+from app.models.app_setting import AppSetting
 from app.models.permission import Permission
 from app.models.role import Role
 
@@ -94,6 +95,7 @@ __all__ = [
     # ========================================================
 
     "AdminUser",
+    "AppSetting",
     "Role",
     "Permission",
 

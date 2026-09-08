@@ -1,5 +1,4 @@
 import { apiRequest } from './client'
-import { ApiError } from './errors'
 import type {
   StoreBannerCreatePayload,
   StoreBannerRead,
@@ -12,7 +11,6 @@ import type {
   StoreItemUpdatePayload,
 } from '../types/store'
 
-const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 // ============================================================
 // Lists (public endpoints — include inactive rows by default)
@@ -103,30 +101,29 @@ export function deleteStoreBanner(id: string): Promise<void> {
 }
 
 // ============================================================
-// Media upload (`POST /api/v1/admin/store/media/image`) — multipart.
-// Returns `{ image_url }`. Requires `store.write`.
+// Store Ads settings (rotation speed) — admin
 // ============================================================
+
+export type StoreAdsSettings = { rotation_seconds: number }
+
+export function getStoreAdsSettings(): Promise<StoreAdsSettings> {
+  return apiRequest<StoreAdsSettings>('/api/v1/admin/store-ads/settings')
+}
+
+export function updateStoreAdsSettings(payload: StoreAdsSettings): Promise<StoreAdsSettings> {
+  return apiRequest<StoreAdsSettings>('/api/v1/admin/store-ads/settings', {
+    method: 'PUT',
+    body: payload,
+  })
+}
+
 
 export async function uploadStoreImage(file: File): Promise<{ image_url: string }> {
   const form = new FormData()
   form.append('file', file)
 
-  const response = await fetch(`${apiUrl}/api/v1/admin/store/media/image`, {
+  return apiRequest<{ image_url: string }>('/api/v1/admin/store/media/image', {
     method: 'POST',
     body: form,
-    credentials: 'include',
   })
-
-  if (!response.ok) {
-    let message = 'تعذر رفع الصورة.'
-    try {
-      const payload = (await response.json()) as { detail?: string }
-      if (payload.detail) message = payload.detail
-    } catch {
-      // keep default
-    }
-    throw new ApiError(response.status, message)
-  }
-
-  return (await response.json()) as { image_url: string }
-}
+}

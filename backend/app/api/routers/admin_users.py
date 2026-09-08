@@ -16,7 +16,10 @@ from app.schemas.admin_user import (
 from app.schemas.admin_user_permission import AdminUserPermissionRead
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.role import RoleRead
-from app.services.admin_user_service import AdminUserService
+from app.services.admin_user_service import (
+    LAST_SUPER_ADMIN_MSG,
+    AdminUserService,
+)
 
 
 router = APIRouter(
@@ -32,6 +35,25 @@ def _build_service(
         admin_user_repository=AdminUserRepository(session),
         role_repository=RoleRepository(session),
         session=session,
+    )
+
+
+def _value_error_to_http(message: str) -> HTTPException:
+    """Map service ValueError messages to HTTP errors with 409 for the
+    protected "last active super admin" case."""
+    if message == LAST_SUPER_ADMIN_MSG:
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=message,
+        )
+    if "Admin user not found" in message:
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=message,
+        )
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=message,
     )
 
 
@@ -199,21 +221,7 @@ async def deactivate_admin_user(
     try:
         admin_user = await service.deactivate_admin_user(admin_user_id)
     except ValueError as exc:
-        message = str(exc)
-        if "Admin user not found" in message:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=message,
-            ) from exc
-        if "Super Admin cannot be deactivated" in message:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=message,
-            ) from exc
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message,
-        ) from exc
+        raise _value_error_to_http(str(exc)) from exc
 
     return admin_user
 
@@ -308,18 +316,7 @@ async def replace_admin_user_roles(
             data.role_ids,
         )
     except ValueError as exc:
-        message = str(exc)
-
-        if "Admin user not found" in message:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=message,
-            ) from exc
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message,
-        ) from exc
+        raise _value_error_to_http(str(exc)) from exc
 
 
 @router.post(
@@ -342,18 +339,7 @@ async def add_admin_user_role(
             role_id,
         )
     except ValueError as exc:
-        message = str(exc)
-
-        if "Admin user not found" in message:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=message,
-            ) from exc
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message,
-        ) from exc
+        raise _value_error_to_http(str(exc)) from exc
 
 
 @router.delete(
@@ -376,18 +362,7 @@ async def remove_admin_user_role(
             role_id,
         )
     except ValueError as exc:
-        message = str(exc)
-
-        if "Admin user not found" in message:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=message,
-            ) from exc
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message,
-        ) from exc
+        raise _value_error_to_http(str(exc)) from exc
 
 
 # ============================================================

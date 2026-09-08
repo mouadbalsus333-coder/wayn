@@ -60,11 +60,11 @@ export function AdminUsersPage() {
       <header className="places-header">
         <div>
           <p className="eyebrow">إدارة النظام</p>
-          <h2>مستخدمو الإدارة</h2>
+          <h2>المشرفين</h2>
           <p className="muted">حسابات فريق الإدارة وأدوارهم وصلاحياتهم. متاحة لـ Super Admin فقط.</p>
         </div>
         <Link to="/users/new" className="primary-button">
-          <UserPlus size={16} /> مستخدم جديد
+          <UserPlus size={16} /> مشرف جديد
         </Link>
         {hasFilters && (
           <button type="button" className="ghost-button" onClick={resetFilters}>
@@ -81,7 +81,7 @@ export function AdminUsersPage() {
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="ابحث بالاسم أو البريد الإلكتروني…"
-            aria-label="بحث في مستخدمي الإدارة"
+            aria-label="بحث في المشرفين"
           />
         </div>
 
@@ -112,7 +112,7 @@ export function AdminUsersPage() {
       {isPending ? (
         <div className="state-panel">
           <Loader2 className="spin" size={28} />
-          <p>جارٍ تحميل مستخدمي الإدارة…</p>
+          <p>جارٍ تحميل المشرفين…</p>
         </div>
       ) : isError ? (
         <div className="state-panel state-panel-error">
@@ -125,7 +125,7 @@ export function AdminUsersPage() {
       ) : data.items.length === 0 ? (
         <div className="state-panel">
           <ShieldCheck size={26} />
-          <p>{hasFilters ? 'لا توجد نتائج مطابقة لعوامل التصفية.' : 'لا يوجد مستخدمو إدارة بعد.'}</p>
+          <p>{hasFilters ? 'لا توجد نتائج مطابقة لعوامل التصفية.' : 'لا يوجد مشرفون بعد.'}</p>
         </div>
       ) : (
         <>
@@ -133,7 +133,7 @@ export function AdminUsersPage() {
             <table className="places-table">
               <thead>
                 <tr>
-                  <th>المستخدم</th>
+                  <th>المشرف</th>
                   <th>الأدوار</th>
                   <th>الصلاحيات</th>
                   <th>الحالة</th>

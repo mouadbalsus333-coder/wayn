@@ -10,10 +10,45 @@ from app.core.database import get_session
 from app.core.config import settings
 from app.core.security import decode_access_token
 from app.models.admin_user import AdminUser
+from app.models.permission import Permission
 from app.models.role import Role
 
 
 security = HTTPBearer(auto_error=False)
+
+
+# ============================================================
+# Super Admin is treated as a wildcard at the authorization layer.
+# An active `super_admin` implicitly holds EVERY permission in the
+# catalog — including ones created in the future — so it never loses
+# access when a new permission is introduced.
+# ============================================================
+
+SUPER_ADMIN_ROLE = "super_admin"
+
+
+def has_super_admin_role(admin_user: AdminUser) -> bool:
+    return any(
+        role.is_active and role.name == SUPER_ADMIN_ROLE
+        for role in admin_user.roles
+    )
+
+
+async def resolve_admin_permission_names(
+    admin_user: AdminUser,
+    session: AsyncSession,
+) -> list[str]:
+    """Return the permission names exposed for this admin.
+
+    For an active super_admin this is *all* catalog permissions, so the
+    UI (sidebar/buttons filtered by `hasPermission`) shows everything and
+    stays correct as new permissions are added. Other admins get their
+    resolved union (role permissions + direct permissions).
+    """
+    if has_super_admin_role(admin_user):
+        result = await session.execute(select(Permission.name))
+        return sorted({row[0] for row in result.all()})
+    return sorted(get_admin_permissions(admin_user))
 
 
 async def get_current_admin(
@@ -172,6 +207,10 @@ def require_permission(permission_name: str):
     async def permission_checker(
         admin_user: AdminUser = Depends(get_current_admin),
     ) -> AdminUser:
+
+        # An active super_admin implicitly has every permission.
+        if has_super_admin_role(admin_user):
+            return admin_user
 
         permissions = get_admin_permissions(
             admin_user

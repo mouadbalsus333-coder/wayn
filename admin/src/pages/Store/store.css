@@ -50,6 +50,26 @@
 .image-upload-button {
   position: relative;
   display: inline-flex;
+}
+
+/* ============================================================
+   Store Ads page
+   ============================================================ */
+
+.ads-settings-card { margin-bottom: 18px; padding: 18px 20px; }
+.ads-settings-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.ads-settings-head h3 { font-size: 15px; margin: 0; }
+.ads-settings-row { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.ads-settings-row .form-field { min-width: 260px; }
+.ads-thumb { width: 72px; height: 40px; object-fit: cover; border-radius: 8px; border: 1px solid var(--color-border); }
+.ads-preview { width: 220px; height: 100px; margin-bottom: 8px; }
+.ads-toggle-field { display: flex; align-items: center; gap: 10px; }
+.ads-toggle-field label { margin: 0; }
+.badge { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.badge-active { background: #e3f7ef; color: #0c7a4d; }
+.badge-muted { background: #f1f2f4; color: #6b7280; }
+.badge-scheduled { background: #fdeee3; color: #b4690e; }
+.badge-expired { background: #fbe9e9; color: #b3261e; }
   align-items: center;
   gap: 0.4rem;
   cursor: pointer;

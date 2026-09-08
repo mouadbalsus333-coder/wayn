@@ -49,13 +49,13 @@ export function AdminUserCreatePage() {
   return (
     <div className="users-page place-actions-page">
       <Link className="back-link" to="/users">
-        <ArrowRight size={16} /> العودة إلى مستخدمي الإدارة
+        <ArrowRight size={16} /> العودة إلى المشرفين
       </Link>
 
       <header className="places-header">
         <div>
           <p className="eyebrow">إدارة النظام</p>
-          <h2>إضافة مستخدم إدارة</h2>
+          <h2>إضافة مشرف</h2>
           <p className="muted">
             يمكنك تعيين الأدوار والصلاحيات مباشرة بعد الإنشاء من صفحة التفاصيل.
           </p>
@@ -64,7 +64,7 @@ export function AdminUserCreatePage() {
 
       {createMutation.isError && (
         <div className="mutation-error" role="alert">
-          {userFacingError(createMutation.error, 'تعذر إنشاء مستخدم الإدارة.')}
+          {userFacingError(createMutation.error, 'تعذر إنشاء المشرف.')}
         </div>
       )}
 
@@ -97,7 +97,7 @@ export function AdminUserCreatePage() {
           <Link className="ghost-button" to="/users">إلغاء</Link>
           <button type="button" className="primary-button" disabled={createMutation.isPending} onClick={submit}>
             {createMutation.isPending ? <Loader2 className="spin" size={16} /> : <UserPlus size={16} />}
-            {createMutation.isPending ? 'جارٍ الإنشاء…' : 'إنشاء المستخدم'}
+            {createMutation.isPending ? 'جارٍ الإنشاء…' : 'إنشاء المشرف'}
           </button>
         </div>
       </div>

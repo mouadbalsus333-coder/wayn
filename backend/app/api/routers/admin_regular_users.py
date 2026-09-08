@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies.admin_auth import (
     get_admin_permissions,
     get_current_admin,
+    has_super_admin_role,
 )
 from app.core.database import get_session
 from app.models.user import AccountStatus
@@ -31,6 +32,9 @@ def _service(session: AsyncSession) -> UserService:
 
 
 def _require_permission(admin_user, permission: str) -> None:
+    # An active super_admin implicitly has every permission.
+    if has_super_admin_role(admin_user):
+        return
     if permission not in get_admin_permissions(admin_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

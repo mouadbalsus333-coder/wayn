@@ -48,13 +48,8 @@ class StoreService {
         .toList(growable: false);
   }
 
-  Future<List<StoreBanner>> banners() async {
-    final d = await waynApi.get(
-      '/api/v1/store/banners',
-      queryParams: {'active_only': true},
-    );
-    return (d as List)
-        .map((e) => StoreBanner.fromMap(Map<String, dynamic>.from(e)))
-        .toList();
+  Future<StoreAds> storeAds() async {
+    final d = await waynApi.get('/api/v1/store-ads');
+    return StoreAds.fromMap(Map<String, dynamic>.from(d as Map));
   }
 }

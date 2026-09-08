@@ -1,7 +1,10 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies.admin_auth import get_admin_permissions
+from app.api.dependencies.admin_auth import (
+    get_admin_permissions,
+    has_super_admin_role,
+)
 from app.core.security import hash_password
 from app.models.admin_user import AdminUser
 from app.models.permission import Permission
@@ -16,6 +19,12 @@ from app.schemas.admin_user import (
 )
 from app.services.wallet.service import WalletService
 
+# Message returned (as HTTP 409) when an operation would remove the
+# super-admin role from — or deactivate — the last active super admin.
+LAST_SUPER_ADMIN_MSG = (
+    "لا يمكن إزالة صلاحيات Super Admin من آخر مشرف رئيسي نشط في النظام"
+)
+
 
 class AdminUserService:
     def __init__(
@@ -28,7 +37,7 @@ class AdminUserService:
         self.role_repository = role_repository
         self.session = session
 
-    def _to_read(
+    async def _to_read(
         self,
         admin_user: AdminUser,
     ) -> AdminUserRead:
@@ -40,8 +49,8 @@ class AdminUserService:
             }
         )
 
-        permission_names = sorted(
-            get_admin_permissions(admin_user)
+        permission_names = await self._resolved_permission_names(
+            admin_user
         )
 
         return AdminUserRead(
@@ -52,6 +61,38 @@ class AdminUserService:
             roles=role_names,
             permissions=permission_names,
         )
+
+    async def _resolved_permission_names(
+        self,
+        admin_user: AdminUser,
+    ) -> list[str]:
+        """All catalog permissions for active super admins, else resolved union."""
+        if has_super_admin_role(admin_user):
+            result = await self.session.execute(
+                select(Permission.name)
+            )
+            return sorted({row[0] for row in result.all()})
+        return sorted(get_admin_permissions(admin_user))
+
+    async def _active_super_admin_count(
+        self,
+        *,
+        exclude_admin_user_id: int | None = None,
+    ) -> int:
+        """Number of active admin users holding an active super_admin role."""
+        query = (
+            select(func.count(AdminUser.id))
+            .join(AdminUser.roles)
+            .where(
+                AdminUser.is_active.is_(True),
+                Role.is_active.is_(True),
+                Role.name == "super_admin",
+            )
+        )
+        if exclude_admin_user_id is not None:
+            query = query.where(AdminUser.id != exclude_admin_user_id)
+        total = int((await self.session.execute(query)).scalar_one())
+        return total
 
     async def list_admin_users_page(
         self,
@@ -70,7 +111,7 @@ class AdminUserService:
             role=role,
         )
 
-        return [self._to_read(user) for user in users], total
+        return [await self._to_read(user) for user in users], total
 
     async def get_admin_user(
         self,
@@ -83,7 +124,7 @@ class AdminUserService:
         if user is None:
             return None
 
-        return self._to_read(user)
+        return await self._to_read(user)
 
     async def _generate_username(self, email: str) -> str:
         """Derive a unique, valid ``users.username`` from an email.
@@ -247,7 +288,7 @@ class AdminUserService:
                 "Admin user could not be reloaded after creation"
             )
 
-        return self._to_read(admin_user)
+        return await self._to_read(admin_user)
 
     async def update_admin_user(
         self,
@@ -262,6 +303,18 @@ class AdminUserService:
             return None
 
         update_data = data.model_dump(exclude_unset=True)
+
+        if (
+            update_data.get("is_active") is False
+            and admin_user.is_active
+            and has_super_admin_role(admin_user)
+            and await self._active_super_admin_count(
+                exclude_admin_user_id=admin_user.id
+            )
+            == 0
+        ):
+            raise ValueError(LAST_SUPER_ADMIN_MSG)
+
         invalidate_tokens = False
 
         if "password" in update_data:
@@ -308,7 +361,7 @@ class AdminUserService:
         if admin_user is None:
             return None
 
-        return self._to_read(admin_user)
+        return await self._to_read(admin_user)
 
     async def activate_admin_user(
         self,
@@ -336,7 +389,7 @@ class AdminUserService:
         if admin_user is None:
             return None
 
-        return self._to_read(admin_user)
+        return await self._to_read(admin_user)
 
     async def deactivate_admin_user(
         self,
@@ -349,11 +402,15 @@ class AdminUserService:
         if admin_user is None:
             raise ValueError("Admin user not found")
 
-        if any(
-            role.is_active and role.name == "super_admin"
-            for role in admin_user.roles
+        if (
+            admin_user.is_active
+            and has_super_admin_role(admin_user)
+            and await self._active_super_admin_count(
+                exclude_admin_user_id=admin_user.id
+            )
+            == 0
         ):
-            raise ValueError("Super Admin cannot be deactivated")
+            raise ValueError(LAST_SUPER_ADMIN_MSG)
 
         admin_user.is_active = False
         admin_user.token_version += 1
@@ -370,7 +427,7 @@ class AdminUserService:
         if admin_user is None:
             raise ValueError("Admin user not found after update")
 
-        return self._to_read(admin_user)
+        return await self._to_read(admin_user)
 
     async def delete_admin_user(
         self,
@@ -465,6 +522,19 @@ class AdminUserService:
                 admin_user_id
             )
 
+        # Prevent removing the super_admin role from the last active
+        # super admin.
+        if (
+            role.name == "super_admin"
+            and user.is_active
+            and has_super_admin_role(user)
+            and await self._active_super_admin_count(
+                exclude_admin_user_id=user.id
+            )
+            == 0
+        ):
+            raise ValueError(LAST_SUPER_ADMIN_MSG)
+
         await self.admin_user_repository.remove_role_from_user(
             admin_user_id,
             role_id,
@@ -487,6 +557,7 @@ class AdminUserService:
             raise ValueError("Admin user not found")
 
         unique_role_ids = list(dict.fromkeys(role_ids))
+        keeps_super_admin = False
 
         for role_id in unique_role_ids:
             role = await self.role_repository.get_role(role_id)
@@ -495,6 +566,23 @@ class AdminUserService:
                 raise ValueError(
                     f"Role {role_id} not found"
                 )
+
+            if role.name == "super_admin":
+                keeps_super_admin = True
+
+        # Replace is a set operation; if the target currently holds an
+        # active super_admin role and the new set drops it, block when
+        # this is the last active super admin.
+        if (
+            not keeps_super_admin
+            and user.is_active
+            and has_super_admin_role(user)
+            and await self._active_super_admin_count(
+                exclude_admin_user_id=user.id
+            )
+            == 0
+        ):
+            raise ValueError(LAST_SUPER_ADMIN_MSG)
 
         await self.admin_user_repository.replace_user_roles(
             admin_user_id,
