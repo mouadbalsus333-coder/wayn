@@ -3,6 +3,7 @@ import type {
   AdminPlaceListParams,
   CategoryRead,
   PaginatedResponse,
+  PlaceCreatePayload,
   PlaceRead,
   PlaceUpdatePayload,
 } from '../types/place'
@@ -14,6 +15,13 @@ export function getPlaces(params: AdminPlaceListParams) {
 
 export function getCategories() {
   return apiRequest<CategoryRead[]>('/api/v1/categories')
+}
+
+export function createPlace(payload: PlaceCreatePayload) {
+  return apiRequest<PlaceRead>('/api/v1/admin/places', {
+    method: 'POST',
+    body: payload,
+  })
 }
 
 export function updatePlace(id: string, payload: PlaceUpdatePayload) {

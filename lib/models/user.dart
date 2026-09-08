@@ -20,7 +20,6 @@ class User {
   final bool isVerified;
 
   final int pointsBalance;
-  final int reputationScore;
   final String? trustLevel;
 
   final int followersCount;
@@ -51,7 +50,6 @@ class User {
     required this.isActive,
     this.isVerified = false,
     this.pointsBalance = 0,
-    this.reputationScore = 0,
     this.trustLevel,
     this.followersCount = 0,
     this.followingCount = 0,
@@ -97,9 +95,6 @@ class User {
 
       pointsBalance:
           _intValue(data['points_balance']),
-
-      reputationScore:
-          _intValue(data['reputation_score']),
 
       trustLevel:
           data['trust_level']?.toString(),
@@ -151,7 +146,6 @@ class User {
       'is_verified': isVerified,
 
       'points_balance': pointsBalance,
-      'reputation_score': reputationScore,
       'trust_level': trustLevel,
 
       'followers_count': followersCount,

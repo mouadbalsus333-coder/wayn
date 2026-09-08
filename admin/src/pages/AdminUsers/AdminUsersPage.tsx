@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Eye, Loader2, RefreshCw, Search, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, Loader2, RefreshCw, Search, ShieldCheck, UserPlus } from 'lucide-react'
 import { userFacingError } from '../../api/errors'
 import { useAdminUsers } from '../../hooks/useAdminUsers'
 import type { AdminUserListParams, AdminUserRead } from '../../types/adminUser'
@@ -63,6 +63,9 @@ export function AdminUsersPage() {
           <h2>مستخدمو الإدارة</h2>
           <p className="muted">حسابات فريق الإدارة وأدوارهم وصلاحياتهم. متاحة لـ Super Admin فقط.</p>
         </div>
+        <Link to="/users/new" className="primary-button">
+          <UserPlus size={16} /> مستخدم جديد
+        </Link>
         {hasFilters && (
           <button type="button" className="ghost-button" onClick={resetFilters}>
             مسح الفلاتر

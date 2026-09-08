@@ -13,9 +13,11 @@ import '../../features/community/widgets/community_post_card.dart';
 import '../../features/notifications/notifications_page.dart';
 import '../../models/user.dart';
 import '../../models/store.dart';
+import '../../models/task.dart';
 import '../../services/auth_service.dart';
 import '../../services/repositories/repository_factory.dart';
 import '../../services/store_service.dart';
+import '../../services/task_service.dart';
 import '../../services/user_service.dart';
 import '../../core/widgets/wayn_network_image.dart';
 
@@ -41,6 +43,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final _userService = UserService();
   late final CommunityService _communityService;
   final _storeService = StoreService();
+  final _taskService = TaskService();
 
   List<CommunityPost> _myPosts = [];
   List<StoreOwnership> _ownerships = [];
@@ -367,6 +370,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             _buildStatsRow(colors),
                             const SizedBox(height: 10),
                             _buildPointsReputationCompact(colors),
+                            const SizedBox(height: 10),
+                            _buildGetPointsButton(colors),
                             const SizedBox(height: 22),
                             _buildSectionToggle(colors),
                             const SizedBox(height: 14),
@@ -623,7 +628,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 Text(
-                  formatCount(_user!.reputationScore),
+                  formatCount(_user!.pointsBalance),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -635,6 +640,37 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ],
+    );
+  }
+
+  // ============================================================
+  // Get points: button + tasks bottom sheet
+  // ============================================================
+
+  Widget _buildGetPointsButton(WaynColors colors) {
+    return SizedBox(
+      width: double.infinity,
+      height: 44,
+      child: FilledButton.icon(
+        onPressed: _openGetPointsSheet,
+        icon: const Icon(Icons.add_task_rounded, size: 20),
+        label: const Text('الحصول على النقاط'),
+        style: FilledButton.styleFrom(
+          backgroundColor: colors.brand,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openGetPointsSheet() async {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _GetPointsSheet(taskService: _taskService),
     );
   }
 
@@ -1067,5 +1103,268 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
     );
+  }
+}
+
+class _GetPointsSheet extends StatefulWidget {
+  const _GetPointsSheet({required this.taskService});
+
+  final TaskService taskService;
+
+  @override
+  State<_GetPointsSheet> createState() => _GetPointsSheetState();
+}
+
+class _GetPointsSheetState extends State<_GetPointsSheet> {
+  List<Task> _tasks = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final tasks = await widget.taskService.getActiveTasks(limit: 20);
+
+      if (!mounted) return;
+
+      setState(() {
+        _tasks = tasks;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = 'تعذر تحميل المهام. تحقق من اتصالك وحاول مرة أخرى.';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colors.textMuted.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+              child: Row(
+                children: [
+                  Icon(Icons.stars_rounded, size: 22, color: colors.brand),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'المهام المتاحة',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(child: _buildContent(colors)),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(WaynColors colors) {
+    if (_loading) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: CircularProgressIndicator(color: colors.brand),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 40, color: colors.danger),
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _loadTasks,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+              style: FilledButton.styleFrom(backgroundColor: colors.brand),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_tasks.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.task_alt_rounded, size: 40, color: colors.textMuted),
+            const SizedBox(height: 12),
+            Text(
+              'لا توجد مهام متاحة حالياً.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      itemCount: _tasks.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final task = _tasks[index];
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: colors.textMuted.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.brand.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  _taskIcon(task.scope),
+                  size: 20,
+                  color: colors.brand,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    if (task.description != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        task.description!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.warning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.stars_rounded, size: 14, color: colors.warning),
+                    const SizedBox(width: 4),
+                    Text(
+                      '+${task.rewardPoints}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: colors.warning,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  IconData _taskIcon(TaskScope scope) {
+    switch (scope) {
+      case TaskScope.place:
+        return Icons.place_rounded;
+      case TaskScope.city:
+        return Icons.location_city_rounded;
+      case TaskScope.category:
+        return Icons.category_rounded;
+      case TaskScope.dataGap:
+        return Icons.edit_note_rounded;
+      case TaskScope.general:
+        return Icons.task_alt_rounded;
+    }
   }
 }

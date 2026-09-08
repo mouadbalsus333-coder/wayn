@@ -1,4 +1,4 @@
-﻿class BackendConfig {
+class BackendConfig {
   /// FastAPI backend.
   static const String backendType =
       String.fromEnvironment(

@@ -75,6 +75,32 @@ export type CategoryRead = {
 }
 
 /**
+ * Payload for `POST /api/v1/admin/places` (backend `PlaceCreate`).
+ * Mirrored from `backend/app/schemas/place.py`.
+ */
+export type PlaceCreatePayload = {
+  category_id?: string | null
+  owner_user_id?: string | null
+  name: string
+  city: string
+  category_name: string
+  image_url: string
+  rating?: number
+  is_open?: boolean
+  is_active?: boolean
+  description?: string | null
+  address?: string | null
+  phone?: string | null
+  website?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  images?: string[]
+  services?: string[]
+  opening_time?: string | null
+  closing_time?: string | null
+}
+
+/**
  * Payload for `PUT /api/v1/admin/places/{id}` (backend `PlaceUpdate`).
  * Every field is optional; the backend applies only the fields sent.
  */

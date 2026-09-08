@@ -1,0 +1,176 @@
+/* Wallet admin page — reuses shared form/modal/table conventions. */
+
+.wallet-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.wallet-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.wallet-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.wallet-stat-card .stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  direction: ltr;
+  text-align: right;
+}
+
+.wallet-lookup-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.wallet-lookup-row input {
+  flex: 1;
+}
+
+.wallet-target {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.wallet-balance {
+  font-size: 1.6rem;
+  font-weight: 700;
+  direction: ltr;
+  text-align: right;
+}
+
+.wallet-recharges-summary {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.wallet-recharges-summary .muted {
+  margin: 0;
+}
+
+.image-upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.image-upload-button input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.image-field-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.image-field-row input {
+  flex: 1;
+}
+
+.icon-button {
+  padding: 0.4rem;
+}
+
+.danger-icon {
+  color: #b3261e;
+}
+
+.store-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.store-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.store-tab.active {
+  border-bottom-color: var(--primary-color, #2563eb);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.modal-wide {
+  max-width: 640px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* Wallet Tabs */
+.wallet-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.wallet-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #64748b);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wallet-tab:hover {
+  border-color: var(--brand, #18A99A);
+  color: var(--brand, #18A99A);
+}
+
+.wallet-tab.active {
+  background: var(--brand, #18A99A);
+  border-color: var(--brand, #18A99A);
+  color: #fff;
+}
+
+/* Transfer cell */
+.transfer-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.transfer-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.transfer-wallet {
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+  font-family: monospace;
+}

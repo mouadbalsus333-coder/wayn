@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies.admin_auth import AdminUser, require_permission
 from app.core.database import get_session
 from app.models.wallet_admin_recharge import WalletAdminRechargeStatus
+from app.models.wallet_transfer import WalletTransferStatus
 from app.services.wallet.admin_recharge_service import AdminRechargeService
 
 
@@ -411,4 +412,253 @@ async def get_recharge(
             email=recharge.admin.email,
             full_name=recharge.admin.full_name,
         ),
+    )
+
+
+# ============================================================
+# Wallet Reports (aggregated statistics)
+# ============================================================
+
+class WalletReportsResponse(BaseModel):
+    """Aggregated wallet statistics for a given time period."""
+    model_config = ConfigDict(from_attributes=True)
+
+    period_start: datetime | None
+    period_end: datetime | None
+    total_recharges: int
+    total_recharge_amount: int
+    confirmed_recharges: int
+    failed_recharges: int
+    total_transfers: int
+    confirmed_transfers: int
+    failed_transfers: int
+    total_transfer_amount: int
+
+
+@router.get(
+    "/reports",
+    response_model=WalletReportsResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(require_permission("wallet.read")),
+    ],
+)
+async def get_wallet_reports(
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> WalletReportsResponse:
+    """
+    Aggregated wallet statistics for reports.
+
+    Supports date filtering for daily/weekly/monthly/yearly views.
+    """
+    from sqlalchemy import func, select
+
+    from app.models.wallet_admin_recharge import WalletAdminRecharge, WalletAdminRechargeStatus
+    from app.models.wallet_transfer import WalletTransfer, WalletTransferStatus
+
+    # Build date conditions
+    recharge_conditions = []
+    transfer_conditions = []
+
+    if created_from is not None:
+        recharge_conditions.append(WalletAdminRecharge.created_at >= created_from)
+        transfer_conditions.append(WalletTransfer.created_at >= created_from)
+    if created_to is not None:
+        recharge_conditions.append(WalletAdminRecharge.created_at <= created_to)
+        transfer_conditions.append(WalletTransfer.created_at <= created_to)
+
+    # Recharge stats
+    recharge_total_query = select(func.count()).select_from(WalletAdminRecharge)
+    if recharge_conditions:
+        recharge_total_query = recharge_total_query.where(*recharge_conditions)
+    total_recharges = (await session.execute(recharge_total_query)).scalar_one()
+
+    recharge_amount_query = select(func.coalesce(func.sum(WalletAdminRecharge.amount), 0)).select_from(WalletAdminRecharge)
+    if recharge_conditions:
+        recharge_amount_query = recharge_amount_query.where(*recharge_conditions)
+    recharge_amount_query = recharge_amount_query.where(
+        WalletAdminRecharge.status == WalletAdminRechargeStatus.CONFIRMED
+    )
+    total_recharge_amount = (await session.execute(recharge_amount_query)).scalar_one()
+
+    confirmed_query = select(func.count()).select_from(WalletAdminRecharge).where(
+        WalletAdminRecharge.status == WalletAdminRechargeStatus.CONFIRMED
+    )
+    if recharge_conditions:
+        confirmed_query = confirmed_query.where(*recharge_conditions)
+    confirmed_recharges = (await session.execute(confirmed_query)).scalar_one()
+
+    failed_query = select(func.count()).select_from(WalletAdminRecharge).where(
+        WalletAdminRecharge.status == WalletAdminRechargeStatus.FAILED
+    )
+    if recharge_conditions:
+        failed_query = failed_query.where(*recharge_conditions)
+    failed_recharges = (await session.execute(failed_query)).scalar_one()
+
+    # Transfer stats
+    transfer_total_query = select(func.count()).select_from(WalletTransfer)
+    if transfer_conditions:
+        transfer_total_query = transfer_total_query.where(*transfer_conditions)
+    total_transfers = (await session.execute(transfer_total_query)).scalar_one()
+
+    transfer_confirmed_query = select(func.count()).select_from(WalletTransfer).where(
+        WalletTransfer.status == WalletTransferStatus.CONFIRMED
+    )
+    if transfer_conditions:
+        transfer_confirmed_query = transfer_confirmed_query.where(*transfer_conditions)
+    confirmed_transfers = (await session.execute(transfer_confirmed_query)).scalar_one()
+
+    transfer_failed_query = select(func.count()).select_from(WalletTransfer).where(
+        WalletTransfer.status == WalletTransferStatus.FAILED
+    )
+    if transfer_conditions:
+        transfer_failed_query = transfer_failed_query.where(*transfer_conditions)
+    failed_transfers = (await session.execute(transfer_failed_query)).scalar_one()
+
+    transfer_amount_query = select(func.coalesce(func.sum(WalletTransfer.amount), 0)).select_from(WalletTransfer).where(
+        WalletTransfer.status == WalletTransferStatus.CONFIRMED
+    )
+    if transfer_conditions:
+        transfer_amount_query = transfer_amount_query.where(*transfer_conditions)
+    total_transfer_amount = (await session.execute(transfer_amount_query)).scalar_one()
+
+    return WalletReportsResponse(
+        period_start=created_from,
+        period_end=created_to,
+        total_recharges=total_recharges,
+        total_recharge_amount=int(total_recharge_amount),
+        confirmed_recharges=confirmed_recharges,
+        failed_recharges=failed_recharges,
+        total_transfers=total_transfers,
+        confirmed_transfers=confirmed_transfers,
+        failed_transfers=failed_transfers,
+        total_transfer_amount=int(total_transfer_amount),
+    )
+
+
+# ============================================================
+# Wallet Transfers (admin monitoring)
+# ============================================================
+
+class WalletTransferItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sender_wallet_id: UUID
+    receiver_wallet_id: UUID
+    sender_wallet_number: str | None
+    receiver_wallet_number: str | None
+    sender_name: str | None
+    receiver_name: str | None
+    asset: str
+    amount: int
+    status: WalletTransferStatus
+    description: str | None
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class WalletTransferListResponse(BaseModel):
+    items: list[WalletTransferItem]
+    total: int
+    offset: int
+    limit: int
+
+
+@router.get(
+    "/transfers",
+    response_model=WalletTransferListResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(require_permission("wallet.transactions")),
+    ],
+)
+async def list_transfers(
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    transfer_status: WalletTransferStatus | None = Query(default=None, alias="status"),
+    search: str | None = Query(default=None, max_length=100),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+) -> WalletTransferListResponse:
+    """
+    List wallet transfers for admin monitoring.
+
+    Supports filtering by date range, status, and search by wallet number.
+    """
+    from sqlalchemy import func, select
+    from sqlalchemy.orm import selectinload
+
+    from app.models.wallet_transfer import WalletTransfer
+    from app.models.wallet import UserWallet
+    from app.models.user import User
+
+    # Build query with joins for wallet numbers and user names
+    query = (
+        select(WalletTransfer)
+        .options(
+            selectinload(WalletTransfer.sender_wallet).selectinload(UserWallet.user),
+            selectinload(WalletTransfer.receiver_wallet).selectinload(UserWallet.user),
+        )
+    )
+
+    # Apply filters
+    if created_from is not None:
+        query = query.where(WalletTransfer.created_at >= created_from)
+    if created_to is not None:
+        query = query.where(WalletTransfer.created_at <= created_to)
+    if transfer_status is not None:
+        query = query.where(WalletTransfer.status == transfer_status)
+
+    # Count total
+    count_query = select(func.count()).select_from(WalletTransfer)
+    if created_from is not None:
+        count_query = count_query.where(WalletTransfer.created_at >= created_from)
+    if created_to is not None:
+        count_query = count_query.where(WalletTransfer.created_at <= created_to)
+    if transfer_status is not None:
+        count_query = count_query.where(WalletTransfer.status == transfer_status)
+
+    total = (await session.execute(count_query)).scalar_one()
+
+    # Apply ordering and pagination
+    query = (
+        query
+        .order_by(WalletTransfer.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+
+    result = await session.execute(query)
+    transfers = result.scalars().all()
+
+    items = []
+    for t in transfers:
+        sender_wallet = t.sender_wallet
+        receiver_wallet = t.receiver_wallet
+
+        items.append(WalletTransferItem(
+            id=t.id,
+            sender_wallet_id=t.sender_wallet_id,
+            receiver_wallet_id=t.receiver_wallet_id,
+            sender_wallet_number=sender_wallet.wallet_number if sender_wallet else None,
+            receiver_wallet_number=receiver_wallet.wallet_number if receiver_wallet else None,
+            sender_name=sender_wallet.user.full_name if sender_wallet and sender_wallet.user else None,
+            receiver_name=receiver_wallet.user.full_name if receiver_wallet and receiver_wallet.user else None,
+            asset=t.asset.value,
+            amount=t.amount,
+            status=t.status,
+            description=t.description,
+            created_at=t.created_at,
+            completed_at=t.completed_at,
+        ))
+
+    return WalletTransferListResponse(
+        items=items,
+        total=total,
+        offset=offset,
+        limit=limit,
     )

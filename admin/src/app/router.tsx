@@ -3,13 +3,20 @@ import { RequireAuth } from '../auth/RequireAuth'
 import { RequireRole } from '../auth/RequireRole'
 import { AdminUsersPage } from '../pages/AdminUsers/AdminUsersPage'
 import { AdminUserDetailsPage } from '../pages/AdminUsers/AdminUserDetailsPage'
+import { AdminUserCreatePage } from '../pages/AdminUsers/AdminUserCreatePage'
 import { CommunityPage } from '../pages/Community/CommunityPage'
 import { CommunityPostPage } from '../pages/Community/CommunityPostPage'
+import { ContributionsPage } from '../pages/Contributions/ContributionsPage'
+import { CategoriesPage } from '../pages/Categories/CategoriesPage'
+import { PermissionsPage } from '../pages/Permissions/PermissionsPage'
+import { StorePage } from '../pages/Store/StorePage'
+import { WalletPage } from '../pages/Wallet/WalletPage'
 import { RequirePermission } from '../auth/RequirePermission'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { LoginPage } from '../pages/Login/LoginPage'
 import { DashboardPage } from '../pages/Dashboard'
 import { PlaceEditPage } from '../pages/Places/PlaceEditPage'
+import { PlaceCreatePage } from '../pages/Places/PlaceCreatePage'
 import { PlaceDetailsPage } from '../pages/Places/PlaceDetailsPage'
 import { PlacesPage } from '../pages/Places/PlacesPage'
 import { permissions } from '../permissions/permissionNames'
@@ -41,6 +48,14 @@ export function AppRouter() {
           }
         />
         <Route
+          path="/places/new"
+          element={
+            <RequirePermission permission={permissions.placesWrite}>
+              <PlaceCreatePage />
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/places/:id"
           element={
             <RequirePermission permission={permissions.placesRead}>
@@ -61,6 +76,14 @@ export function AppRouter() {
           element={
             <RequireRole role="super_admin">
               <AdminUsersPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/users/new"
+          element={
+            <RequireRole role="super_admin">
+              <AdminUserCreatePage />
             </RequireRole>
           }
         />
@@ -89,6 +112,14 @@ export function AppRouter() {
           }
         />
         <Route
+          path="/contributions"
+          element={
+            <RequirePermission permission={permissions.contributionsRead}>
+              <ContributionsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/regular-users"
           element={
             <RequirePermission permission={permissions.usersRead}>
@@ -102,6 +133,38 @@ export function AppRouter() {
             <RequirePermission permission={permissions.usersRead}>
               <RegularUserDetailsPage />
             </RequirePermission>
+          }
+        />
+        <Route
+          path="/wallet"
+          element={
+            <RequirePermission permission={permissions.walletRead}>
+              <WalletPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/categories"
+          element={
+            <RequirePermission permission={permissions.categoriesRead}>
+              <CategoriesPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/store"
+          element={
+            <RequirePermission permission={permissions.storeRead}>
+              <StorePage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/permissions"
+          element={
+            <RequireRole role="super_admin">
+              <PermissionsPage />
+            </RequireRole>
           }
         />
         <Route

@@ -1,0 +1,22 @@
+.categories-page {
+  max-width: 1200px;
+}
+
+.modal-wide {
+  width: min(100%, 560px);
+}
+
+.actions-inline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.danger-icon {
+  color: var(--color-danger, #dc2626);
+}
+
+.danger-icon:hover {
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+}

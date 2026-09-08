@@ -1,6 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { deletePlace, updatePlace } from '../api/places'
-import type { PlaceRead, PlaceUpdatePayload } from '../types/place'
+import { createPlace, deletePlace, updatePlace } from '../api/places'
+import type { PlaceCreatePayload, PlaceRead, PlaceUpdatePayload } from '../types/place'
+
+/** POST /api/v1/admin/places then invalidate the places list cache. */
+export function useCreatePlace() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: PlaceCreatePayload) => createPlace(payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'places'] })
+    },
+  })
+}
 
 /** PUT /api/v1/admin/places/{id} then invalidate the places list cache. */
 export function useUpdatePlace() {

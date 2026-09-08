@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/navigation/wayn_actions.dart';
 import '../../core/network/api_client.dart';

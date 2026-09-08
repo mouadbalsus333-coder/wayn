@@ -51,3 +51,20 @@ export type ReplaceRolesPayload = { role_ids: number[] }
 
 /** Body of `PUT /admin/users/{id}/permissions` (`AdminUserPermissionUpdate`). */
 export type ReplacePermissionsPayload = { permission_ids: number[] }
+
+/** Body of `POST /api/v1/admin/users` (`AdminUserCreate`). */
+export type AdminUserCreatePayload = {
+  email: string
+  password: string
+  full_name: string
+  is_active?: boolean
+  role_ids?: number[] | null
+  permission_ids?: number[] | null
+}
+
+/** Body of `PUT /api/v1/admin/users/{id}` (`AdminUserUpdate`). */
+export type AdminUserUpdatePayload = {
+  full_name?: string | null
+  password?: string | null
+  is_active?: boolean | null
+}

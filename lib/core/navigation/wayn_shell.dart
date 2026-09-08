@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/wayn_colors.dart';
@@ -6,7 +6,7 @@ import '../widgets/wayn_guest_banner.dart';
 import '../../features/community/community_page.dart';
 import '../../features/explore/explore_page.dart';
 import '../../features/map/map_page.dart';
-import '../../features/profile/profile_page.dart';
+import 'package:wayn/features/profile/profile_page.dart';
 import '../../features/store/store_page.dart';
 import '../../models/user.dart';
 import 'wayn_actions.dart';

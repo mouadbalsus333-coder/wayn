@@ -1,6 +1,15 @@
 import { apiRequest } from './client'
 import type { PaginatedResponse } from '../types/place'
-import type { AdminUserListParams, AdminUserPermissionRead, AdminUserRead, ReplacePermissionsPayload, ReplaceRolesPayload, RoleRead } from '../types/adminUser'
+import type {
+  AdminUserCreatePayload,
+  AdminUserListParams,
+  AdminUserPermissionRead,
+  AdminUserRead,
+  AdminUserUpdatePayload,
+  ReplacePermissionsPayload,
+  ReplaceRolesPayload,
+  RoleRead,
+} from '../types/adminUser'
 
 function buildQuery(params: AdminUserListParams): string {
   const query = new URLSearchParams()
@@ -14,9 +23,32 @@ function buildQuery(params: AdminUserListParams): string {
   return query.toString()
 }
 
-/** `GET /api/v1/admin/users` — requires the `super_admin` role (backend `require_role`). */
+/** `GET /api/v1/admin/users?` — requires the `super_admin` role. */
 export function getAdminUsers(params: AdminUserListParams): Promise<PaginatedResponse<AdminUserRead>> {
   return apiRequest<PaginatedResponse<AdminUserRead>>(`/api/v1/admin/users?${buildQuery(params)}`)
+}
+
+/** `POST /api/v1/admin/users` — requires the `super_admin` role. */
+export function createAdminUser(payload: AdminUserCreatePayload): Promise<AdminUserRead> {
+  return apiRequest<AdminUserRead>('/api/v1/admin/users', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/** `PUT /api/v1/admin/users/{id}` — requires the `super_admin` role. */
+export function updateAdminUser(id: number, payload: AdminUserUpdatePayload): Promise<AdminUserRead> {
+  return apiRequest<AdminUserRead>(`/api/v1/admin/users/${id}`, {
+    method: 'PUT',
+    body: payload,
+  })
+}
+
+/** `DELETE /api/v1/admin/users/{id}` — requires the `super_admin` role. */
+export function deleteAdminUser(id: number): Promise<void> {
+  return apiRequest<void>(`/api/v1/admin/users/${id}`, {
+    method: 'DELETE',
+  })
 }
 
 /** `GET /api/v1/admin/users/{id}` — requires the `super_admin` role. */
