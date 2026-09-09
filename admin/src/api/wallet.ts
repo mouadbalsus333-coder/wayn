@@ -7,6 +7,9 @@ import type {
   WalletRechargeListResponse,
   WalletRechargePayload,
   WalletRechargeStats,
+  WalletReports,
+  WalletTransferListParams,
+  WalletTransferListResponse,
 } from '../types/wallet'
 
 const base = '/api/v1/admin/wallet'

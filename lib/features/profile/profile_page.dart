@@ -6,68 +6,95 @@ import '../../core/theme/wayn_colors.dart';
 import '../../core/utils/short_number.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
+import '../../core/widgets/wayn_network_image.dart';
 import '../../features/community/models/community_post.dart';
 import '../../features/community/services/community_service.dart';
 import '../../features/community/widgets/comments_sheet.dart';
 import '../../features/community/widgets/community_post_card.dart';
 import '../../features/notifications/notifications_page.dart';
-import '../../models/user.dart';
+import '../../features/wallet/wallet_page.dart';
 import '../../models/store.dart';
-import '../../models/task.dart';
+import '../../models/user.dart';
+import '../../models/wallet.dart';
 import '../../services/auth_service.dart';
 import '../../services/repositories/repository_factory.dart';
 import '../../services/store_service.dart';
-import '../../services/task_service.dart';
 import '../../services/user_service.dart';
-import '../../core/widgets/wayn_network_image.dart';
+import '../../services/wallet_service.dart';
 
 /// صفحة "حسابي".
 ///
-/// الترتيب: صورة + اسم + ID ← الوصف ← خط فاصل
-/// ← بطاقة النقاط + زر الحصول على النقاط
-/// ← إحصائيات الحساب ← [التقييمات | الخزانة] ← المحتوى.
+/// الترتيب:
+/// صورة + اسم + username + ID + النقاط والمحفظة
+/// ← الوصف
+/// ← خط فاصل
+/// ← إحصائيات الحساب
+/// ← [التقييمات | الخزانة]
+/// ← المحتوى.
 class ProfilePage extends StatefulWidget {
   final User? user;
 
-  const ProfilePage({super.key, required this.user});
+  const ProfilePage({
+    super.key,
+    required this.user,
+  });
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-enum _SectionTab { ratings, treasury }
+enum _SectionTab {
+  ratings,
+  treasury,
+}
 
 class _ProfilePageState extends State<ProfilePage> {
   User? _user;
 
   final _auth = AuthService();
   final _userService = UserService();
+  final _walletService = WalletService();
+
   late final CommunityService _communityService;
+
   final _storeService = StoreService();
-  final _taskService = TaskService();
 
   List<CommunityPost> _myPosts = [];
   List<StoreOwnership> _ownerships = [];
+
   int _points = 0;
+  Wallet? _wallet;
 
   _SectionTab _activeSection = _SectionTab.ratings;
 
   bool _initialLoading = true;
   bool _refreshing = false;
   bool _loadFailed = false;
+
   bool _wardrobeLoading = false;
   bool _wardrobeLoaded = false;
+
+  bool _walletLoading = true;
+  bool _pointsLoading = true;
+
   String? _wardrobeError;
 
   @override
   void initState() {
     super.initState();
+
     _user = widget.user;
-    _communityService = CommunityService(createCommunityRepository());
+
+    _communityService = CommunityService(
+      createCommunityRepository(),
+    );
+
     if (_user != null) {
       _refresh();
     } else {
-      setState(() => _initialLoading = false);
+      setState(() {
+        _initialLoading = false;
+      });
     }
   }
 
@@ -98,7 +125,12 @@ class _ProfilePageState extends State<ProfilePage> {
       });
     }
 
-    await Future.wait([_loadUser(), _loadPoints(), _loadMyPosts()]);
+    await Future.wait([
+      _loadUser(),
+      _loadPoints(),
+      _loadWallet(),
+      _loadMyPosts(),
+    ]);
 
     if (_activeSection == _SectionTab.treasury) {
       await _loadOwnership();
@@ -141,7 +173,10 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _openTreasury() async {
-    setState(() => _activeSection = _SectionTab.treasury);
+    setState(() {
+      _activeSection = _SectionTab.treasury;
+    });
+
     await _loadOwnership();
   }
 
@@ -159,14 +194,47 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadPoints() async {
     try {
-      _points = await _userService.getMyPoints();
+      final points = await _userService.getMyPoints();
+
+      if (!mounted) return;
+
+      setState(() {
+        _points = points;
+        _pointsLoading = false;
+      });
     } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _pointsLoading = false;
+      });
+
       _loadFailed = true;
+    }
+  }
+
+  Future<void> _loadWallet() async {
+    try {
+      final wallet = await _walletService.getWallet();
+
+      if (!mounted) return;
+
+      setState(() {
+        _wallet = wallet;
+        _walletLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _walletLoading = false;
+      });
     }
   }
 
   Future<void> _loadMyPosts() async {
     final user = _user;
+
     if (user == null) return;
 
     try {
@@ -192,7 +260,10 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    final index = _myPosts.indexWhere((item) => item.id == post.id);
+    final index = _myPosts.indexWhere(
+      (item) => item.id == post.id,
+    );
+
     if (index == -1) return;
 
     final previous = _myPosts[index];
@@ -201,16 +272,22 @@ class _ProfilePageState extends State<ProfilePage> {
       _myPosts[index] = previous.copyWith(
         isLiked: !previous.isLiked,
         likesCount: previous.isLiked
-            ? (previous.likesCount > 0 ? previous.likesCount - 1 : 0)
+            ? (previous.likesCount > 0
+                ? previous.likesCount - 1
+                : 0)
             : previous.likesCount + 1,
       );
     });
 
     try {
       if (previous.isLiked) {
-        await _communityService.unlikePost(previous.id);
+        await _communityService.unlikePost(
+          previous.id,
+        );
       } else {
-        await _communityService.likePost(previous.id);
+        await _communityService.likePost(
+          previous.id,
+        );
       }
     } catch (_) {
       if (!mounted) return;
@@ -231,7 +308,10 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    final index = _myPosts.indexWhere((item) => item.id == post.id);
+    final index = _myPosts.indexWhere(
+      (item) => item.id == post.id,
+    );
+
     if (index == -1) return;
 
     final previous = _myPosts[index];
@@ -240,16 +320,22 @@ class _ProfilePageState extends State<ProfilePage> {
       _myPosts[index] = previous.copyWith(
         isSaved: !previous.isSaved,
         savesCount: previous.isSaved
-            ? (previous.savesCount > 0 ? previous.savesCount - 1 : 0)
+            ? (previous.savesCount > 0
+                ? previous.savesCount - 1
+                : 0)
             : previous.savesCount + 1,
       );
     });
 
     try {
       if (previous.isSaved) {
-        await _communityService.unsavePost(previous.id);
+        await _communityService.unsavePost(
+          previous.id,
+        );
       } else {
-        await _communityService.savePost(previous.id);
+        await _communityService.savePost(
+          previous.id,
+        );
       }
     } catch (_) {
       if (!mounted) return;
@@ -274,7 +360,7 @@ class _ProfilePageState extends State<ProfilePage> {
           behavior: SnackBarBehavior.floating,
           content: Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.login_rounded,
                 color: Colors.white,
                 size: 20,
@@ -292,18 +378,25 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               TextButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context)
+                      .hideCurrentSnackBar();
+
                   _navigateToLogin();
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                  ),
                   minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  tapTargetSize:
+                      MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text(
                   'تسجيل الدخول',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
@@ -314,7 +407,10 @@ class _ProfilePageState extends State<ProfilePage> {
       );
   }
 
-  void _showComments(CommunityPost post, int index) {
+  void _showComments(
+    CommunityPost post,
+    int index,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -353,7 +449,8 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               WaynHeader(
                 onMenuPressed: _onMenuPressed,
-                onNotificationsPressed: _onNotificationsPressed,
+                onNotificationsPressed:
+                    _onNotificationsPressed,
               ),
               Expanded(
                 child: _initialLoading
@@ -368,36 +465,60 @@ class _ProfilePageState extends State<ProfilePage> {
                             color: colors.brand,
                             onRefresh: _refresh,
                             child: ListView(
-                              physics: const AlwaysScrollableScrollPhysics(
-                                parent: BouncingScrollPhysics(),
+                              physics:
+                                  const AlwaysScrollableScrollPhysics(
+                                parent:
+                                    BouncingScrollPhysics(),
                               ),
-                              padding: const EdgeInsets.fromLTRB(
+                              padding:
+                                  const EdgeInsets.fromLTRB(
                                 20,
                                 10,
                                 20,
                                 35,
                               ),
                               children: [
-                                _buildAccountHeader(colors),
+                                _buildAccountHeader(
+                                  colors,
+                                ),
                                 const SizedBox(height: 14),
-                                _buildDescriptionCard(colors),
+                                _buildDescriptionCard(
+                                  colors,
+                                ),
                                 const SizedBox(height: 12),
-                                _buildProfileDivider(colors),
+                                _buildProfileDivider(
+                                  colors,
+                                ),
                                 const SizedBox(height: 14),
-                                _buildPointsReputationCompact(colors),
-                                const SizedBox(height: 14),
+
+                                // تم حذف بطاقة النقاط
+                                // وزر "الحصول على النقاط".
+
                                 _buildStatsRow(colors),
                                 const SizedBox(height: 22),
-                                _buildSectionToggle(colors),
+                                _buildSectionToggle(
+                                  colors,
+                                ),
                                 const SizedBox(height: 14),
-                                if (_activeSection == _SectionTab.ratings)
-                                  _buildRatingsContent(colors)
+                                if (_activeSection ==
+                                    _SectionTab.ratings)
+                                  _buildRatingsContent(
+                                    colors,
+                                  )
                                 else
-                                  _buildTreasuryContent(colors),
+                                  _buildTreasuryContent(
+                                    colors,
+                                  ),
                                 if (_loadFailed)
                                   Padding(
-                                    padding: const EdgeInsets.only(top: 16),
-                                    child: _buildRefreshFailed(colors),
+                                    padding:
+                                        const EdgeInsets.only(
+                                      top: 16,
+                                    ),
+                                    child:
+                                        _buildRefreshFailed(
+                                      colors,
+                                    ),
                                   ),
                               ],
                             ),
@@ -410,18 +531,28 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildGuestProfile(WaynColors colors) {
+  // ============================================================
+  // Guest
+  // ============================================================
+
+  Widget _buildGuestProfile(
+    WaynColors colors,
+  ) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment:
+              MainAxisAlignment.center,
           children: [
             Container(
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: colors.brand.withValues(alpha: 0.12),
+                color: colors.brand.withValues(
+                  alpha: 0.12,
+                ),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -460,7 +591,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   backgroundColor: colors.brand,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius:
+                        BorderRadius.circular(16),
                   ),
                   elevation: 0,
                 ),
@@ -483,86 +615,272 @@ class _ProfilePageState extends State<ProfilePage> {
   // Account header
   // ============================================================
 
-  Widget _buildAccountHeader(WaynColors colors) {
+  Widget _buildAccountHeader(
+    WaynColors colors,
+  ) {
     final user = _user!;
 
-    final displayName = user.displayName?.trim().isNotEmpty == true
-        ? user.displayName!.trim()
-        : 'مستخدم WAYN';
+    final displayName =
+        user.displayName?.trim().isNotEmpty == true
+            ? user.displayName!.trim()
+            : 'مستخدم WAYN';
 
-    final username = user.username?.trim() ?? '';
+    final username =
+        user.username?.trim() ?? '';
 
     final avatarLetter = displayName.isEmpty
         ? 'و'
         : displayName.substring(0, 1);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            CircleAvatar(
-              radius: 34,
-              backgroundColor: colors.surfaceAlt,
-              child: Text(
-                avatarLetter,
-                style: TextStyle(
-                  fontSize: 27,
-                  fontWeight: FontWeight.w900,
-                  color: colors.brand,
-                ),
-              ),
+        CircleAvatar(
+          radius: 34,
+          backgroundColor: colors.surfaceAlt,
+          child: Text(
+            avatarLetter,
+            style: TextStyle(
+              fontSize: 27,
+              fontWeight: FontWeight.w900,
+              color: colors.brand,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    displayName,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w900,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    '@$username',
-                    style: TextStyle(
-                      color: colors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  _buildCopyableId(colors),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Padding(
+            padding:
+                const EdgeInsets.only(top: 2),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  displayName,
+                  overflow:
+                      TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '@$username',
+                  overflow:
+                      TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.textSecondary,
+                    fontWeight:
+                        FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                _buildCopyableId(colors),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        _buildAccountBalances(colors),
       ],
     );
   }
 
-  Widget _buildCopyableId(WaynColors colors) {
+  Widget _buildAccountBalances(
+    WaynColors colors,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildPointsButton(colors),
+        const SizedBox(height: 6),
+        _buildWalletButton(colors),
+      ],
+    );
+  }
+
+  Widget _buildPointsButton(
+    WaynColors colors,
+  ) {
+    return _buildHeaderActionButton(
+      colors,
+      icon: Icons.stars_rounded,
+      iconColor: Colors.orange,
+      iconBackground:
+          Colors.orange.withValues(alpha: .12),
+      value: _pointsLoading
+          ? null
+          : '$_points',
+      loading: _pointsLoading,
+      onTap: () {
+        // النقاط معروضة من الرصيد الحقيقي للمستخدم.
+      },
+    );
+  }
+
+  Widget _buildWalletButton(
+    WaynColors colors,
+  ) {
+    final coins =
+        _wallet?.coinsBalance ?? 0;
+
+    return _buildHeaderActionButton(
+      colors,
+      icon:
+          Icons.account_balance_wallet_rounded,
+      iconColor: colors.brand,
+      iconBackground:
+          colors.brand.withValues(alpha: .12),
+      value: _walletLoading
+          ? null
+          : '$coins',
+      loading: _walletLoading,
+      onTap: _openWallet,
+    );
+  }
+
+  /// زر أصغر قليلاً من التصميم السابق،
+  /// مع الحفاظ على نفس الشكل والوظيفة.
+  Widget _buildHeaderActionButton(
+    WaynColors colors, {
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBackground,
+    required VoidCallback onTap,
+    String? value,
+    bool loading = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius:
+            BorderRadius.circular(13),
+        child: Container(
+          height: 42,
+          constraints:
+              const BoxConstraints(
+            minWidth: 42,
+          ),
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 7,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius:
+                BorderRadius.circular(13),
+            border: Border.all(
+              color: colors.divider,
+            ),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 9,
+                offset: const Offset(0, 3),
+                color:
+                    Colors.black.withValues(
+                  alpha: .04,
+                ),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize:
+                MainAxisSize.min,
+            children: [
+              Container(
+                width: 29,
+                height: 29,
+                decoration: BoxDecoration(
+                  color: iconBackground,
+                  borderRadius:
+                      BorderRadius.circular(9),
+                ),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: iconColor,
+                ),
+              ),
+              const SizedBox(width: 5),
+              if (loading)
+                SizedBox(
+                  width: 15,
+                  height: 15,
+                  child:
+                      CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: iconColor,
+                  ),
+                )
+              else if (value != null)
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight:
+                        FontWeight.w900,
+                    color:
+                        colors.textPrimary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openWallet() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            const WalletPage(),
+      ),
+    );
+  }
+
+  Widget _buildCopyableId(
+    WaynColors colors,
+  ) {
     final id = _user!.id;
-    final displayId = id.length > 10 ? id.substring(0, 10) : id;
-    final truncated = id.length > 10 ? '$displayId...' : displayId;
+
+    final displayId =
+        id.length > 10
+            ? id.substring(0, 10)
+            : id;
+
+    final truncated =
+        id.length > 10
+            ? '$displayId...'
+            : displayId;
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           'ID: $truncated',
-          textDirection: TextDirection.ltr,
+          textDirection:
+              TextDirection.ltr,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10,
             color: colors.textSecondary,
-            fontWeight: FontWeight.w600,
+            fontWeight:
+                FontWeight.w600,
           ),
         ),
         const SizedBox(width: 4),
         GestureDetector(
-          onTap: () => _copyToClipboard(id, 'تم نسخ المعرف'),
+          onTap: () => _copyToClipboard(
+            id,
+            'تم نسخ المعرف',
+          ),
           child: Icon(
             Icons.copy_rounded,
             size: 14,
@@ -582,11 +900,13 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
             message,
-            textDirection: TextDirection.rtl,
+            textDirection:
+                TextDirection.rtl,
           ),
         ),
       );
@@ -597,13 +917,17 @@ class _ProfilePageState extends State<ProfilePage> {
   // Description
   // ============================================================
 
-  Widget _buildDescriptionCard(WaynColors colors) {
-    final bio = _user!.bio?.trim().isNotEmpty == true
-        ? _user!.bio!.trim()
-        : null;
+  Widget _buildDescriptionCard(
+    WaynColors colors,
+  ) {
+    final bio =
+        _user!.bio?.trim().isNotEmpty == true
+            ? _user!.bio!.trim()
+            : null;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
         Text(
           'الوصف',
@@ -637,7 +961,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   'لا يوجد وصف بعد. يمكنك إضافته من قائمة الإعدادات.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: colors.textSecondary,
+                    color:
+                        colors.textSecondary,
                   ),
                 ),
               ),
@@ -647,7 +972,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildProfileDivider(WaynColors colors) {
+  Widget _buildProfileDivider(
+    WaynColors colors,
+  ) {
     return SizedBox(
       width: double.infinity,
       child: Divider(
@@ -659,109 +986,22 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // ============================================================
-  // Points + Get points
-  // ============================================================
-
-  Widget _buildPointsReputationCompact(WaynColors colors) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 10,
-            ),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.stars_rounded,
-                  size: 18,
-                  color: colors.warning,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'النقاط',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: colors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                Text(
-                  formatCount(_points),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: colors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: SizedBox(
-            height: 42,
-            child: FilledButton.icon(
-              onPressed: _openGetPointsSheet,
-              icon: const Icon(
-                Icons.add_task_rounded,
-                size: 18,
-              ),
-              label: const Text(
-                'الحصول على النقاط',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.warning,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _openGetPointsSheet() async {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _GetPointsSheet(
-        taskService: _taskService,
-      ),
-    );
-  }
-
-  // ============================================================
   // Stats row
   // ============================================================
 
-  Widget _buildStatsRow(WaynColors colors) {
+  Widget _buildStatsRow(
+    WaynColors colors,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(
+      padding:
+          const EdgeInsets.symmetric(
         horizontal: 6,
         vertical: 14,
       ),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius:
+            BorderRadius.circular(20),
       ),
       child: Row(
         children: [
@@ -800,7 +1040,8 @@ class _ProfilePageState extends State<ProfilePage> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: colors.textPrimary,
+              color:
+                  colors.textPrimary,
             ),
           ),
           const SizedBox(height: 3),
@@ -816,7 +1057,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _divider(WaynColors colors) {
+  Widget _divider(
+    WaynColors colors,
+  ) {
     return Container(
       width: 1,
       height: 34,
@@ -828,30 +1071,41 @@ class _ProfilePageState extends State<ProfilePage> {
   // Section toggle
   // ============================================================
 
-  Widget _buildSectionToggle(WaynColors colors) {
+  Widget _buildSectionToggle(
+    WaynColors colors,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(5),
+      padding:
+          const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius:
+            BorderRadius.circular(20),
       ),
       child: Row(
         children: [
           _toggleButton(
             colors,
-            icon: Icons.rate_review_outlined,
+            icon:
+                Icons.rate_review_outlined,
             label: 'التقييمات',
-            active: _activeSection == _SectionTab.ratings,
+            active:
+                _activeSection ==
+                    _SectionTab.ratings,
             onTap: () => setState(
-              () => _activeSection = _SectionTab.ratings,
+              () => _activeSection =
+                  _SectionTab.ratings,
             ),
           ),
           const SizedBox(width: 6),
           _toggleButton(
             colors,
-            icon: Icons.inventory_2_outlined,
+            icon:
+                Icons.inventory_2_outlined,
             label: 'الخزانة',
-            active: _activeSection == _SectionTab.treasury,
+            active:
+                _activeSection ==
+                    _SectionTab.treasury,
             onTap: _openTreasury,
           ),
         ],
@@ -870,15 +1124,20 @@ class _ProfilePageState extends State<ProfilePage> {
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(
+          duration:
+              const Duration(
+            milliseconds: 180,
+          ),
+          padding:
+              const EdgeInsets.symmetric(
             vertical: 11,
           ),
           decoration: BoxDecoration(
             color: active
                 ? colors.brand
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(15),
+            borderRadius:
+                BorderRadius.circular(15),
             border: active
                 ? null
                 : Border.all(
@@ -886,7 +1145,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment:
+                MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
@@ -900,7 +1160,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight:
+                      FontWeight.w800,
                   color: active
                       ? colors.onBrand
                       : colors.textSecondary,
@@ -917,11 +1178,14 @@ class _ProfilePageState extends State<ProfilePage> {
   // Ratings content
   // ============================================================
 
-  Widget _buildRatingsContent(WaynColors colors) {
+  Widget _buildRatingsContent(
+    WaynColors colors,
+  ) {
     if (_myPosts.isEmpty) {
       return _emptySection(
         colors,
-        icon: Icons.rate_review_outlined,
+        icon:
+            Icons.rate_review_outlined,
         title: 'لا توجد تقييمات بعد',
         subtitle:
             'منشورات المجتمع التي تشير إلى أماكن ستظهر هنا.',
@@ -936,23 +1200,37 @@ class _ProfilePageState extends State<ProfilePage> {
           index++
         )
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding:
+                const EdgeInsets.only(
+              bottom: 12,
+            ),
             child: CommunityPostCard(
               post: _myPosts[index],
               onLike: () =>
-                  _toggleLike(_myPosts[index]),
+                  _toggleLike(
+                _myPosts[index],
+              ),
               onSave: () =>
-                  _toggleSave(_myPosts[index]),
+                  _toggleSave(
+                _myPosts[index],
+              ),
               onComments: () =>
-                  _showComments(_myPosts[index], index),
+                  _showComments(
+                _myPosts[index],
+                index,
+              ),
               onAuthorTap: (authorId) =>
                   openUserProfile(
-                    context,
-                    userId: authorId,
-                    isOwner: _myPosts[index].isOwner,
-                  ),
+                context,
+                userId: authorId,
+                isOwner:
+                    _myPosts[index].isOwner,
+              ),
               onPlaceTap: (placeId) =>
-                  openPlaceFromId(context, placeId),
+                  openPlaceFromId(
+                context,
+                placeId,
+              ),
             ),
           ),
       ],
@@ -963,24 +1241,32 @@ class _ProfilePageState extends State<ProfilePage> {
   // Treasury content
   // ============================================================
 
-  Widget _buildTreasuryContent(WaynColors colors) {
-    if (_wardrobeLoading && !_wardrobeLoaded) {
+  Widget _buildTreasuryContent(
+    WaynColors colors,
+  ) {
+    if (_wardrobeLoading &&
+        !_wardrobeLoaded) {
       return const Padding(
         padding: EdgeInsets.all(35),
         child: Center(
-          child: CircularProgressIndicator(),
+          child:
+              CircularProgressIndicator(),
         ),
       );
     }
 
-    if (_wardrobeError != null && !_wardrobeLoaded) {
-      return _wardrobeErrorSection(colors);
+    if (_wardrobeError != null &&
+        !_wardrobeLoaded) {
+      return _wardrobeErrorSection(
+        colors,
+      );
     }
 
     if (_ownerships.isEmpty) {
       return _emptySection(
         colors,
-        icon: Icons.inventory_2_outlined,
+        icon:
+            Icons.inventory_2_outlined,
         title: 'خزانتك فارغة',
         subtitle:
             'ابدأ بشراء أول عنصر من متجر WAYN.',
@@ -989,8 +1275,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return GridView.builder(
       shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _ownerships.length,
+      physics:
+          const NeverScrollableScrollPhysics(),
+      itemCount:
+          _ownerships.length,
       gridDelegate:
           const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -998,11 +1286,12 @@ class _ProfilePageState extends State<ProfilePage> {
         mainAxisSpacing: 12,
         childAspectRatio: .72,
       ),
-      itemBuilder: (context, index) =>
-          _ownershipCard(
-            colors,
-            _ownerships[index],
-          ),
+      itemBuilder:
+          (context, index) =>
+              _ownershipCard(
+        colors,
+        _ownerships[index],
+      ),
     );
   }
 
@@ -1021,7 +1310,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final image = item.imageUrl == null
         ? Container(
             color: colors.surfaceAlt,
-            alignment: Alignment.center,
+            alignment:
+                Alignment.center,
             child: Icon(
               Icons.storefront_rounded,
               size: 40,
@@ -1032,9 +1322,12 @@ class _ProfilePageState extends State<ProfilePage> {
             imageUrl: item.imageUrl!,
             width: double.infinity,
             fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => Container(
-              color: colors.surfaceAlt,
-              alignment: Alignment.center,
+            errorBuilder:
+                (_, _, _) => Container(
+              color:
+                  colors.surfaceAlt,
+              alignment:
+                  Alignment.center,
               child: Icon(
                 Icons.storefront_rounded,
                 color: colors.brand,
@@ -1045,10 +1338,12 @@ class _ProfilePageState extends State<ProfilePage> {
     return Opacity(
       opacity: expired ? .58 : 1,
       child: Container(
-        padding: const EdgeInsets.all(9),
+        padding:
+            const EdgeInsets.all(9),
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius:
+              BorderRadius.circular(18),
         ),
         child: Column(
           crossAxisAlignment:
@@ -1068,10 +1363,13 @@ class _ProfilePageState extends State<ProfilePage> {
             Text(
               item.nameAr,
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              overflow:
+                  TextOverflow.ellipsis,
               style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: colors.textPrimary,
+                fontWeight:
+                    FontWeight.w800,
+                color:
+                    colors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
@@ -1079,7 +1377,8 @@ class _ProfilePageState extends State<ProfilePage> {
               'الكمية: ${ownership.quantity}',
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontWeight:
+                    FontWeight.w800,
                 color: colors.brand,
               ),
             ),
@@ -1093,7 +1392,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: expired
                     ? colors.danger
                     : colors.textSecondary,
-                fontWeight: FontWeight.w700,
+                fontWeight:
+                    FontWeight.w700,
               ),
             ),
           ],
@@ -1102,16 +1402,27 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  String _expiryLabel(DateTime? expiresAt) {
-    if (expiresAt == null) return 'دائم';
-    if (expiresAt.isBefore(DateTime.now())) {
+  String _expiryLabel(
+    DateTime? expiresAt,
+  ) {
+    if (expiresAt == null) {
+      return 'دائم';
+    }
+
+    if (expiresAt.isBefore(
+      DateTime.now(),
+    )) {
       return 'منتهي';
     }
 
-    final days =
-        expiresAt.difference(DateTime.now()).inDays;
+    final days = expiresAt
+        .difference(DateTime.now())
+        .inDays;
 
-    if (days < 1) return 'ينتهي اليوم';
+    if (days < 1) {
+      return 'ينتهي اليوم';
+    }
+
     if (days <= 30) {
       return 'ينتهي خلال $days يوم';
     }
@@ -1125,23 +1436,28 @@ class _ProfilePageState extends State<ProfilePage> {
     WaynColors colors,
   ) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding:
+          const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius:
+            BorderRadius.circular(20),
       ),
       child: Column(
         children: [
           Text(
             _wardrobeError!,
-            textAlign: TextAlign.center,
+            textAlign:
+                TextAlign.center,
             style: TextStyle(
-              color: colors.textSecondary,
+              color:
+                  colors.textSecondary,
             ),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: _loadOwnership,
+            onPressed:
+                _loadOwnership,
             icon: const Icon(
               Icons.refresh_rounded,
             ),
@@ -1161,13 +1477,15 @@ class _ProfilePageState extends State<ProfilePage> {
     required String subtitle,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(
+      padding:
+          const EdgeInsets.symmetric(
         horizontal: 24,
         vertical: 40,
       ),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius:
+            BorderRadius.circular(20),
       ),
       child: Column(
         children: [
@@ -1181,21 +1499,26 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 14),
           Text(
             title,
-            textAlign: TextAlign.center,
+            textAlign:
+                TextAlign.center,
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: colors.textPrimary,
+              fontWeight:
+                  FontWeight.w800,
+              color:
+                  colors.textPrimary,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
-            textAlign: TextAlign.center,
+            textAlign:
+                TextAlign.center,
             style: TextStyle(
               fontSize: 13,
               height: 1.5,
-              color: colors.textSecondary,
+              color:
+                  colors.textSecondary,
             ),
           ),
         ],
@@ -1207,10 +1530,12 @@ class _ProfilePageState extends State<ProfilePage> {
     WaynColors colors,
   ) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding:
+          const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius:
+            BorderRadius.circular(16),
       ),
       child: Row(
         children: [
@@ -1225,348 +1550,13 @@ class _ProfilePageState extends State<ProfilePage> {
               'تعذر تحديث بعض البيانات، اسحب للأسفل لإعادة المحاولة.',
               style: TextStyle(
                 fontSize: 12,
-                color: colors.textSecondary,
+                color:
+                    colors.textSecondary,
               ),
             ),
           ),
         ],
       ),
     );
-  }
-}
-
-class _GetPointsSheet extends StatefulWidget {
-  const _GetPointsSheet({
-    required this.taskService,
-  });
-
-  final TaskService taskService;
-
-  @override
-  State<_GetPointsSheet> createState() =>
-      _GetPointsSheetState();
-}
-
-class _GetPointsSheetState
-    extends State<_GetPointsSheet> {
-  List<Task> _tasks = [];
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTasks();
-  }
-
-  Future<void> _loadTasks() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final tasks =
-          await widget.taskService.getActiveTasks(
-        limit: 20,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _tasks = tasks;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _error =
-            'تعذر تحميل المهام. تحقق من اتصالك وحاول مرة أخرى.';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.waynColors;
-
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(
-        constraints: BoxConstraints(
-          maxHeight:
-              MediaQuery.of(context).size.height * 0.75,
-        ),
-        decoration: BoxDecoration(
-          color: colors.background,
-          borderRadius:
-              const BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 44,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colors.textMuted.withValues(
-                  alpha: 0.3,
-                ),
-                borderRadius:
-                    BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                14,
-                20,
-                6,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.stars_rounded,
-                    size: 22,
-                    color: colors.brand,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'المهام المتاحة',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(),
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: colors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: _buildContent(colors),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent(WaynColors colors) {
-    if (_loading) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: CircularProgressIndicator(
-            color: colors.brand,
-          ),
-        ),
-      );
-    }
-
-    if (_error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 40,
-              color: colors.danger,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _loadTasks,
-              icon: const Icon(
-                Icons.refresh_rounded,
-              ),
-              label: const Text(
-                'إعادة المحاولة',
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.brand,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_tasks.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.task_alt_rounded,
-              size: 40,
-              color: colors.textMuted,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'لا توجد مهام متاحة حالياً.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.separated(
-      shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(
-        20,
-        4,
-        20,
-        8,
-      ),
-      itemCount: _tasks.length,
-      separatorBuilder: (_, _) =>
-          const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final task = _tasks[index];
-
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: colors.textMuted.withValues(
-                alpha: 0.2,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colors.brand.withValues(
-                    alpha: 0.1,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  _taskIcon(task.scope),
-                  size: 20,
-                  color: colors.brand,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      task.title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    if (task.description != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        task.description!,
-                        maxLines: 2,
-                        overflow:
-                            TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color:
-                              colors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: colors.warning.withValues(
-                    alpha: 0.15,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize:
-                      MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.stars_rounded,
-                      size: 14,
-                      color: colors.warning,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '+${task.rewardPoints}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: colors.warning,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  IconData _taskIcon(TaskScope scope) {
-    switch (scope) {
-      case TaskScope.place:
-        return Icons.place_rounded;
-      case TaskScope.city:
-        return Icons.location_city_rounded;
-      case TaskScope.category:
-        return Icons.category_rounded;
-      case TaskScope.dataGap:
-        return Icons.edit_note_rounded;
-      case TaskScope.general:
-        return Icons.task_alt_rounded;
-    }
   }
 }
