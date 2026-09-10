@@ -16,6 +16,7 @@ from app.models.role import Role
 from app.models.category import Category
 from app.models.favorite import UserFavorite
 from app.models.place import Place
+from app.models.place_social import PlaceSocial, PlaceSocialType
 from app.models.place_contribution import (
     PlaceContribution,
     PlaceContributionStatus,
@@ -105,6 +106,8 @@ __all__ = [
 
     "Category",
     "Place",
+    "PlaceSocial",
+    "PlaceSocialType",
     "PlaceContribution",
     "PlaceContributionStatus",
     "PlaceContributionType",

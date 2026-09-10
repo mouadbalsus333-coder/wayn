@@ -148,7 +148,6 @@ class DartHttpApiClient implements ApiClient {
     final trimmedToken = token.trim();
 
     if (trimmedToken.isEmpty) {
-      print('WAYN AUTH: received empty token');
       await clearAuthToken();
       return;
     }
@@ -161,11 +160,6 @@ class DartHttpApiClient implements ApiClient {
     // Auth state changed, so user-specific GET cache must not
     // survive the authentication transition.
     _clearGetCache();
-
-    print(
-      'WAYN AUTH: access token saved successfully '
-      '(length: ${trimmedToken.length})',
-    );
   }
 
   Future<String?> getAuthToken() async {
@@ -188,8 +182,6 @@ class DartHttpApiClient implements ApiClient {
     // Prevent cached authenticated data from being reused
     // after logout.
     _clearGetCache();
-
-    print('WAYN AUTH: access token cleared');
   }
 
   Future<bool> hasAuthToken() async {
@@ -219,9 +211,11 @@ class DartHttpApiClient implements ApiClient {
 
       if (cached != null) {
         if (cached.isValid) {
-          print(
-            'WAYN HTTP CACHE HIT: GET $uri',
-          );
+          if (kDebugMode) {
+            print(
+              'WAYN HTTP CACHE HIT: GET ${uri.path}',
+            );
+          }
 
           return cached.data;
         }
@@ -421,19 +415,21 @@ class DartHttpApiClient implements ApiClient {
       ),
     );
 
-    print(
-      'WAYN HTTP UPLOAD: POST $uri',
-    );
-
-    print(
-      'WAYN HTTP UPLOAD FILE: $fileName '
-      '(${fileBytes.length} bytes)',
-    );
-
-    if (contentType != null && contentType.trim().isNotEmpty) {
+    if (kDebugMode) {
       print(
-        'WAYN HTTP UPLOAD CONTENT TYPE: $contentType',
+        'WAYN HTTP UPLOAD: POST ${uri.path}',
       );
+
+      print(
+        'WAYN HTTP UPLOAD FILE: $fileName '
+        '(${fileBytes.length} bytes)',
+      );
+
+      if (contentType != null && contentType.trim().isNotEmpty) {
+        print(
+          'WAYN HTTP UPLOAD CONTENT TYPE: $contentType',
+        );
+      }
     }
 
     final streamedResponse = await _client.send(
@@ -494,10 +490,14 @@ class DartHttpApiClient implements ApiClient {
       ),
     );
 
-    print(
-      'WAYN HTTP CACHE STORE: $key '
-      '(TTL: ${_getCacheDuration.inSeconds}s)',
-    );
+    if (kDebugMode) {
+      final uri = Uri.tryParse(key);
+
+      print(
+        'WAYN HTTP CACHE STORE: ${uri?.path ?? '<invalid-url>'} '
+        '(TTL: ${_getCacheDuration.inSeconds}s)',
+      );
+    }
   }
 
   void _removeOldestCacheEntry() {
@@ -528,7 +528,9 @@ class DartHttpApiClient implements ApiClient {
 
     _getCache.clear();
 
-    print('WAYN HTTP CACHE: cleared');
+    if (kDebugMode) {
+      print('WAYN HTTP CACHE: cleared');
+    }
   }
 
   void _invalidateCacheForPath(String path) {
@@ -566,10 +568,11 @@ class DartHttpApiClient implements ApiClient {
       _getCache.remove(key);
     }
 
-    if (keysToRemove.isNotEmpty) {
+    if (kDebugMode && keysToRemove.isNotEmpty) {
       print(
         'WAYN HTTP CACHE: invalidated '
-        '${keysToRemove.length} entr${keysToRemove.length == 1 ? 'y' : 'ies'}',
+        '${keysToRemove.length} entr'
+        '${keysToRemove.length == 1 ? 'y' : 'ies'}',
       );
     }
   }
@@ -649,24 +652,29 @@ class DartHttpApiClient implements ApiClient {
     final status = response.statusCode;
 
     // ----------------------------------------------------------
-    // DEBUG HTTP LOGGING
+    // SAFE DEBUG HTTP LOGGING
     // ----------------------------------------------------------
-
+    //
+    // Never log:
+    // - response body
+    // - authorization headers
+    // - access tokens
+    // - refresh tokens
+    // - passwords
+    // - request bodies
+    // - query parameters
+    //
+    // Only method, path and status are logged in debug mode.
     if (kDebugMode) {
+      final request = response.request;
+
       print(
         'WAYN HTTP: '
-        '${response.request?.method} '
-        '${response.request?.url}',
+        '${request?.method ?? 'UNKNOWN'} '
+        '${request?.url.path ?? '<unknown-path>'}',
       );
 
       print('WAYN HTTP STATUS: $status');
-
-      // Response bodies can be large, especially for places,
-      // community posts, and other list endpoints.
-      // Keep the full body logging available for debugging only.
-      print(
-        'WAYN HTTP BODY: ${response.body}',
-      );
     }
 
     // ----------------------------------------------------------
@@ -693,10 +701,10 @@ class DartHttpApiClient implements ApiClient {
         }
 
         return decoded;
-      } catch (error) {
+      } catch (_) {
         if (kDebugMode) {
           print(
-            'WAYN HTTP: JSON decode failed: $error',
+            'WAYN HTTP: JSON decode failed',
           );
         }
 
@@ -742,7 +750,7 @@ class DartHttpApiClient implements ApiClient {
 
     if (kDebugMode) {
       print(
-        'WAYN HTTP ERROR: $message',
+        'WAYN HTTP ERROR: HTTP $status',
       );
     }
 

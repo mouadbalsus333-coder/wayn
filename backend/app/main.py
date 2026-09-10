@@ -63,25 +63,46 @@ app.add_middleware(
 # ============================================================
 # Exception handlers
 # ============================================================
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    # Do not log exc.errors().
+    #
+    # Validation details may contain:
+    # - submitted values
+    # - field names
+    # - validator context
+    # - internal validation information
+    #
+    # The client still receives the structured validation response
+    # below. Only sensitive/internal details are excluded from logs.
     logging.getLogger("wayn.backend.validation").warning(
-        "Validation error: %s",
-        exc.errors(),
+        "Request validation failed.",
     )
-    # exc.errors() ctx can hold non-JSON-serializable values (e.g. ValueError
-    # raised by custom validators), so flatten ctx entries into strings.
+
+    # exc.errors() ctx can hold non-JSON-serializable values
+    # (for example ValueError raised by custom validators), so
+    # flatten ctx entries into strings.
     errors = []
+
     for error in exc.errors():
-        safe = {key: value for key, value in error.items() if key != "ctx"}
+        safe = {
+            key: value
+            for key, value in error.items()
+            if key != "ctx"
+        }
+
         if isinstance(error.get("ctx"), dict):
             safe["ctx"] = {
-                key: str(value) for key, value in error["ctx"].items()
+                key: str(value)
+                for key, value in error["ctx"].items()
             }
+
         errors.append(safe)
+
     return JSONResponse(
         status_code=422,
         content={
@@ -96,11 +117,20 @@ async def sqlalchemy_exception_handler(
     request: Request,
     exc: SQLAlchemyError,
 ) -> JSONResponse:
+    # Do not log the exception object or traceback here.
+    #
+    # Database exceptions can contain:
+    # - SQL statements
+    # - table/column names
+    # - database metadata
+    # - constraint information
+    # - query parameters
+    #
+    # Keep the production log generic.
     logger.error(
-        "Database error: %s",
-        exc,
-        exc_info=True,
+        "Database operation failed.",
     )
+
     return JSONResponse(
         status_code=500,
         content={
@@ -114,11 +144,14 @@ async def unhandled_exception_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
+    # Never expose exception details or stack traces through the
+    # application logging path used in production.
+    #
+    # The client receives only a generic error message below.
     logger.error(
-        "Unhandled error: %s",
-        exc,
-        exc_info=True,
+        "Unhandled server error.",
     )
+
     return JSONResponse(
         status_code=500,
         content={
@@ -326,6 +359,9 @@ app.include_router(
 )
 
 
+# ============================================================
+# Media
+# ============================================================
 app.include_router(
     media.router,
     prefix="/api/v1",

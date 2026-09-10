@@ -58,3 +58,51 @@
   .form-grid { grid-template-columns: 1fr; }
   .place-hero-card { flex-direction: column; }
 }
+
+/* ============================================================
+Add-Place form (name/location/hours/socials)
+============================================================ */
+
+.form-section { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+.form-section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 16px; font-weight: 800; letter-spacing: 0; color: var(--color-text); }
+.form-section > .muted { margin: 0 0 12px; font-size: 13px; }
+
+.field-hint { color: var(--color-muted); font-size: 12px; line-height: 1.7; margin-top: 4px; }
+
+.category-input-row { display: flex; gap: 10px; align-items: stretch; }
+.category-input-row select.grow { flex: 1; }
+.category-input-row .ghost-button { white-space: nowrap; flex: 0 0 auto; }
+
+/* Map */
+.place-map { width: 100%; height: 340px; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface-soft); }
+.place-map:focus { outline: none; }
+.coords-label { margin: 8px 0 0; color: var(--color-muted); font-size: 12px; font-family: ui-monospace, monospace; text-align: left; }
+
+/* Working hours */
+.hours-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.hours-day { padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.hours-day.is-closed { opacity: .72; }
+.hours-day-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.hours-day-name { font-weight: 800; font-size: 14px; color: var(--color-text); }
+.hours-day-mode { min-height: 36px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 13px; }
+
+.hours-24-label { margin: 6px 0 0; color: var(--color-primary-deep); font-size: 12px; font-weight: 700; }
+
+.hours-intervals { display: grid; gap: 8px; margin-top: 4px; }
+.hours-interval-row { display: flex; align-items: center; gap: 8px; }
+.hours-time { min-height: 38px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font: inherit; }
+.hours-arrow { color: var(--color-muted); }
+.add-interval-button { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 6px 10px; border: 1px dashed var(--color-border); border-radius: var(--radius-sm); background: transparent; color: var(--color-primary-deep); font-size: 13px; font-weight: 700; cursor: pointer; }
+.add-interval-button:hover { border-color: var(--color-primary); }
+
+/* Socials */
+.social-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.social-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: var(--color-accent); color: var(--color-primary-deep); font-size: 12px; font-weight: 700; }
+.social-chip-value { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-muted); font-weight: 500; font-family: ui-monospace, monospace; font-size: 11px; }
+.chip-remove { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; color: var(--color-danger); background: rgba(220, 38, 38, .12); cursor: pointer; flex: 0 0 auto; }
+.chip-remove:hover { background: rgba(220, 38, 38, .22); }
+.chip-remove:disabled { opacity: .55; cursor: wait; }
+
+.social-type-list { display: grid; gap: 8px; margin: 6px 0 14px; }
+.social-type-row { text-align: start; padding: 11px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font-weight: 700; cursor: pointer; }
+.social-type-row:hover { border-color: var(--color-primary); background: var(--color-accent); }

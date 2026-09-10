@@ -374,91 +374,63 @@ class FastApiAuthRepository implements AuthRepository {
   Future<User?> _handleAuthResponse(
     dynamic response,
   ) async {
-    try {
-      print('WAYN AUTH: received response');
-      print(
-        'WAYN AUTH: response type = '
-        '${response.runtimeType}',
-      );
-
-      if (response == null) {
-        print('WAYN AUTH ERROR: response is null');
-        return null;
-      }
-
-      if (response is! Map) {
-        print(
-          'WAYN AUTH ERROR: response is not a Map: '
-          '${response.runtimeType}',
-        );
-
-        throw ApiClientException(
-          'Invalid authentication response',
-        );
-      }
-
-      final data = Map<String, dynamic>.from(response);
-
-      print(
-        'WAYN AUTH: response keys = '
-        '${data.keys.toList()}',
-      );
-
-      // ----------------------------------------------------------
-      // Access token
-      // ----------------------------------------------------------
-
-      final accessToken = data['access_token']?.toString();
-
-      if (accessToken == null || accessToken.trim().isEmpty) {
-        print(
-          'WAYN AUTH ERROR: access_token is missing',
-        );
-
-        throw ApiClientException(
-          'Authentication response does not contain an access token',
-        );
-      }
-
-      // ----------------------------------------------------------
-      // User
-      // ----------------------------------------------------------
-
-      final userData = data['user'];
-
-      if (userData is! Map) {
-        throw ApiClientException(
-          'Authentication response does not contain a valid user',
-        );
-      }
-
-      final userMap = Map<String, dynamic>.from(userData);
-
-      // ----------------------------------------------------------
-      // Save token
-      // ----------------------------------------------------------
-
-      await _api.setAuthToken(accessToken);
-
-      // ----------------------------------------------------------
-      // Convert API user
-      // ----------------------------------------------------------
-
-      final user = User.fromMap(userMap);
-
-      // ----------------------------------------------------------
-      // Save local authenticated user
-      // ----------------------------------------------------------
-
-      await _userSessionStorage.saveUser(user);
-
-      return user;
-    } catch (error, stackTrace) {
-      print('WAYN AUTH FAILED: $error');
-      print('WAYN AUTH STACKTRACE: $stackTrace');
-
-      rethrow;
+    if (response == null) {
+      return null;
     }
+
+    if (response is! Map) {
+      throw ApiClientException(
+        'Invalid authentication response',
+      );
+    }
+
+    final data = Map<String, dynamic>.from(response);
+
+    // ----------------------------------------------------------
+    // Access token
+    // ----------------------------------------------------------
+
+    final accessToken = data['access_token']?.toString();
+
+    if (accessToken == null || accessToken.trim().isEmpty) {
+      throw ApiClientException(
+        'Authentication response does not contain an access token',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // User
+    // ----------------------------------------------------------
+
+    final userData = data['user'];
+
+    if (userData is! Map) {
+      throw ApiClientException(
+        'Authentication response does not contain a valid user',
+      );
+    }
+
+    final userMap = Map<String, dynamic>.from(userData);
+
+    // ----------------------------------------------------------
+    // Save token
+    // ----------------------------------------------------------
+
+    await _api.setAuthToken(accessToken);
+
+    // ----------------------------------------------------------
+    // Convert API user
+    // ----------------------------------------------------------
+
+    final user = User.fromMap(userMap);
+
+    // ----------------------------------------------------------
+    // Save local authenticated user
+    // ----------------------------------------------------------
+
+    await _userSessionStorage.saveUser(user);
+
+    return user;
   }
 
   // ============================================================

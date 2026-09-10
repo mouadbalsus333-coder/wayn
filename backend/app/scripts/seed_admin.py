@@ -419,7 +419,7 @@ async def create_admin() -> None:
             print("===================================")
             print("WAYN Admin initialization complete")
             print("===================================")
-            print(f"Email: {email}")
+            print("Admin account configured successfully.")
             print("Role: super_admin")
             print("Permissions: all")
             print("===================================")

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowRight,
@@ -17,10 +18,11 @@ import {
 } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { userFacingError } from '../../api/errors'
+import { listPlaceSocials } from '../../api/places'
 import { useAuth } from '../../auth/useAuth'
 import { useDeletePlace } from '../../hooks/usePlaceMutations'
 import { permissions } from '../../permissions/permissionNames'
-import type { PlaceRead } from '../../types/place'
+import type { PlaceRead, PlaceSocialType } from '../../types/place'
 import './place-actions.css'
 
 export function PlaceDetailsPage() {
@@ -98,6 +100,8 @@ export function PlaceDetailsPage() {
 
       <InfoGrid place={place} />
 
+      <PlaceSocialsCard placeId={place.id} />
+
       {canDelete && (
         <section className="danger-zone">
           <h3>منطقة الخطر</h3>
@@ -137,6 +141,63 @@ function InfoRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string
       <Icon size={17} className="info-icon" />
       <strong>{label}:</strong>
       <span>{value || '—'}</span>
+    </div>
+  )
+}
+
+const SOCIAL_LABELS: Record<PlaceSocialType, string> = {
+  FACEBOOK: 'فيسبوك',
+  YOUTUBE: 'يوتيوب',
+  WHATSAPP: 'واتساب',
+  WEB: 'موقع ويب',
+  TIKTOK: 'تيك توك',
+  INSTAGRAM: 'انستغرام',
+}
+
+function PlaceSocialsCard({ placeId }: { placeId: string }) {
+  // Reads via the existing `GET /api/v1/admin/places/{id}/socials` endpoint
+  // (permission-gated on `places.read` in the backend).
+  const socialsQuery = useQuery({
+    queryKey: ['admin', 'places', placeId, 'socials'],
+    queryFn: () => listPlaceSocials(placeId),
+  })
+
+  const socials = socialsQuery.data ?? []
+  if (socialsQuery.isPending) {
+    return (
+      <div className="info-card" style={{ marginBottom: 22 }}>
+        <h3>وسائل التواصل</h3>
+        <p className="muted" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Loader2 className="spin" size={15} /> جارٍ التحميل…
+        </p>
+      </div>
+    )
+  }
+  if (socialsQuery.isError || socials.length === 0) return null
+
+  return (
+    <div className="info-card" style={{ marginBottom: 22 }}>
+      <h3>وسائل التواصل</h3>
+      <div className="services-list">
+        {socials.map((social) =>
+          social.social_type === 'WHATSAPP' ? (
+            <span className="service-chip" key={social.id} dir="ltr">
+              WhatsApp: {social.value}
+            </span>
+          ) : (
+            <a
+              className="service-chip"
+              key={social.id}
+              href={social.value}
+              target="_blank"
+              rel="noreferrer"
+              dir="ltr"
+            >
+              {SOCIAL_LABELS[social.social_type]}
+            </a>
+          ),
+        )}
+      </div>
     </div>
   )
 }

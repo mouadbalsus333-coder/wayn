@@ -5,6 +5,8 @@ import type {
   PaginatedResponse,
   PlaceCreatePayload,
   PlaceRead,
+  PlaceSocialCreate,
+  PlaceSocialRead,
   PlaceUpdatePayload,
 } from '../types/place'
 
@@ -35,6 +37,34 @@ export function deletePlace(id: string) {
   return apiRequest<void>(`/api/v1/admin/places/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
+}
+
+/** `GET /api/v1/admin/places/{id}/socials` — requires `places.read`. */
+export function listPlaceSocials(placeId: string) {
+  return apiRequest<PlaceSocialRead[]>(
+    `/api/v1/admin/places/${encodeURIComponent(placeId)}/socials`,
+  )
+}
+
+/** `POST /api/v1/admin/places/{id}/socials` — requires `places.write`. */
+export function createPlaceSocial(placeId: string, payload: PlaceSocialCreate) {
+  return apiRequest<PlaceSocialRead>(
+    `/api/v1/admin/places/${encodeURIComponent(placeId)}/socials`,
+    {
+      method: 'POST',
+      body: payload,
+    },
+  )
+}
+
+/** `DELETE /api/v1/admin/places/{id}/socials/{socialId}` — requires `places.write`. */
+export function deletePlaceSocial(placeId: string, socialId: string) {
+  return apiRequest<void>(
+    `/api/v1/admin/places/${encodeURIComponent(placeId)}/socials/${encodeURIComponent(socialId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
 }
 
 function buildQuery(params: AdminPlaceListParams) {

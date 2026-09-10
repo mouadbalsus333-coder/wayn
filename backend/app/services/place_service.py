@@ -4,6 +4,7 @@ from app.models.place import Place, VerificationStatus
 from app.repositories.category_repository import CategoryRepository
 from app.repositories.place_repository import PlaceRepository
 from app.schemas.place import PlaceCreate, PlaceUpdate
+from app.services.working_hours import flat_opening_hours, is_open_now
 
 
 class PlaceService:
@@ -207,6 +208,17 @@ class PlaceService:
                 srid=4326,
             )
 
+        # Structured per-day hours.
+        working_hours = data.working_hours_json
+
+        if working_hours:
+            is_open = is_open_now(working_hours)
+            opening_time, closing_time = flat_opening_hours(working_hours)
+        else:
+            is_open = data.is_open
+            opening_time = data.opening_time
+            closing_time = data.closing_time
+
         place = Place(
             category_id=data.category_id,
             name=data.name,
@@ -214,7 +226,7 @@ class PlaceService:
             category_name=category_name,
             image_url=data.image_url,
             rating=data.rating,
-            is_open=data.is_open,
+            is_open=is_open,
             is_active=data.is_active,
             description=data.description,
             address=data.address,
@@ -225,8 +237,9 @@ class PlaceService:
             location=location,
             images=data.images,
             services=data.services,
-            opening_time=data.opening_time,
-            closing_time=data.closing_time,
+            opening_time=opening_time,
+            closing_time=closing_time,
+            working_hours_json=working_hours,
         )
 
         return await self.repository.create_place(place)
@@ -291,6 +304,26 @@ class PlaceService:
                     field,
                     value,
                 )
+
+        # --------------------------------------------------------
+        # Structured working hours — recompute the derived flags used
+        # by Explore/Map ("open now") and the legacy flat display fields.
+        # --------------------------------------------------------
+
+        if "working_hours_json" in update_data:
+            working_hours = place.working_hours_json
+
+            if working_hours:
+                place.is_open = is_open_now(working_hours)
+                place.opening_time, place.closing_time = flat_opening_hours(
+                    working_hours
+                )
+            else:
+                place.working_hours_json = None
+                if "opening_time" not in update_data:
+                    place.opening_time = None
+                if "closing_time" not in update_data:
+                    place.closing_time = None
 
         # --------------------------------------------------------
         # Location

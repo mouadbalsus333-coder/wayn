@@ -6,6 +6,48 @@
 export const VERIFICATION_STATUSES = ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED'] as const
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number]
 
+/** Place working-hours weekdays (matches backend `working_hours_json`). */
+export const WEEKDAYS = [
+  'saturday',
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+] as const
+export type WeekdayKey = (typeof WEEKDAYS)[number]
+
+export type DayHoursInterval = {
+  open: string
+  close: string
+}
+
+/** Per-day opening schedule stored in `working_hours_json`. */
+export type DayHours =
+  | { type: 'open24'; intervals?: never }
+  | { type: 'closed'; intervals?: never }
+  | { type: 'regular'; intervals: DayHoursInterval[] }
+
+export type WorkingHoursJson = Partial<Record<WeekdayKey, DayHours>>
+
+/** Supported place social/contact types. */
+export const PLACE_SOCIAL_TYPES = ['FACEBOOK', 'YOUTUBE', 'WHATSAPP', 'WEB', 'TIKTOK', 'INSTAGRAM'] as const
+export type PlaceSocialType = (typeof PLACE_SOCIAL_TYPES)[number]
+
+export type PlaceSocialRead = {
+  id: string
+  place_id: string
+  social_type: PlaceSocialType
+  value: string
+  created_at?: string | null
+}
+
+export type PlaceSocialCreate = {
+  social_type: PlaceSocialType
+  value: string
+}
+
 export const SORT_OPTIONS = [
   'created_at',
   'updated_at',
@@ -37,6 +79,8 @@ export type PlaceRead = {
   services: string[]
   opening_time: string | null
   closing_time: string | null
+  working_hours_json?: WorkingHoursJson | null
+  socials?: PlaceSocialRead[]
   reviews_count: number
   visits_count: number
   owner_user_id?: string | null
@@ -98,6 +142,7 @@ export type PlaceCreatePayload = {
   services?: string[]
   opening_time?: string | null
   closing_time?: string | null
+  working_hours_json?: WorkingHoursJson | null
 }
 
 /**
@@ -123,4 +168,5 @@ export type PlaceUpdatePayload = {
   longitude?: number | null
   opening_time?: string | null
   closing_time?: string | null
+  working_hours_json?: WorkingHoursJson | null
 }

@@ -8,10 +8,13 @@ from app.api.dependencies.admin_auth import require_permission
 from app.core.database import get_session
 from app.repositories.category_repository import CategoryRepository
 from app.repositories.place_repository import PlaceRepository
-from app.models.place import VerificationStatus
+from app.repositories.place_social_repository import PlaceSocialRepository
+from app.models.place import Place, VerificationStatus
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.place import PlaceCreate, PlaceRead, PlaceUpdate
+from app.schemas.place_social import PlaceSocialCreate, PlaceSocialRead
 from app.services.place_service import PlaceService
+from app.services.place_social_service import PlaceSocialService
 
 router = APIRouter(
     prefix="/admin/places",
@@ -166,3 +169,102 @@ async def delete_admin_place(
         )
 
     await service.delete_place(place)
+
+
+# ============================================================
+# Place social / contact links
+# ============================================================
+# Admin manages a place's contact links (Facebook/YouTube/WhatsApp/Web/
+# TikTok/Instagram). WhatsApp stores a phone number only; the app builds the
+# chat link from it. All endpoints are permission-gated on top of the existing
+# admin permission system.
+
+
+async def _get_place_or_404(
+    place_id: str,
+    session: AsyncSession,
+) -> Place:
+    """Return the place, raising 404 when it does not exist."""
+    place_repository = PlaceRepository(session)
+    place = await place_repository.get_place(place_id)
+    if place is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Place not found",
+        )
+    return place
+
+
+@router.get(
+    "/{place_id}/socials",
+    response_model=list[PlaceSocialRead],
+    dependencies=[
+        Depends(require_permission("places.read")),
+    ],
+)
+async def list_place_socials(
+    place_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> list[PlaceSocialRead]:
+    await _get_place_or_404(place_id, session)
+
+    service = PlaceSocialService(
+        PlaceSocialRepository(session),
+    )
+
+    return await service.list_for_place(place_id)
+
+
+@router.post(
+    "/{place_id}/socials",
+    response_model=PlaceSocialRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(require_permission("places.write")),
+    ],
+)
+async def create_place_social(
+    place_id: str,
+    data: PlaceSocialCreate,
+    session: AsyncSession = Depends(get_session),
+) -> PlaceSocialRead:
+    place = await _get_place_or_404(place_id, session)
+    service = PlaceSocialService(
+        PlaceSocialRepository(session),
+    )
+
+    try:
+        return await service.create(place, data)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete(
+    "/{place_id}/socials/{social_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(require_permission("places.write")),
+    ],
+)
+async def delete_place_social(
+    place_id: str,
+    social_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    await _get_place_or_404(place_id, session)
+
+    service = PlaceSocialService(
+        PlaceSocialRepository(session),
+    )
+
+    social = await service.repository.get(social_id)
+    if social is None or social.place_id != place_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Social link not found",
+        )
+
+    await service.delete(social)

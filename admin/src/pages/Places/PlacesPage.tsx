@@ -7,12 +7,15 @@ import {
   Eye,
   Loader2,
   MapPin,
+  Plus,
   RefreshCw,
   Search,
 } from 'lucide-react'
 import { userFacingError } from '../../api/errors'
+import { useAuth } from '../../auth/useAuth'
 import { useCategories } from '../../hooks/useCategories'
 import { usePlaces } from '../../hooks/usePlaces'
+import { permissions } from '../../permissions/permissionNames'
 import {
   VERIFICATION_STATUSES,
   type AdminPlaceListParams,
@@ -49,6 +52,8 @@ export function PlacesPage() {
   const [isActive, setIsActive] = useState('')
   const [sortBy, setSortBy] = useState<PlaceSortBy>('created_at')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const { hasPermission } = useAuth()
+  const canWrite = hasPermission(permissions.placesWrite)
 // Debounce the search input so we don't fire a request per keystroke.
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -100,6 +105,11 @@ return (
           <h2>الأماكن</h2>
           <p className="muted">تصفح وابحث وصنّف الأماكن في النظام وفق صلاحياتك.</p>
         </div>
+        {canWrite && (
+          <Link className="primary-button" to="/places/new">
+            <Plus size={17} /> إضافة مكان
+          </Link>
+        )}
         {hasFilters && (
           <button type="button" className="ghost-button" onClick={resetFilters}>
             مسح الفلاتر

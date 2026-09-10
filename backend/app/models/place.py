@@ -254,3 +254,10 @@ class Place(Base):
         cascade="all, delete-orphan",
         order_by="CommunityPost.created_at.desc()",
     )
+
+    socials = relationship(
+        "PlaceSocial",
+        back_populates="place",
+        cascade="all, delete-orphan",
+        order_by="PlaceSocial.created_at.asc()",
+    )

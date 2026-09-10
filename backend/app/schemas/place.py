@@ -26,8 +26,8 @@ class PlaceCreate(BaseModel):
     )
 
     image_url: str = Field(
-        min_length=1,
         max_length=1024,
+        description="Optional placeholder URL. May be empty when a place has no images.",
     )
 
     rating: float = 0.0
