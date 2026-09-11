@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:url_launcher/url_launcher.dart';
 import '../home/models/place.dart';
 import '../../services/favorite_service.dart';
 import '../../services/review_service.dart';
@@ -65,12 +66,20 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
               child: _buildPlaceInformation(),
             ),
 
-            // =====================================================
+                        // =====================================================
             // ACTIONS
             // =====================================================
 
             SliverToBoxAdapter(
               child: _buildActions(),
+            ),
+
+            // =====================================================
+            // SOCIAL
+            // =====================================================
+
+            SliverToBoxAdapter(
+              child: _buildSocials(),
             ),
 
             // =====================================================
@@ -568,6 +577,127 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
   // ===============================================================
   // DESCRIPTION
   // ===============================================================
+
+    // ===============================================================
+  // SOCIAL
+  // ===============================================================
+
+    // NOTE: استخدمنا static final (ليس const) لأن بعض أيقونات
+  // Material Icons غير متوفرة على جميع إصدارات Flutter/Material.
+  // YouTube و TikTok يستخدمان أيقونة public كبديل واضح.
+  static final Map<String, IconData> _socialIcons = {
+    'facebook': Icons.facebook,
+    'youtube': Icons.public,
+    'web': Icons.public,
+    'tiktok': Icons.public,
+    'instagram': Icons.photo_camera,
+  };
+
+  Uri? _socialUri(PlaceSocial social) {
+    final type = social.socialType;
+    final value = social.value.trim();
+
+    if (value.isEmpty) {
+      return null;
+    }
+
+    if (type == 'whatsapp') {
+      final clean = value.replaceAll(RegExp(r'[^0-9+]'), '');
+      if (clean.isEmpty) {
+        return null;
+      }
+
+      final link = clean.startsWith('00')
+          ? 'https://wa.me/${clean.substring(2)}'
+          : 'https://wa.me/$clean';
+
+      return Uri.parse(link);
+    }
+
+    final hasScheme = value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('mailto:');
+
+    return Uri.parse(
+      hasScheme ? value : 'https://$value',
+    );
+  }
+
+  Future<void> _openSocial(PlaceSocial social) async {
+    final uri = _socialUri(social);
+    if (uri == null) {
+      return;
+    }
+
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+        if (!launched &&
+        mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تعذر فتح الرابط',
+            textDirection: TextDirection.rtl,
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildSocials() {
+    final socials = place.socials
+        .where(
+          (s) =>
+              s.socialType.isNotEmpty &&
+              s.value.trim().isNotEmpty,
+        )
+        .toList();
+
+    if (socials.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return _buildSection(
+      title: 'وسائل التواصل',
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: socials
+            .map(
+              (social) => _SocialButton(
+                icon: _socialIcons[social.socialType] ??
+                    Icons.link,
+                label: _socialLabel(social.socialType),
+                onTap: () =>
+                    _openSocial(social),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  String _socialLabel(String type) {
+    switch (type) {
+      case 'facebook':
+        return 'فيسبوك';
+      case 'youtube':
+        return 'يوتيوب';
+      case 'web':
+        return 'الموقع';
+      case 'tiktok':
+        return 'تيك توك';
+      case 'instagram':
+        return 'إنستغرام';
+      case 'whatsapp':
+        return 'واتساب';
+      default:
+        return 'واتساب';
+    }
+  }
 
   Widget _buildDescription() {
     final description = place.description;
@@ -1255,8 +1385,66 @@ class _PlaceDetailsPageState extends State<PlaceDetailsPage> {
         );
       },
     );
+    }
+}
+
+
+// ===================================================================
+// SOCIAL BUTTON
+// ===================================================================
+
+class _SocialButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SocialButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 17,
+              color: colors.textPrimary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: colors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
+
 
 /// حوار تقييم المكان.
 ///

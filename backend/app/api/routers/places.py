@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.repositories.category_repository import CategoryRepository
 from app.repositories.place_repository import PlaceRepository
+from app.repositories.place_social_repository import PlaceSocialRepository
 from app.schemas.pagination import PaginatedResponse
-from app.schemas.place import PlaceRead
+from app.schemas.place import PlaceDetailsRead, PlaceRead
 from app.services.place_service import PlaceService
+from app.services.place_social_service import PlaceSocialService
 
 
 router = APIRouter()
@@ -75,6 +77,38 @@ async def list_places(
         le=100,
         description="Number of places per page",
     ),
+    sort_by: str | None = Query(
+        None,
+        pattern="^(reviews|rating|distance)$",
+        description=(
+            "Optional single effective ordering criterion: "
+            "'reviews' (most reviewed), 'rating' (highest rated), "
+            "'distance' (nearest first). Requires latitude/longitude "
+            "when 'distance'."
+        ),
+    ),
+    is_open: bool | None = Query(
+        None,
+        description="When set, keep only places that are currently open "
+        "(backend computed via working hours).",
+    ),
+    category_ids: str | None = Query(
+        None,
+        description="Comma-separated category ids. When set, keep only "
+        "places belonging to any of the given categories.",
+    ),
+    latitude: float | None = Query(
+        None,
+        ge=-90,
+        le=90,
+        description="User latitude (required only for sort_by=distance).",
+    ),
+    longitude: float | None = Query(
+        None,
+        ge=-180,
+        le=180,
+        description="User longitude (required only for sort_by=distance).",
+    ),
     session: AsyncSession = Depends(get_session),
 ):
     repository = PlaceRepository(session)
@@ -87,9 +121,28 @@ async def list_places(
 
     offset = (page - 1) * limit
 
+    parsed_category_ids = [
+        cid.strip()
+        for cid in (category_ids or "").split(",")
+        if cid.strip()
+    ]
+
+    if sort_by == "distance" and (
+        latitude is None or longitude is None
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="latitude and longitude are required for sort_by=distance",
+        )
+
     places, total = await service.get_places(
         offset=offset,
         limit=limit,
+        sort_by=sort_by,
+        is_open=is_open,
+        category_ids=parsed_category_ids or None,
+        latitude=latitude,
+        longitude=longitude,
     )
 
     return _build_paginated_response(
@@ -433,7 +486,7 @@ async def list_places_by_category(
 
 @router.get(
     "/places/{place_id}",
-    response_model=PlaceRead,
+    response_model=PlaceDetailsRead,
 )
 async def get_place(
     place_id: str,
@@ -466,4 +519,16 @@ async def get_place(
             detail="Place not found",
         )
 
-    return place
+    details = PlaceDetailsRead.model_validate(place)
+
+    social_service = PlaceSocialService(
+        PlaceSocialRepository(session),
+    )
+    raw_socials = await social_service.list_for_place(
+        place_id,
+    )
+    details.socials = [
+        PlaceSocialRead.model_validate(s) for s in raw_socials
+    ]
+
+    return details

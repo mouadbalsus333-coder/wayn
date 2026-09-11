@@ -26,11 +26,21 @@ class PlaceService:
         offset: int = 0,
         limit: int = 20,
         active_only: bool = True,
+        sort_by: str | None = None,
+        is_open: bool | None = None,
+        category_ids: list[str] | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> tuple[list[Place], int]:
         return await self.repository.list_places(
             offset=offset,
             limit=limit,
             active_only=active_only,
+            sort_by=sort_by,
+            is_open=is_open,
+            category_ids=category_ids,
+            latitude=latitude,
+            longitude=longitude,
         )
 
     async def get_admin_places(

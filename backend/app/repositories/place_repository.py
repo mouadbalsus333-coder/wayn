@@ -32,30 +32,84 @@ class PlaceRepository:
         offset: int = 0,
         limit: int = 20,
         active_only: bool = True,
+        sort_by: str | None = None,
+        is_open: bool | None = None,
+        category_ids: list[str] | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> tuple[list[Place], int]:
-        query = select(Place)
+        """List active places with optional combined filters and sort.
+
+        ``sort_by`` accepts one of the effective ordering criteria:
+          - "reviews"  -> most reviewed first (reviews_count DESC)
+          - "rating"   -> highest rated first (rating DESC)
+          - "distance" -> nearest first (requires latitude/longitude)
+          - default    -> created_at DESC
+
+        ``is_open`` and ``category_ids`` are independent filters that can be
+        combined with any ``sort_by``, so a single call can express e.g.
+        open places, in selected categories, ordered by reviews.
+        """
+        conditions = []
 
         if active_only:
-            query = query.where(
-                Place.is_active.is_(True),
-                Place.deleted_at.is_(None),
-            )
+            conditions.append(Place.is_active.is_(True))
+            conditions.append(Place.deleted_at.is_(None))
 
-        count_query = select(func.count()).select_from(Place)
+        if is_open is not None:
+            conditions.append(Place.is_open.is_(is_open))
 
-        if active_only:
-            count_query = count_query.where(
-                Place.is_active.is_(True),
-                Place.deleted_at.is_(None),
+        if category_ids:
+            conditions.append(Place.category_id.in_(category_ids))
+
+        if sort_by == "distance":
+            if latitude is None or longitude is None:
+                raise ValueError(
+                    "distance sort requires latitude and longitude"
+                )
+            user_location = func.ST_SetSRID(
+                func.ST_MakePoint(longitude, latitude),
+                4326,
             )
+            user_geography = func.ST_GeogFromText(
+                func.ST_AsText(user_location)
+            )
+            distance = func.ST_Distance(
+                Place.location,
+                user_geography,
+            )
+            conditions.append(Place.location.is_not(None))
+
+        count_query = (
+            select(func.count())
+            .select_from(Place)
+            .where(*conditions)
+        )
 
         total = (
             await self.session.execute(count_query)
         ).scalar_one()
 
+        order_columns = []
+        if sort_by == "reviews":
+            order_columns = [
+                Place.reviews_count.desc(),
+                Place.rating.desc(),
+            ]
+        elif sort_by == "rating":
+            order_columns = [
+                Place.rating.desc(),
+                Place.reviews_count.desc(),
+            ]
+        elif sort_by == "distance":
+            order_columns = [distance.asc()]
+        else:
+            order_columns = [Place.created_at.desc()]
+
         query = (
-            query
-            .order_by(Place.created_at.desc())
+            select(Place)
+            .where(*conditions)
+            .order_by(*order_columns)
             .offset(offset)
             .limit(limit)
         )
@@ -344,7 +398,7 @@ class PlaceRepository:
             select(Place)
             .where(*conditions)
             .order_by(
-                Place.visits_count.desc(),
+                Place.reviews_count.desc(),
                 Place.rating.desc(),
             )
             .offset(offset)

@@ -62,6 +62,11 @@ abstract class PlaceRepository {
   Future<PaginatedPlaces> getPlacesPage({
     int page = 1,
     int limit = 20,
+    String? sortBy,
+    bool? isOpen,
+    List<String>? categoryIds,
+    double? latitude,
+    double? longitude,
   });
 
   Future<PaginatedPlaces> getNearbyPlacesPage({

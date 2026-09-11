@@ -5,12 +5,12 @@ import '../../services/category_service.dart';
 import '../../services/place_service.dart';
 import '../../services/repositories/place_repository.dart';
 import '../places/place_details_page.dart';
+import '../places/widgets/place_filter_sheet.dart';
 import '../home/models/place.dart';
 import '../../core/widgets/wayn_header.dart';
 import '../../core/widgets/wayn_menu_drawer.dart';
 import '../../core/theme/wayn_colors.dart';
 import '../../features/notifications/notifications_page.dart';
-import '../home/widgets/home_filters.dart';
 import '../home/widgets/home_search_bar.dart';
 import '../home/widgets/place_card.dart';
 import '../home/widgets/section_header.dart';
@@ -61,6 +61,9 @@ class _ExplorePageState extends State<ExplorePage> {
   Position? _currentPosition;
 
   bool _showingAllPlaces = true;
+
+  /// الفلتر الموحّد المطبَّق حاليًا (يفتح من زر الفلتر في مستطيل البحث).
+  PlaceFilter _filter = PlaceFilter();
 
   ({double latitude, double longitude})?
       _lastLoadedReference;
@@ -444,9 +447,29 @@ class _ExplorePageState extends State<ExplorePage> {
         );
 
       default:
+        if (_filter.isEmpty) {
+          return _placeService.getPlacesPage(
+            page: page,
+            limit: _pageSize,
+          );
+        }
+
+        final ref = _referencePoint;
+
+        final query = PlaceFilterQuery.fromFilter(
+          _filter,
+          latitude: ref?.latitude,
+          longitude: ref?.longitude,
+        );
+
         return _placeService.getPlacesPage(
           page: page,
           limit: _pageSize,
+          sortBy: query.sortBy,
+          isOpen: query.isOpen,
+          categoryIds: query.categoryIds,
+          latitude: query.latitude,
+          longitude: query.longitude,
         );
     }
   }
@@ -1133,32 +1156,126 @@ class _ExplorePageState extends State<ExplorePage> {
       builder: (sheetContext) {
         return Directionality(
           textDirection: TextDirection.rtl,
-          child: _CategoryBottomSheet(
+          child: PlaceFilterSheet(
             categories: _categories,
-            status: _categoriesStatus,
-            selectedCategory: _selectedCategory,
-            onAllPressed: () async {
+            initial: _filter,
+            onApply: (filter) {
               Navigator.of(
                 sheetContext,
               ).pop();
 
-              await _selectAllPlaces();
-            },
-            onCategoryPressed:
-                (category) async {
-              Navigator.of(
-                sheetContext,
-              ).pop();
-
-              await _onCategorySelected(
-                category,
+              _onFilterApplied(
+                filter,
               );
             },
-            iconFromName: _iconFromName,
           ),
         );
       },
     );
+  }
+
+  // ================================================================
+  // FILTER APPLIED
+  // ================================================================
+
+  Future<void> _onFilterApplied(
+    PlaceFilter filter,
+  ) async {
+    if (!mounted) return;
+
+    setState(() {
+      _filter = filter;
+      _selectedFilterIndex = -1;
+      _selectedCategory = null;
+      _selectedCategoryLabel = 'كل الأماكن';
+      _searchQuery = '';
+      _showingAllPlaces = filter.isEmpty;
+      _isLoading = true;
+      _isLoadingMore = false;
+      _errorMessage = null;
+      _currentPage = 1;
+      _totalPages = 0;
+      _replacePlaces([]);
+    });
+
+    try {
+      final result =
+          await _loadPageForCurrentState(
+        page: 1,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _replacePlaces(
+          _preparePlaces(result.items),
+          refreshDistanceCache:
+              _showingAllPlaces,
+        );
+        _currentPage = result.page;
+        _totalPages = result.pages;
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _replacePlaces([]);
+        _isLoading = false;
+        _isLoadingMore = false;
+        _errorMessage = error.toString();
+      });
+
+      debugPrint(
+        'Filter failed: $error',
+      );
+    }
+  }
+
+  Future<void> _reloadFilteredView() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _isLoadingMore = false;
+      _errorMessage = null;
+      _currentPage = 1;
+      _totalPages = 0;
+      _replacePlaces([]);
+    });
+
+    try {
+      final result =
+          await _loadPageForCurrentState(
+        page: 1,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _replacePlaces(
+          _preparePlaces(result.items),
+        );
+        _currentPage = result.page;
+        _totalPages = result.pages;
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _replacePlaces([]);
+        _isLoading = false;
+        _isLoadingMore = false;
+        _errorMessage = error.toString();
+      });
+
+      debugPrint(
+        'Failed to reload filtered view: $error',
+      );
+    }
   }
 
   // ================================================================
@@ -1215,19 +1332,6 @@ class _ExplorePageState extends State<ExplorePage> {
                           AlwaysScrollableScrollPhysics(),
                     ),
                     slivers: [
-                      // ------------------------------------------------
-                      // FILTERS
-                      // ------------------------------------------------
-
-                      SliverToBoxAdapter(
-                        child: HomeFilters(
-                          selectedIndex:
-                              _selectedFilterIndex,
-                          onFilterSelected:
-                              _onFilterSelected,
-                        ),
-                      ),
-
                       // ------------------------------------------------
                       // CATEGORIES
                       // ------------------------------------------------
@@ -1415,6 +1519,11 @@ class _ExplorePageState extends State<ExplorePage> {
         );
       }
 
+      return;
+    }
+
+    if (!_filter.isEmpty) {
+      await _reloadFilteredView();
       return;
     }
 

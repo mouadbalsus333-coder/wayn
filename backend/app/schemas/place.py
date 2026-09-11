@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.place_social import PlaceSocialRead
+
 
 class PlaceCreate(BaseModel):
     category_id: str | None = None
@@ -136,4 +138,16 @@ class PlaceRead(BaseModel):
 
     model_config = {
         "from_attributes": True,
-    }
+    }
+
+
+class PlaceDetailsRead(PlaceRead):
+    # Only populated by the single-place details endpoint.
+    # List endpoints keep returning the lighter PlaceRead (no N+1).
+    socials: list[PlaceSocialRead] = Field(
+        default_factory=list,
+    )
+
+    model_config = {
+        "from_attributes": True,
+    }

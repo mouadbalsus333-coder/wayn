@@ -154,13 +154,40 @@ class FastApiPlaceRepository implements PlaceRepository {
   Future<PaginatedPlaces> getPlacesPage({
     int page = 1,
     int limit = 20,
+    String? sortBy,
+    bool? isOpen,
+    List<String>? categoryIds,
+    double? latitude,
+    double? longitude,
   }) async {
+    final queryParams = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+    };
+
+    if (sortBy != null && sortBy.isNotEmpty) {
+      queryParams['sort_by'] = sortBy;
+    }
+
+    if (isOpen != null) {
+      queryParams['is_open'] = isOpen;
+    }
+
+    if (categoryIds != null && categoryIds.isNotEmpty) {
+      queryParams['category_ids'] = categoryIds.join(',');
+    }
+
+    if (latitude != null) {
+      queryParams['latitude'] = latitude;
+    }
+
+    if (longitude != null) {
+      queryParams['longitude'] = longitude;
+    }
+
     final response = await _apiClient.get(
       '/api/v1/places',
-      queryParams: {
-        'page': page,
-        'limit': limit,
-      },
+      queryParams: queryParams,
     );
 
     return _paginatedPlacesFromResponse(

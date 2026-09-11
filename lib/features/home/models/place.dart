@@ -1,3 +1,20 @@
+/// وسيلة تواصل للمكان.
+class PlaceSocial {
+  final String socialType;
+  final String value;
+
+  PlaceSocial({required this.socialType, required this.value});
+
+  PlaceSocial.fromMap(Map<String, dynamic> data)
+      : socialType = data['social_type']?.toString() ?? '',
+        value = data['value']?.toString() ?? '';
+
+  Map<String, dynamic> toMap() => {
+        'social_type': socialType,
+        'value': value,
+      };
+}
+
 class Place {
   final String id;
   final String? categoryId;
@@ -26,6 +43,8 @@ class Place {
   final int reviewsCount;
   final int visitsCount;
 
+  final List<PlaceSocial> socials;
+
   const Place({
     required this.id,
     this.categoryId,
@@ -52,7 +71,10 @@ class Place {
 
     this.reviewsCount = 0,
     this.visitsCount = 0,
+
+    this.socials = const [],
   });
+
   factory Place.fromMap(Map<String, dynamic> data) {
     double? d(dynamic v) => v == null ? null : (v is num ? v.toDouble() : double.tryParse(v.toString()));
     int i(dynamic v) => v is num ? v.toInt() : int.tryParse(v?.toString() ?? '') ?? 0;
@@ -77,8 +99,14 @@ class Place {
       services: list(data['services']),
       openingTime: data['opening_time']?.toString(),
       closingTime: data['closing_time']?.toString(),
-      reviewsCount: i(data['reviews_count']),
+            reviewsCount: i(data['reviews_count']),
       visitsCount: i(data['visits_count']),
+      socials: (data['socials'] is List)
+          ? (data['socials'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map((e) => PlaceSocial.fromMap(e))
+              .toList()
+          : const [],
     );
   }
 

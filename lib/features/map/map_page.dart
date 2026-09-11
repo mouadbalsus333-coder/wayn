@@ -9,9 +9,12 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../home/models/place.dart';
+import '../places/widgets/place_filter_sheet.dart';
+import '../../../models/category.dart';
 import '../community/models/community_post.dart';
 import '../community/repositories/community_repository.dart';
 import '../../../services/place_service.dart';
+import '../../../services/category_service.dart';
 import '../../../services/repositories/repository_factory.dart';
 import '../../../core/config/backend_config.dart';
 import '../../../core/theme/wayn_colors.dart';
@@ -24,8 +27,6 @@ import '../../../core/navigation/wayn_actions.dart';
 import '../../../features/notifications/notifications_page.dart';
 import '../community/widgets/community_post_card.dart';
 import '../../../features/location/saved_locations_store.dart';
-
-enum _MapStatusFilter { all, open, closed, near }
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -85,9 +86,12 @@ class _MapPageState extends State<MapPage> {
 
   final bool _showPlaces = true;
 
-  _MapStatusFilter _statusFilter = _MapStatusFilter.all;
+  /// الفلتر الموحّد المطبَّق حاليًا (يفتح من زر الفلتر في مستطيل البحث).
+  PlaceFilter _filter = PlaceFilter();
 
-  String? _categoryFilter;
+  List<Category> _categories = [];
+
+  final CategoryService _categoryService = CategoryService();
 
   bool _showVisitorOpinions = false;
 
@@ -165,6 +169,7 @@ class _MapPageState extends State<MapPage> {
     await SavedLocationsStore.instance.ensureLoaded();
     await _loadCurrentLocation();
     await _loadPlaces();
+    await _loadCategories();
   }
 
   // ===============================================================
@@ -617,6 +622,65 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
+// ===============================================================
+  // LOAD CATEGORIES
+  // ===============================================================
+
+  Future<void> _loadCategories() async {
+    final result =
+        await _categoryService.getCategories();
+
+    if (!mounted) return;
+
+    final uniqueCategories =
+        <String, Category>{};
+
+    for (final category
+        in result.categories) {
+      final key = category.nameAr
+          .trim()
+          .toLowerCase();
+
+      if (key.isEmpty) {
+        continue;
+      }
+
+      final existing =
+          uniqueCategories[key];
+
+      if (existing == null ||
+          ((existing.icon == null ||
+                  existing.icon!
+                      .trim()
+                      .isEmpty) &&
+              category.icon != null &&
+              category.icon!
+                  .trim()
+                  .isNotEmpty)) {
+        uniqueCategories[key] =
+            category;
+      }
+    }
+
+    final categories =
+        uniqueCategories.values.toList();
+
+    categories.sort(
+      (a, b) => a.nameAr.compareTo(
+        b.nameAr,
+      ),
+    );
+
+    final loaded =
+        result.status ==
+            CategoryLoadStatus.loaded;
+
+    setState(() {
+      _categories = loaded
+          ? categories
+          : [];
+    });
+  }
   List<Place> _validPlaces(
     List<Place> places,
   ) {
@@ -1228,30 +1292,22 @@ class _MapPageState extends State<MapPage> {
   // ===============================================================
 
   List<Place> get _visiblePlaces {
+    final filter = _filter;
+
     final result = _places.where((place) {
       if (!_showPlaces) {
         return false;
       }
 
-      if (_statusFilter == _MapStatusFilter.open &&
-          !place.isOpen) {
+      if (filter.openOnly && !place.isOpen) {
         return false;
       }
 
-      if (_statusFilter == _MapStatusFilter.closed &&
-          place.isOpen) {
-        return false;
-      }
-
-      if (_statusFilter == _MapStatusFilter.near) {
-        if (place.latitude == null ||
-            place.longitude == null) {
-          return false;
-        }
-      }
-
-      if (_categoryFilter != null &&
-          place.category != _categoryFilter) {
+      if (!filter.allCategories &&
+          (place.categoryId == null ||
+              !filter.categoryIds.contains(
+                place.categoryId,
+              ))) {
         return false;
       }
 
@@ -1273,33 +1329,33 @@ class _MapPageState extends State<MapPage> {
       return true;
     }).toList();
 
-    if (_statusFilter == _MapStatusFilter.near &&
-        _referenceOrGps != null) {
-      result.sort(
-        (a, b) =>
-            _distanceToPlace(a).compareTo(
-          _distanceToPlace(b),
-        ),
-      );
-    }
-
-    return result;
-  }
-
-  List<String> get _categoryOptions {
-    final categories = <String>{};
-
-    for (final place in _places) {
-      final category = place.category.trim();
-
-      if (category.isNotEmpty) {
-        categories.add(category);
+    if (filter.sort != null) {
+      switch (filter.sort) {
+        case PlaceSortCriterion.reviews:
+          result.sort(
+            (a, b) => b.reviewsCount
+                .compareTo(a.reviewsCount),
+          );
+        case PlaceSortCriterion.rating:
+          result.sort(
+            (a, b) => b.rating
+                .compareTo(a.rating),
+          );
+        case PlaceSortCriterion.distance:
+          if (_referenceOrGps != null) {
+            result.sort(
+              (a, b) =>
+                  _distanceToPlace(a).compareTo(
+                _distanceToPlace(b),
+              ),
+            );
+          }
+        case null:
+          break;
       }
     }
 
-    final list = categories.toList()..sort();
-
-    return list;
+    return result;
   }
 
   double _distanceToPlace(Place place) {
@@ -1799,249 +1855,39 @@ class _MapPageState extends State<MapPage> {
   // FILTER SHEET
   // ===============================================================
 
-  List<({String label, _MapStatusFilter value})>
-      get _statusOptions => const [
-        (label: 'الكل', value: _MapStatusFilter.all),
-        (label: 'مفتوح', value: _MapStatusFilter.open),
-        (label: 'مغلق', value: _MapStatusFilter.closed),
-        (label: 'قريب مني', value: _MapStatusFilter.near),
-      ];
-
   Future<void> _openFilterSheet() async {
-    final result =
-        await showModalBottomSheet<(_MapStatusFilter, String?)>(
+    PlaceFilter? selected;
+
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _buildFilterSheet(),
+      builder: (sheetContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: PlaceFilterSheet(
+            categories: _categories,
+            initial: _filter,
+            onApply: (filter) {
+              selected = filter;
+              Navigator.of(sheetContext).pop();
+            },
+          ),
+        );
+      },
     );
 
-    if (result == null || !mounted) {
+    if (selected == null || !mounted) {
       return;
     }
 
     setState(() {
-      _statusFilter = result.$1;
-      _categoryFilter = result.$2;
+      _filter = selected!;
     });
 
     await _addPlaceMarkers();
   }
 
-  Widget _buildFilterSheet() {
-    return StatefulBuilder(
-      builder: (context, setSheetState) {
-        var status = _statusFilter;
-        String? category = _categoryFilter;
-
-        return SafeArea(
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(26),
-              ),
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight:
-                    MediaQuery.of(context).size.height * 0.72,
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  10,
-                  20,
-                  16,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE5E9EF),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Center(
-                      child: Text(
-                        'فلترة',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: _waynText,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    const Text(
-                      'الحالة',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: _waynText,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      children: [
-                        for (final item in _statusOptions)
-                          _buildFilterOption(
-                            label: item.label,
-                            selected: status == item.value,
-                            onTap: () {
-                              setSheetState(() {
-                                status = item.value;
-                              });
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'التصنيف',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: _waynText,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      children: [
-                        _buildFilterOption(
-                          label: 'الكل',
-                          selected: category == null,
-                          onTap: () {
-                            setSheetState(() {
-                              category = null;
-                            });
-                          },
-                        ),
-                        for (final item in _categoryOptions)
-                          _buildFilterOption(
-                            label: item,
-                            selected: category == item,
-                            onTap: () {
-                              setSheetState(() {
-                                category = item;
-                              });
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildFilterActionButton(
-                            label: 'إعادة تعيين',
-                            backgroundColor: const Color(
-                              0xFFF2F4F7,
-                            ),
-                            foregroundColor: _waynText,
-                            onTap: () {
-                              Navigator.of(context).pop(
-                                (_MapStatusFilter.all, null),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildFilterActionButton(
-                            label: 'تطبيق الفلتر',
-                            backgroundColor: _waynTeal,
-                            foregroundColor: Colors.white,
-                            onTap: () {
-                              Navigator.of(context).pop(
-                                (status, category),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFilterOption({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.only(left: 8, bottom: 8),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? _waynTeal : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected
-                ? _waynTeal
-                : const Color(0xFFE5E9EF),
-            width: 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: selected
-                ? Colors.white
-                : const Color(0xFF596273),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterActionButton({
-    required String label,
-    required Color backgroundColor,
-    required Color foregroundColor,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(13),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: foregroundColor,
-          ),
-        ),
-      ),
-    );
-  }
 
   // ===============================================================
   // LOCATION BUTTON

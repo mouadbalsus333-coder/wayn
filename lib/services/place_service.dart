@@ -80,10 +80,20 @@ class PlaceService {
   Future<PaginatedPlaces> getPlacesPage({
     int page = 1,
     int limit = 20,
+    String? sortBy,
+    bool? isOpen,
+    List<String>? categoryIds,
+    double? latitude,
+    double? longitude,
   }) async {
     return _placeRepository.getPlacesPage(
       page: page,
       limit: limit,
+      sortBy: sortBy,
+      isOpen: isOpen,
+      categoryIds: categoryIds,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 
