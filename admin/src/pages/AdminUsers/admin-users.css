@@ -1,4 +1,4 @@
-/* ===== Roles & Permissions management (Task 5) ===== */
+﻿/* ===== Roles & Permissions management (Task 5) ===== */
 
 .access-card h3 { margin-bottom: 12px; }
 
@@ -10,7 +10,7 @@
 .chip-remove:disabled { opacity: .55; cursor: wait; }
 
 .access-add-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
-.access-add-row select { min-width: 220px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--color-border, #e2e8f0); border-radius: var(--radius-sm); background: white; color: var(--color-text); font: inherit; }
+.access-add-row select { min-width: 220px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--color-border, #e2e8f0); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font: inherit; }
 .access-add-row .primary-button { min-height: 40px; padding-inline: 14px; }
 
 .access-limitation { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--color-border, #cbd5e1); border-radius: var(--radius-sm); color: var(--color-muted); font-size: 12.5px; line-height: 1.7; }
@@ -25,7 +25,7 @@
   .access-add-row select { min-width: 0; flex: 1 1 100%; }
 }
 
-/* Admin Users module — reuses design tokens and shared classes (places.css / place-actions.css). */
+/* Admin Users module â€” reuses design tokens and shared classes (places.css / place-actions.css). */
 
 .filters-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px; }
 .filters-bar .search-box { display: flex; align-items: center; gap: 9px; flex: 1 1 260px; min-width: 220px; padding: 0 13px; min-height: 46px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-muted); }
@@ -53,3 +53,4 @@
   .filters-bar .role-filter { flex: 1 1 100%; }
   .filters-bar .status-filter { flex: 1 1 100%; }
 }
+

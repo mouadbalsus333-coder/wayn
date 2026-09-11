@@ -180,14 +180,18 @@ class _ProfilePageState extends State<ProfilePage> {
     await _loadOwnership();
   }
 
-  Future<void> _loadUser() async {
+    Future<void> _loadUser() async {
     try {
       final user = await _auth.getCurrentUser();
+
+      if (!mounted) return;
 
       if (user != null) {
         _user = user;
       }
     } catch (_) {
+      if (!mounted) return;
+
       _loadFailed = true;
     }
   }

@@ -194,6 +194,17 @@ class UserRead(BaseModel):
     is_verified: bool
 
     # ============================================================
+    # Social stats
+    # ============================================================
+    # Loaded from the UserFollow table so the Flutter app can render
+    # profile stats (followers / following) without an extra API
+    # round-trip. Defaults keep ``model_validate(user)`` usable for
+    # registration, where a new account naturally has zero followers
+    # and zero following.
+    followers_count: int = 0
+    following_count: int = 0
+
+    # ============================================================
     # Admin context
     # ============================================================
     #

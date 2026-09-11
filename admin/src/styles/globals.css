@@ -1,4 +1,4 @@
-:root {
+﻿:root {
 --color-bg: #f7f9fc;
 --color-surface: #ffffff;
 --color-text: #172033;
@@ -702,13 +702,24 @@ transform: rotate(360deg);
 }
 
 /* ============================================================
-Dark mode — common elements
+Dark mode â€” common elements
 ============================================================ */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
 
 html[data-theme="dark"] input,
 html[data-theme="dark"] select,
 html[data-theme="dark"] textarea {
-color-scheme: dark;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] select,
+html[data-theme="dark"] select option,
+html[data-theme="dark"] select optgroup {
+  color: var(--color-text);
+  background-color: var(--color-surface);
 }
 
 html[data-theme="dark"] .login-form label {
@@ -814,3 +825,5 @@ flex-shrink: 0;
 font-size: 0;
 }
 }
+
+

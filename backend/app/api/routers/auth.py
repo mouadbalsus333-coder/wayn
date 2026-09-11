@@ -5,6 +5,7 @@ from app.api.dependencies.auth import get_current_user
 from app.core.database import get_session
 from app.core.security import create_access_token
 from app.models.user import User
+from app.repositories.social_repository import SocialRepository
 from app.repositories.user_verification_code_repository import (
     UserVerificationCodeRepository,
 )
@@ -40,14 +41,23 @@ router = APIRouter(
 )
 
 
-def _user_read_with_admin(
+async def _user_read_with_admin(
     user: User,
     admin_context: UserAdminInfo | None,
+    session: AsyncSession,
 ) -> UserRead:
-    """Build a :class:`UserRead` carrying the resolved admin context."""
+    """Build a :class:`UserRead` with admin context and follow stats."""
 
     payload = UserRead.model_validate(user)
     payload.admin = admin_context
+
+    social_repository = SocialRepository(session)
+    payload.followers_count = await social_repository.count_followers(
+        user.id,
+    )
+    payload.following_count = await social_repository.count_following(
+        user.id,
+    )
     return payload
 
 
@@ -188,7 +198,7 @@ async def login(
     return AuthResponse(
         access_token=access_token,
         token_type="bearer",
-        user=_user_read_with_admin(user, admin_context),
+        user=await _user_read_with_admin(user, admin_context, session),
     )
 
 
@@ -264,7 +274,7 @@ async def verify_email(
     return VerificationResponse(
         access_token=access_token,
         token_type="bearer",
-        user=_user_read_with_admin(user, admin_context),
+        user=await _user_read_with_admin(user, admin_context, session),
     )
 
 
@@ -503,7 +513,7 @@ async def get_me(
         current_user.email,
     )
 
-    return _user_read_with_admin(current_user, admin_context)
+    return await _user_read_with_admin(current_user, admin_context, session)
 
 
 # ============================================================
@@ -540,7 +550,7 @@ async def update_my_profile(
 
     admin_context = await get_user_admin_context(session, user.email)
 
-    return _user_read_with_admin(user, admin_context)
+    return await _user_read_with_admin(user, admin_context, session)
 
 
 # ============================================================
@@ -593,9 +603,9 @@ async def update_my_location(
         user=current_user,
         latitude=data.latitude,
         longitude=data.longitude,
-        source=data.source,
+    source=data.source,
     )
 
     admin_context = await get_user_admin_context(session, user.email)
 
-    return _user_read_with_admin(user, admin_context)
+    return await _user_read_with_admin(user, admin_context, session)
