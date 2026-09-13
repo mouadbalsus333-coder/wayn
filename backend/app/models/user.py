@@ -254,6 +254,17 @@ class User(Base):
     )
 
     # ============================================================
+    # Devices (FCM tokens)
+    # ============================================================
+
+    devices = relationship(
+        "UserDevice",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="UserDevice.created_at.desc()",
+    )
+
+    # ============================================================
     # Points Transactions
     # ============================================================
     #

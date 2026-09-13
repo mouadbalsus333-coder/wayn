@@ -28,6 +28,11 @@ dependencies:
     path: third_party/maplibre_gl
   image_picker: 1.2.3
 
+  # Firebase Cloud Messaging (FCM) push notifications
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
+  flutter_local_notifications: ^19.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

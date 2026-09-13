@@ -91,6 +91,14 @@ class UserNotification(Base):
         index=True,
     )
 
+    source: Mapped[str] = mapped_column(
+        sa.String(50),
+        nullable=False,
+        default="social",
+        server_default="social",
+        index=True,
+    )
+
     text: Mapped[str] = mapped_column(
         sa.Text,
         nullable=False,

@@ -39,6 +39,13 @@ app.*.map.json
 /android/app/release
 # Backend environment / secrets
 backend/.env
+# Firebase service-account credentials (never commit)
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase-service-account.json
+**/*-firebase-adminsdk-*.json
+**/service-account.json
+backend/firebase/*.json
 # Python
 __pycache__/
 *.py[cod]

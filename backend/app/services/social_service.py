@@ -197,6 +197,10 @@ class SocialService:
                     "actor_avatar": actor_avatar,
                     "is_read": notification.is_read,
                     "created_at": notification.created_at,
+                    # --- Backward-compatible additions ---
+                    "source": notification.source or "social",
+                    "data": notification.data,
+                    "read_at": notification.read_at,
                 }
             )
 

@@ -1,14 +1,21 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/auth_gate.dart';
+import 'services/notifications/fcm_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await waynThemeController.load();
+
+  // Best-effort Firebase/FCM init (no-op if Firebase is not configured).
+  // Fire-and-forget: must never block app startup.
+  unawaited(initializeFirebasePush());
 
   runApp(const WaynApp());
 }

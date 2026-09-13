@@ -74,3 +74,10 @@ class AdminUser(Base):
         secondary="admin_user_permissions",
         back_populates="direct_admin_users",
     )
+
+    sent_notifications = relationship(
+        "AdminNotification",
+        back_populates="sent_by",
+        cascade="all, delete-orphan",
+        order_by="AdminNotification.created_at.desc()",
+    )

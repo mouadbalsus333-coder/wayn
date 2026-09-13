@@ -41,6 +41,19 @@ from app.models import admin_associations  # noqa: F401
 
 from app.models.favorite import UserFavorite  # noqa: F401
 from app.models.review import PlaceReview  # noqa: F401
+from app.models.social import UserNotification  # noqa: F401
+
+# ============================================================
+# User Devices (FCM tokens)
+# ============================================================
+
+from app.models.user_device import UserDevice  # noqa: F401
+
+# ============================================================
+# Admin Notifications
+# ============================================================
+
+from app.models.admin_notification import AdminNotification  # noqa: F401
 
 # ============================================================
 # Wallet / Points / Coins models

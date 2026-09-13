@@ -14,6 +14,7 @@ from app.api.routers import (
     admin_auth,
     admin_community,
     admin_dashboard,
+    admin_notifications,
     admin_permissions,
     admin_places,
     admin_regular_users,
@@ -24,6 +25,7 @@ from app.api.routers import (
     auth,
     categories,
     community,
+    devices,
     favorites,
     health,
     notifications,
@@ -261,6 +263,15 @@ app.include_router(
 
 
 # ============================================================
+# Devices (user + FCM token registration)
+# ============================================================
+app.include_router(
+    devices.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
 # Store
 # ============================================================
 app.include_router(
@@ -346,6 +357,15 @@ app.include_router(
 # ============================================================
 app.include_router(
     admin_users.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
+# Admin Notifications
+# ============================================================
+app.include_router(
+    admin_notifications.router,
     prefix="/api/v1",
 )
 

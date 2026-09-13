@@ -280,6 +280,38 @@ class Settings:
             "",
         )
 
+        # ----------------------------------------------------
+        # Firebase Cloud Messaging (FCM / Push)
+        # ----------------------------------------------------
+        #
+        # Credentials are never hard-coded. Two mutually-exclusive
+        # ways to supply the service account are supported:
+        #   * FIREBASE_SERVICE_ACCOUNT_JSON -> inline JSON document
+        #   * FIREBASE_SERVICE_ACCOUNT_PATH  -> path to a JSON file
+        # Credentials must never be committed to Git.
+        #
+        self.firebase_project_id = os.environ.get(
+            "FIREBASE_PROJECT_ID",
+            "",
+        )
+
+        self.firebase_service_account_json = os.environ.get(
+            "FIREBASE_SERVICE_ACCOUNT_JSON",
+            "",
+        )
+
+        self.firebase_service_account_path = os.environ.get(
+            "FIREBASE_SERVICE_ACCOUNT_PATH",
+            "",
+        )
+
+        # Explicit kill-switch so push can be disabled independently
+        # of whether credentials exist in the environment.
+        self.firebase_enabled = (
+            os.environ.get("FIREBASE_ENABLED", "false").strip().lower()
+            == "true"
+        )
+
 
 # ============================================================
 # Global settings instance

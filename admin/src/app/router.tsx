@@ -24,6 +24,7 @@ import { permissions } from '../permissions/permissionNames'
 import { RegularUsersPage } from '../pages/RegularUsers/RegularUsersPage'
 import { RegularUserDetailsPage } from '../pages/RegularUsers/RegularUserDetailsPage'
 import { ReviewsPage } from '../pages/Reviews/ReviewsPage'
+import { NotificationsPage } from '../pages/Notifications/NotificationsPage'
 
 function ProtectedLayout() {
   return (
@@ -181,6 +182,14 @@ export function AppRouter() {
           element={
             <RequirePermission permission={permissions.reviewsRead}>
               <ReviewsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <RequirePermission permission={permissions.notificationsRead}>
+              <NotificationsPage />
             </RequirePermission>
           }
         />

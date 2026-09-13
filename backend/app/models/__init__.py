@@ -35,6 +35,23 @@ from app.models import admin_associations
 from app.models.social import UserFollow, UserNotification
 
 # ============================================================
+# User Devices (FCM tokens)
+# ============================================================
+
+from app.models.user_device import UserDevice
+
+# ============================================================
+# Admin Notifications
+# ============================================================
+
+from app.models.admin_notification import (
+    AdminNotification,
+    NotificationChannel,
+    NotificationType,
+    NotificationStatus,
+)
+
+# ============================================================
 # Community
 # ============================================================
 

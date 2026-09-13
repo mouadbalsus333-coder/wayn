@@ -1,14 +1,19 @@
+import 'dart:async' show unawaited;
+
 import '../models/user.dart';
+import 'notifications/fcm_controller.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/repository_factory.dart';
 
 class AuthService {
   final AuthRepository _authRepository;
+  final FcmController _fcmController;
 
   AuthService({
     AuthRepository? authRepository,
-  }) : _authRepository =
-            authRepository ?? createAuthRepository();
+    FcmController? fcmController,
+  })  : _authRepository = authRepository ?? createAuthRepository(),
+        _fcmController = fcmController ?? FcmController();
 
   // ============================================================
   // Register
@@ -40,10 +45,18 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    return _authRepository.login(
+    final user = await _authRepository.login(
       email: email,
       password: password,
     );
+
+    // After a successful login, register this device for push delivery.
+    // Fire-and-forget: must never break the auth flow.
+    if (user != null) {
+      unawaited(_fcmController.registerDeviceIfReady());
+    }
+
+    return user;
   }
 
   // ============================================================
@@ -59,6 +72,9 @@ class AuthService {
   // ============================================================
 
   Future<void> logout() async {
+    // Deactivate this device so it no longer receives push after logout.
+    // Fire-and-forget: logout must succeed even if the backend is unreachable.
+    unawaited(_fcmController.deactivateDevice());
     await _authRepository.logout();
   }
 

@@ -38,6 +38,12 @@ class NotificationRead(BaseModel):
     actor_avatar: str | None
     is_read: bool
     created_at: datetime
+    # --- Backward-compatible additions ---
+    # source / data / read_at are optional with defaults so that
+    # older responses (and older clients) keep working unchanged.
+    source: str = "social"
+    data: dict | None = None
+    read_at: datetime | None = None
 
     model_config = {
         "from_attributes": True,

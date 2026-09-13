@@ -12,6 +12,8 @@ export const permissions = {
   communityModerate: 'community.moderate',
   reviewsRead: 'reviews.read',
   reviewsModerate: 'reviews.moderate',
+  notificationsRead: 'notifications.read',
+  notificationsSend: 'notifications.send',
   contributionsRead: 'contributions.read',
   contributionsApprove: 'contributions.approve',
   contributionsReject: 'contributions.reject',

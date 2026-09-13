@@ -1,4 +1,4 @@
-import { LayoutDashboard, MapPin, MessagesSquare, Star, Users, UserRound, ClipboardCheck, Wallet, Tags, Store, Megaphone, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, MapPin, MessagesSquare, Star, Users, UserRound, ClipboardCheck, Wallet, Tags, Store, Megaphone, ShieldCheck, Bell, type LucideIcon } from 'lucide-react'
 import { permissions } from './permissionNames'
 
 export type NavigationItem = {
@@ -23,4 +23,5 @@ export const navigationItems: NavigationItem[] = [
   { label: 'المتجر', path: '/store', icon: Store, permission: permissions.storeRead },
   { label: 'إعلانات المتجر', path: '/store-ads', icon: Megaphone, permission: permissions.storeRead },
   { label: 'الصلاحيات', path: '/permissions', icon: ShieldCheck, role: 'super_admin' },
+  { label: 'الإشعارات', path: '/notifications', icon: Bell, permission: permissions.notificationsRead },
 ]
