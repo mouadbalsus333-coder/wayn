@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, Response, status
+﻿from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.admin_auth import (
@@ -7,6 +7,7 @@ from app.api.dependencies.admin_auth import (
     resolve_admin_permission_names,
 )
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.api.dependencies.auth import get_current_user
 from app.core.database import get_session
 from app.core.security import (
@@ -82,7 +83,9 @@ async def _authenticate_admin(
     "/login",
     response_model=AdminLoginResponse,
 )
+@limiter.limit("5/minute")
 async def admin_login(
+    request: Request,
     data: AdminLoginRequest,
     session: AsyncSession = Depends(get_session),
 ) -> AdminLoginResponse:
@@ -106,7 +109,9 @@ async def admin_login(
     "/web-login",
     response_model=AdminWebLoginResponse,
 )
+@limiter.limit("5/minute")
 async def admin_web_login(
+    request: Request,
     data: AdminLoginRequest,
     response: Response,
     session: AsyncSession = Depends(get_session),

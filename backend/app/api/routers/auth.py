@@ -1,8 +1,9 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, status
+﻿from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user
 from app.core.database import get_session
+from app.core.rate_limit import limiter
 from app.core.security import create_access_token
 from app.models.user import User
 from app.repositories.social_repository import SocialRepository
@@ -71,7 +72,9 @@ async def _user_read_with_admin(
     response_model=RegistrationResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("3/minute")
 async def register(
+    request: Request,
     data: UserRegisterRequest,
     session: AsyncSession = Depends(get_session),
 ):
@@ -161,7 +164,9 @@ async def register(
     "/login",
     response_model=AuthResponse,
 )
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     data: UserLoginRequest,
     session: AsyncSession = Depends(get_session),
 ):
@@ -211,7 +216,9 @@ async def login(
     "/verify-email",
     response_model=VerificationResponse,
 )
+@limiter.limit("5/15minutes")
 async def verify_email(
+    request: Request,
     data: EmailVerificationRequest,
     session: AsyncSession = Depends(get_session),
 ):
@@ -286,7 +293,9 @@ async def verify_email(
 @router.post(
     "/resend-verification",
 )
+@limiter.limit("3/15minutes")
 async def resend_verification(
+    request: Request,
     data: ResendVerificationRequest,
     session: AsyncSession = Depends(get_session),
 ):
@@ -364,7 +373,9 @@ async def resend_verification(
 @router.post(
     "/forgot-password",
 )
+@limiter.limit("3/15minutes")
 async def forgot_password(
+    request: Request,
     data: ForgotPasswordRequest,
     session: AsyncSession = Depends(get_session),
 ):
@@ -443,7 +454,9 @@ async def forgot_password(
 @router.post(
     "/reset-password",
 )
+@limiter.limit("5/15minutes")
 async def reset_password(
+    request: Request,
     data: PasswordResetRequest,
     session: AsyncSession = Depends(get_session),
 ):
