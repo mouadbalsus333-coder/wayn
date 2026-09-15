@@ -7,6 +7,7 @@ import '../models/place.dart';
 class PlaceCard extends StatelessWidget {
   final Place place;
   final double? distanceKm;
+  final bool isFavorite;
   final VoidCallback? onFavoritePressed;
   final VoidCallback? onPressed;
 
@@ -14,6 +15,7 @@ class PlaceCard extends StatelessWidget {
     super.key,
     required this.place,
     this.distanceKm,
+    this.isFavorite = false,
     this.onFavoritePressed,
     this.onPressed,
   });
@@ -181,10 +183,14 @@ class PlaceCard extends StatelessWidget {
                             color: Colors.white.withValues(alpha: 0.22),
                           ),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Icon(
-                            Icons.bookmark_border_rounded,
-                            color: Colors.white,
+                            isFavorite
+                                ? Icons.bookmark_rounded
+                                : Icons.bookmark_border_rounded,
+                            color: isFavorite
+                                ? Colors.orange
+                                : Colors.white,
                             size: 19,
                           ),
                         ),

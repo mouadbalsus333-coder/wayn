@@ -48,8 +48,7 @@ class _ExplorePageState extends State<ExplorePage> {
   int _currentPage = 1;
   int _totalPages = 0;
 
-  CategoryLoadStatus _categoriesStatus =
-      CategoryLoadStatus.loading;
+  CategoryLoadStatus _categoriesStatus = CategoryLoadStatus.loading;
 
   String? _errorMessage;
 
@@ -65,22 +64,19 @@ class _ExplorePageState extends State<ExplorePage> {
   /// الفلتر الموحّد المطبَّق حاليًا (يفتح من زر الفلتر في مستطيل البحث).
   PlaceFilter _filter = PlaceFilter();
 
-  ({double latitude, double longitude})?
-      _lastLoadedReference;
+  ({double latitude, double longitude})? _lastLoadedReference;
 
   // ================================================================
   // DISTANCE CACHE REFERENCE
   // ================================================================
 
-  ({double latitude, double longitude})?
-      _distanceCacheReference;
+  ({double latitude, double longitude})? _distanceCacheReference;
 
   // ================================================================
   // PAGINATION
   // ================================================================
 
-  bool get _hasMorePages =>
-      _totalPages > 0 && _currentPage < _totalPages;
+  bool get _hasMorePages => _totalPages > 0 && _currentPage < _totalPages;
 
   // ================================================================
   // INIT
@@ -92,9 +88,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
     _scrollController.addListener(_onScroll);
 
-    SavedLocationsStore.instance.addListener(
-      _onSavedLocationChanged,
-    );
+    SavedLocationsStore.instance.addListener(_onSavedLocationChanged);
 
     _initializeExplore();
   }
@@ -109,8 +103,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
     final position = _scrollController.position;
 
-    if (position.pixels >=
-        position.maxScrollExtent - 600) {
+    if (position.pixels >= position.maxScrollExtent - 600) {
       _loadNextPage();
     }
   }
@@ -121,11 +114,11 @@ class _ExplorePageState extends State<ExplorePage> {
     final ref = _referencePoint;
     final last = _lastLoadedReference;
 
-    final changed = (ref == null) != (last == null) ||
+    final changed =
+        (ref == null) != (last == null) ||
         (ref != null &&
             last != null &&
-            (ref.latitude != last.latitude ||
-                ref.longitude != last.longitude));
+            (ref.latitude != last.latitude || ref.longitude != last.longitude));
 
     if (changed) {
       _loadNearbyPlaces();
@@ -139,9 +132,7 @@ class _ExplorePageState extends State<ExplorePage> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
 
-    SavedLocationsStore.instance.removeListener(
-      _onSavedLocationChanged,
-    );
+    SavedLocationsStore.instance.removeListener(_onSavedLocationChanged);
 
     super.dispose();
   }
@@ -149,10 +140,7 @@ class _ExplorePageState extends State<ExplorePage> {
   Future<void> _initializeExplore() async {
     await _loadCurrentLocation();
 
-    await Future.wait([
-      _loadPlaces(),
-      _loadCategories(),
-    ]);
+    await Future.wait([_loadPlaces(), _loadCategories(), _loadFavorites()]);
   }
 
   // ================================================================
@@ -167,8 +155,7 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final serviceEnabled =
-          await Geolocator.isLocationServiceEnabled();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
       if (!serviceEnabled) {
         if (mounted) {
@@ -180,17 +167,14 @@ class _ExplorePageState extends State<ExplorePage> {
         return;
       }
 
-      var permission =
-          await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
-        permission =
-            await Geolocator.requestPermission();
+        permission = await Geolocator.requestPermission();
       }
 
       if (permission == LocationPermission.denied ||
-          permission ==
-              LocationPermission.deniedForever) {
+          permission == LocationPermission.deniedForever) {
         if (mounted) {
           setState(() {
             _isLoadingLocation = false;
@@ -200,8 +184,7 @@ class _ExplorePageState extends State<ExplorePage> {
         return;
       }
 
-      final position =
-          await Geolocator.getCurrentPosition(
+      final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
         ),
@@ -216,9 +199,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _refreshDistanceCache();
       });
     } catch (error) {
-      debugPrint(
-        'Explore location error: $error',
-      );
+      debugPrint('Explore location error: $error');
 
       if (!mounted) return;
 
@@ -233,9 +214,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // LOAD ALL PLACES
   // ================================================================
 
-  Future<void> _loadPlaces({
-    bool reset = true,
-  }) async {
+  Future<void> _loadPlaces({bool reset = true}) async {
     if (!mounted) return;
 
     if (reset) {
@@ -251,25 +230,20 @@ class _ExplorePageState extends State<ExplorePage> {
     }
 
     try {
-      final result =
-          await _placeService.getPlacesPage(
+      final result = await _placeService.getPlacesPage(
         page: reset ? 1 : _currentPage,
         limit: _pageSize,
       );
 
       if (!mounted) return;
 
-      final prepared =
-          _preparePlaces(result.items);
+      final prepared = _preparePlaces(result.items);
 
       setState(() {
         if (reset) {
           _replacePlaces(prepared);
         } else {
-          _replacePlaces([
-            ..._places,
-            ...prepared,
-          ]);
+          _replacePlaces([..._places, ...prepared]);
         }
 
         _currentPage = result.page;
@@ -290,9 +264,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = error.toString();
       });
 
-      debugPrint(
-        'Failed to load places: $error',
-      );
+      debugPrint('Failed to load places: $error');
     }
   }
 
@@ -301,10 +273,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Future<void> _loadNextPage() async {
-    if (!mounted ||
-        _isLoading ||
-        _isLoadingMore ||
-        !_hasMorePages) {
+    if (!mounted || _isLoading || _isLoadingMore || !_hasMorePages) {
       return;
     }
 
@@ -315,52 +284,30 @@ class _ExplorePageState extends State<ExplorePage> {
     final nextPage = _currentPage + 1;
 
     try {
-      final result =
-          await _loadPageForCurrentState(
-        page: nextPage,
-      );
+      final result = await _loadPageForCurrentState(page: nextPage);
 
       if (!mounted) return;
 
-      final prepared =
-          _preparePlaces(result.items);
+      final prepared = _preparePlaces(result.items);
 
-      var combinedPlaces = [
-        ..._places,
-        ...prepared,
-      ];
+      var combinedPlaces = [..._places, ...prepared];
 
-      if (_selectedFilterIndex == 0 &&
-          !_showingAllPlaces) {
+      if (_selectedFilterIndex == 0 && !_showingAllPlaces) {
         final ref = _referencePoint;
 
         if (ref != null) {
-          final refPos =
-              _positionFromReference(
-            ref,
-          );
+          final refPos = _positionFromReference(ref);
 
-          _ensureDistanceCacheReference(
-            ref,
-          );
+          _ensureDistanceCacheReference(ref);
 
-          _cacheMissingDistances(
-            prepared,
-            ref,
-          );
+          _cacheMissingDistances(prepared, ref);
 
-          combinedPlaces = _sortByDistance(
-            combinedPlaces,
-            refPos,
-          );
+          combinedPlaces = _sortByDistance(combinedPlaces, refPos);
         }
       }
 
       setState(() {
-        _replacePlaces(
-          combinedPlaces,
-          refreshDistanceCache: false,
-        );
+        _replacePlaces(combinedPlaces, refreshDistanceCache: false);
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoadingMore = false;
@@ -372,9 +319,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _isLoadingMore = false;
       });
 
-      debugPrint(
-        'Failed to load next Explore page: $error',
-      );
+      debugPrint('Failed to load next Explore page: $error');
     }
   }
 
@@ -382,15 +327,9 @@ class _ExplorePageState extends State<ExplorePage> {
   // LOAD PAGE FOR CURRENT VIEW
   // ================================================================
 
-  Future<PaginatedPlaces>
-      _loadPageForCurrentState({
-    required int page,
-  }) async {
+  Future<PaginatedPlaces> _loadPageForCurrentState({required int page}) async {
     if (_showingAllPlaces) {
-      return _placeService.getPlacesPage(
-        page: page,
-        limit: _pageSize,
-      );
+      return _placeService.getPlacesPage(page: page, limit: _pageSize);
     }
 
     if (_searchQuery.isNotEmpty) {
@@ -423,16 +362,10 @@ class _ExplorePageState extends State<ExplorePage> {
           );
         }
 
-        return _placeService.getPlacesPage(
-          page: page,
-          limit: _pageSize,
-        );
+        return _placeService.getPlacesPage(page: page, limit: _pageSize);
 
       case 1:
-        return _placeService.getOpenPlacesPage(
-          page: page,
-          limit: _pageSize,
-        );
+        return _placeService.getOpenPlacesPage(page: page, limit: _pageSize);
 
       case 2:
         return _placeService.getHighestRatedPlacesPage(
@@ -448,10 +381,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
       default:
         if (_filter.isEmpty) {
-          return _placeService.getPlacesPage(
-            page: page,
-            limit: _pageSize,
-          );
+          return _placeService.getPlacesPage(page: page, limit: _pageSize);
         }
 
         final ref = _referencePoint;
@@ -478,10 +408,8 @@ class _ExplorePageState extends State<ExplorePage> {
   // REFERENCE POINT
   // ================================================================
 
-  ({double latitude, double longitude})?
-      get _referencePoint {
-    final saved =
-        SavedLocationsStore.instance.referencePoint;
+  ({double latitude, double longitude})? get _referencePoint {
+    final saved = SavedLocationsStore.instance.referencePoint;
 
     if (saved != null) {
       return saved;
@@ -490,18 +418,13 @@ class _ExplorePageState extends State<ExplorePage> {
     final gps = _currentPosition;
 
     if (gps != null) {
-      return (
-        latitude: gps.latitude,
-        longitude: gps.longitude,
-      );
+      return (latitude: gps.latitude, longitude: gps.longitude);
     }
 
     return null;
   }
 
-  Position _positionFromReference(
-    ({double latitude, double longitude}) ref,
-  ) {
+  Position _positionFromReference(({double latitude, double longitude}) ref) {
     return Position(
       latitude: ref.latitude,
       longitude: ref.longitude,
@@ -561,8 +484,7 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final result =
-          await _placeService.getNearbyPlacesPage(
+      final result = await _placeService.getNearbyPlacesPage(
         latitude: currentRef.latitude,
         longitude: currentRef.longitude,
         radius: 5000,
@@ -572,34 +494,18 @@ class _ExplorePageState extends State<ExplorePage> {
 
       if (!mounted) return;
 
-      final prepared =
-          _preparePlaces(result.items);
+      final prepared = _preparePlaces(result.items);
 
-      final refPos =
-          _positionFromReference(
-        currentRef,
-      );
+      final refPos = _positionFromReference(currentRef);
 
-      _ensureDistanceCacheReference(
-        currentRef,
-      );
+      _ensureDistanceCacheReference(currentRef);
 
-      _cacheMissingDistances(
-        prepared,
-        currentRef,
-      );
+      _cacheMissingDistances(prepared, currentRef);
 
-      final sortedPlaces =
-          _sortByDistance(
-        prepared,
-        refPos,
-      );
+      final sortedPlaces = _sortByDistance(prepared, refPos);
 
       setState(() {
-        _replacePlaces(
-          sortedPlaces,
-          refreshDistanceCache: false,
-        );
+        _replacePlaces(sortedPlaces, refreshDistanceCache: false);
 
         _currentPage = result.page;
         _totalPages = result.pages;
@@ -622,9 +528,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = error.toString();
       });
 
-      debugPrint(
-        'Nearby places error: $error',
-      );
+      debugPrint('Nearby places error: $error');
     }
   }
 
@@ -632,9 +536,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // PREPARE PLACES
   // ================================================================
 
-  List<Place> _preparePlaces(
-    List<Place> places,
-  ) {
+  List<Place> _preparePlaces(List<Place> places) {
     return places
         .where(
           (place) =>
@@ -652,14 +554,10 @@ class _ExplorePageState extends State<ExplorePage> {
   // DISTANCE
   // ================================================================
 
-  double? _distanceToPlace(
-    Place place,
-  ) {
+  double? _distanceToPlace(Place place) {
     final ref = _referencePoint;
 
-    if (ref == null ||
-        place.latitude == null ||
-        place.longitude == null) {
+    if (ref == null || place.latitude == null || place.longitude == null) {
       return null;
     }
 
@@ -674,15 +572,13 @@ class _ExplorePageState extends State<ExplorePage> {
   bool _isSameDistanceCacheReference(
     ({double latitude, double longitude}) ref,
   ) {
-    final cached =
-        _distanceCacheReference;
+    final cached = _distanceCacheReference;
 
     if (cached == null) {
       return false;
     }
 
-    return cached.latitude == ref.latitude &&
-        cached.longitude == ref.longitude;
+    return cached.latitude == ref.latitude && cached.longitude == ref.longitude;
   }
 
   void _ensureDistanceCacheReference(
@@ -711,14 +607,12 @@ class _ExplorePageState extends State<ExplorePage> {
         continue;
       }
 
-      if (place.latitude == null ||
-          place.longitude == null) {
+      if (place.latitude == null || place.longitude == null) {
         _placeDistances[place.id] = null;
         continue;
       }
 
-      _placeDistances[place.id] =
-          Geolocator.distanceBetween(
+      _placeDistances[place.id] = Geolocator.distanceBetween(
         ref.latitude,
         ref.longitude,
         place.latitude!,
@@ -727,10 +621,7 @@ class _ExplorePageState extends State<ExplorePage> {
     }
   }
 
-  void _replacePlaces(
-    List<Place> places, {
-    bool refreshDistanceCache = true,
-  }) {
+  void _replacePlaces(List<Place> places, {bool refreshDistanceCache = true}) {
     _places = places;
 
     if (refreshDistanceCache) {
@@ -744,8 +635,7 @@ class _ExplorePageState extends State<ExplorePage> {
     if (ref == null) {
       _distanceCacheReference = null;
       _placeDistances = <String, double?>{
-        for (final place in _places)
-          place.id: null,
+        for (final place in _places) place.id: null,
       };
       return;
     }
@@ -756,8 +646,7 @@ class _ExplorePageState extends State<ExplorePage> {
     );
 
     _placeDistances = <String, double?>{
-      for (final place in _places)
-        place.id: _distanceToPlace(place),
+      for (final place in _places) place.id: _distanceToPlace(place),
     };
   }
 
@@ -765,60 +654,37 @@ class _ExplorePageState extends State<ExplorePage> {
   // SORT BY DISTANCE
   // ================================================================
 
-  List<Place> _sortByDistance(
-    List<Place> places,
-    Position position,
-  ) {
-    final ref = (
-      latitude: position.latitude,
-      longitude: position.longitude,
-    );
+  List<Place> _sortByDistance(List<Place> places, Position position) {
+    final ref = (latitude: position.latitude, longitude: position.longitude);
 
     _ensureDistanceCacheReference(ref);
 
-    final placesWithDistance =
-        <_PlaceDistance>[];
+    final placesWithDistance = <_PlaceDistance>[];
 
     for (final place in places) {
-      var distance =
-          _placeDistances[place.id];
+      var distance = _placeDistances[place.id];
 
       if (distance == null &&
           place.latitude != null &&
           place.longitude != null) {
-        distance =
-            Geolocator.distanceBetween(
+        distance = Geolocator.distanceBetween(
           position.latitude,
           position.longitude,
           place.latitude!,
           place.longitude!,
         );
 
-        _placeDistances[place.id] =
-            distance;
+        _placeDistances[place.id] = distance;
       }
 
       placesWithDistance.add(
-        _PlaceDistance(
-          place: place,
-          distance:
-              distance ?? double.infinity,
-        ),
+        _PlaceDistance(place: place, distance: distance ?? double.infinity),
       );
     }
 
-    placesWithDistance.sort(
-      (a, b) =>
-          a.distance.compareTo(
-        b.distance,
-      ),
-    );
+    placesWithDistance.sort((a, b) => a.distance.compareTo(b.distance));
 
-    return placesWithDistance
-        .map(
-          (item) => item.place,
-        )
-        .toList();
+    return placesWithDistance.map((item) => item.place).toList();
   }
 
   // ================================================================
@@ -828,59 +694,39 @@ class _ExplorePageState extends State<ExplorePage> {
   Future<void> _loadCategories() async {
     if (mounted) {
       setState(() {
-        _categoriesStatus =
-            CategoryLoadStatus.loading;
+        _categoriesStatus = CategoryLoadStatus.loading;
       });
     }
 
-    final result =
-        await _categoryService.getCategories();
+    final result = await _categoryService.getCategories();
 
     if (!mounted) return;
 
-    final uniqueCategories =
-        <String, Category>{};
+    final uniqueCategories = <String, Category>{};
 
-    for (final category
-        in result.categories) {
-      final key = category.nameAr
-          .trim()
-          .toLowerCase();
+    for (final category in result.categories) {
+      final key = category.nameAr.trim().toLowerCase();
 
       if (key.isEmpty) {
         continue;
       }
 
-      final existing =
-          uniqueCategories[key];
+      final existing = uniqueCategories[key];
 
       if (existing == null ||
-          ((existing.icon == null ||
-                  existing.icon!
-                      .trim()
-                      .isEmpty) &&
+          ((existing.icon == null || existing.icon!.trim().isEmpty) &&
               category.icon != null &&
-              category.icon!
-                  .trim()
-                  .isNotEmpty)) {
-        uniqueCategories[key] =
-            category;
+              category.icon!.trim().isNotEmpty)) {
+        uniqueCategories[key] = category;
       }
     }
 
-    final categories =
-        uniqueCategories.values.toList()
-          ..sort(
-            (a, b) =>
-                a.sortOrder.compareTo(
-              b.sortOrder,
-            ),
-          );
+    final categories = uniqueCategories.values.toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
     setState(() {
       _categories = categories;
-      _categoriesStatus =
-          result.status;
+      _categoriesStatus = result.status;
     });
   }
 
@@ -888,9 +734,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // SEARCH
   // ================================================================
 
-  Future<void> _searchPlaces(
-    String query,
-  ) async {
+  Future<void> _searchPlaces(String query) async {
     final search = query.trim();
 
     if (search.isEmpty) {
@@ -915,8 +759,7 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final result =
-          await _placeService.searchPlacesPage(
+      final result = await _placeService.searchPlacesPage(
         search,
         page: 1,
         limit: _pageSize,
@@ -941,9 +784,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = error.toString();
       });
 
-      debugPrint(
-        'Search failed: $error',
-      );
+      debugPrint('Search failed: $error');
     }
   }
 
@@ -951,9 +792,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // FILTER
   // ================================================================
 
-  Future<void> _onFilterSelected(
-    int index,
-  ) async {
+  Future<void> _onFilterSelected(int index) async {
     if (!mounted) return;
 
     setState(() {
@@ -971,48 +810,28 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final result =
-          await _loadPageForCurrentState(
-        page: 1,
-      );
+      final result = await _loadPageForCurrentState(page: 1);
 
       if (!mounted) return;
 
-      var places =
-          _preparePlaces(result.items);
+      var places = _preparePlaces(result.items);
 
       if (index == 0) {
         final ref = _referencePoint;
 
         if (ref != null) {
-          final refPos =
-              _positionFromReference(
-            ref,
-          );
+          final refPos = _positionFromReference(ref);
 
-          _ensureDistanceCacheReference(
-            ref,
-          );
+          _ensureDistanceCacheReference(ref);
 
-          _cacheMissingDistances(
-            places,
-            ref,
-          );
+          _cacheMissingDistances(places, ref);
 
-          places =
-              _sortByDistance(
-            places,
-            refPos,
-          );
+          places = _sortByDistance(places, refPos);
         }
       }
 
       setState(() {
-        _replacePlaces(
-          places,
-          refreshDistanceCache:
-              index != 0,
-        );
+        _replacePlaces(places, refreshDistanceCache: index != 0);
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoading = false;
@@ -1028,9 +847,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = error.toString();
       });
 
-      debugPrint(
-        'Filter failed: $error',
-      );
+      debugPrint('Filter failed: $error');
     }
   }
 
@@ -1038,9 +855,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // CATEGORY
   // ================================================================
 
-  Future<void> _onCategorySelected(
-    Category category,
-  ) async {
+  Future<void> _onCategorySelected(Category category) async {
     if (!mounted) return;
 
     setState(() {
@@ -1058,8 +873,7 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final result =
-          await _placeService.getPlacesByCategoryPage(
+      final result = await _placeService.getPlacesByCategoryPage(
         category.id,
         page: 1,
         limit: _pageSize,
@@ -1113,8 +927,7 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final result =
-          await _placeService.getPlacesPage(
+      final result = await _placeService.getPlacesPage(
         page: 1,
         limit: _pageSize,
       );
@@ -1138,9 +951,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = error.toString();
       });
 
-      debugPrint(
-        'Failed to load all places: $error',
-      );
+      debugPrint('Failed to load all places: $error');
     }
   }
 
@@ -1160,13 +971,9 @@ class _ExplorePageState extends State<ExplorePage> {
             categories: _categories,
             initial: _filter,
             onApply: (filter) {
-              Navigator.of(
-                sheetContext,
-              ).pop();
+              Navigator.of(sheetContext).pop();
 
-              _onFilterApplied(
-                filter,
-              );
+              _onFilterApplied(filter);
             },
           ),
         );
@@ -1178,9 +985,7 @@ class _ExplorePageState extends State<ExplorePage> {
   // FILTER APPLIED
   // ================================================================
 
-  Future<void> _onFilterApplied(
-    PlaceFilter filter,
-  ) async {
+  Future<void> _onFilterApplied(PlaceFilter filter) async {
     if (!mounted) return;
 
     setState(() {
@@ -1199,18 +1004,14 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final result =
-          await _loadPageForCurrentState(
-        page: 1,
-      );
+      final result = await _loadPageForCurrentState(page: 1);
 
       if (!mounted) return;
 
       setState(() {
         _replacePlaces(
           _preparePlaces(result.items),
-          refreshDistanceCache:
-              _showingAllPlaces,
+          refreshDistanceCache: _showingAllPlaces,
         );
         _currentPage = result.page;
         _totalPages = result.pages;
@@ -1227,9 +1028,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = error.toString();
       });
 
-      debugPrint(
-        'Filter failed: $error',
-      );
+      debugPrint('Filter failed: $error');
     }
   }
 
@@ -1246,17 +1045,12 @@ class _ExplorePageState extends State<ExplorePage> {
     });
 
     try {
-      final result =
-          await _loadPageForCurrentState(
-        page: 1,
-      );
+      final result = await _loadPageForCurrentState(page: 1);
 
       if (!mounted) return;
 
       setState(() {
-        _replacePlaces(
-          _preparePlaces(result.items),
-        );
+        _replacePlaces(_preparePlaces(result.items));
         _currentPage = result.page;
         _totalPages = result.pages;
         _isLoading = false;
@@ -1272,9 +1066,7 @@ class _ExplorePageState extends State<ExplorePage> {
         _errorMessage = error.toString();
       });
 
-      debugPrint(
-        'Failed to reload filtered view: $error',
-      );
+      debugPrint('Failed to reload filtered view: $error');
     }
   }
 
@@ -1284,33 +1076,24 @@ class _ExplorePageState extends State<ExplorePage> {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        context.waynColors;
+    final colors = context.waynColors;
 
     return Directionality(
-      textDirection:
-          TextDirection.rtl,
+      textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor:
-            colors.background,
-        resizeToAvoidBottomInset:
-            false,
+        backgroundColor: colors.background,
+        resizeToAvoidBottomInset: false,
         body: SafeArea(
           child: Column(
             children: [
               WaynHeader(
-                onMenuPressed:
-                    _onMenuPressed,
-                onNotificationsPressed:
-                    _onNotificationsPressed,
+                onMenuPressed: _onMenuPressed,
+                onNotificationsPressed: _onNotificationsPressed,
               ),
               HomeSearchBar(
-                selectedCategory:
-                    _selectedCategoryLabel,
-                onCategoryPressed:
-                    _onCategoryPressed,
-                onSearchChanged:
-                    _searchPlaces,
+                selectedCategory: _selectedCategoryLabel,
+                onCategoryPressed: _onCategoryPressed,
+                onSearchChanged: _searchPlaces,
               ),
               Expanded(
                 child: RefreshIndicator(
@@ -1324,140 +1107,91 @@ class _ExplorePageState extends State<ExplorePage> {
                   },
                   color: colors.brand,
                   child: CustomScrollView(
-                    controller:
-                        _scrollController,
-                    physics:
-                        const BouncingScrollPhysics(
-                      parent:
-                          AlwaysScrollableScrollPhysics(),
+                    controller: _scrollController,
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
                     ),
                     slivers: [
                       // ------------------------------------------------
                       // CATEGORIES
                       // ------------------------------------------------
-
                       SliverToBoxAdapter(
-                        child:
-                            _buildExploreCategoriesSection(),
+                        child: _buildExploreCategoriesSection(),
                       ),
 
                       // ------------------------------------------------
                       // RESULTS HEADER
                       // ------------------------------------------------
-
                       SliverToBoxAdapter(
                         child: SectionHeader(
-                          title:
-                              _buildResultsTitle(),
-                          action:
-                              'عرض الكل',
-                          onActionPressed:
-                              _onViewAllPressed,
+                          title: _buildResultsTitle(),
+                          action: 'عرض الكل',
+                          onActionPressed: _onViewAllPressed,
                         ),
                       ),
 
                       // ------------------------------------------------
                       // LOADING
                       // ------------------------------------------------
-
                       if (_isLoading)
-                        const SliverToBoxAdapter(
-                          child:
-                              _LoadingPlaces(),
-                        )
-
+                        const SliverToBoxAdapter(child: _LoadingPlaces())
                       // ------------------------------------------------
                       // ERROR
                       // ------------------------------------------------
-
                       else if (_errorMessage != null)
-                        SliverToBoxAdapter(
-                          child:
-                              _buildErrorState(),
-                        )
-
+                        SliverToBoxAdapter(child: _buildErrorState())
                       // ------------------------------------------------
                       // EMPTY
                       // ------------------------------------------------
-
                       else if (_places.isEmpty)
-                        SliverToBoxAdapter(
-                          child:
-                              _buildEmptyState(),
-                        )
-
+                        SliverToBoxAdapter(child: _buildEmptyState())
                       // ------------------------------------------------
                       // PLACES - LAZY LIST
                       // ------------------------------------------------
-
                       else
                         SliverList(
-                          delegate:
-                              SliverChildBuilderDelegate(
-                            (context, index) {
-                              final place =
-                                  _places[index];
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final place = _places[index];
 
-                              final distance =
-                                  _placeDistances[place.id];
+                            final distance = _placeDistances[place.id];
 
-                              return RepaintBoundary(
-                                key: ValueKey(
-                                  place.id,
+                            return RepaintBoundary(
+                              key: ValueKey(place.id),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 8,
                                 ),
-                                child: Padding(
-                                  padding:
-                                      const EdgeInsets
-                                          .symmetric(
-                                    horizontal: 20,
-                                    vertical: 8,
-                                  ),
-                                  child: PlaceCard(
-                                    place:
-                                        place,
-                                    distanceKm:
-                                        distance,
-                                    onFavoritePressed:
-                                        () {
-                                      _onFavoritePressed(
-                                        place,
-                                      );
-                                    },
-                                    onPressed:
-                                        () {
-                                      _onPlacePressed(
-                                        place,
-                                      );
-                                    },
-                                  ),
+                                child: PlaceCard(
+                                  place: place,
+                                  distanceKm: distance,
+                                  isFavorite: _favoriteIds.contains(place.id),
+                                  onFavoritePressed: () {
+                                    _onFavoritePressed(place);
+                                  },
+                                  onPressed: () {
+                                    _onPlacePressed(place);
+                                  },
                                 ),
-                              );
-                            },
-                            childCount:
-                                _places.length,
-                          ),
+                              ),
+                            );
+                          }, childCount: _places.length),
                         ),
 
                       // ------------------------------------------------
                       // LOADING MORE
                       // ------------------------------------------------
-
                       if (_isLoadingMore)
                         const SliverToBoxAdapter(
                           child: Padding(
-                            padding:
-                                EdgeInsets.symmetric(
-                              vertical: 20,
-                            ),
+                            padding: EdgeInsets.symmetric(vertical: 20),
                             child: Center(
-                              child:
-                                  CircularProgressIndicator(
-                                strokeWidth:
-                                    2.2,
-                                color:
-                                    Color(
-                                  0xFF18A99A,
-                                ),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Color(0xFF18A99A),
                               ),
                             ),
                           ),
@@ -1466,12 +1200,7 @@ class _ExplorePageState extends State<ExplorePage> {
                       // ------------------------------------------------
                       // BOTTOM SPACE
                       // ------------------------------------------------
-
-                      const SliverToBoxAdapter(
-                        child: SizedBox(
-                          height: 100,
-                        ),
-                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 100)),
                     ],
                   ),
                 ),
@@ -1496,27 +1225,19 @@ class _ExplorePageState extends State<ExplorePage> {
     }
 
     if (_searchQuery.isNotEmpty) {
-      await _searchPlaces(
-        _searchQuery,
-      );
+      await _searchPlaces(_searchQuery);
       return;
     }
 
     if (_selectedCategory != null) {
-      final categoryId =
-          _selectedCategory!;
+      final categoryId = _selectedCategory!;
 
       final category = _categories
-          .where(
-            (item) =>
-                item.id == categoryId,
-          )
+          .where((item) => item.id == categoryId)
           .firstOrNull;
 
       if (category != null) {
-        await _onCategorySelected(
-          category,
-        );
+        await _onCategorySelected(category);
       }
 
       return;
@@ -1532,9 +1253,7 @@ class _ExplorePageState extends State<ExplorePage> {
       return;
     }
 
-    await _onFilterSelected(
-      _selectedFilterIndex,
-    );
+    await _onFilterSelected(_selectedFilterIndex);
   }
 
   // ================================================================
@@ -1577,169 +1296,93 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildExploreCategoriesSection() {
-    final colors =
-        context.waynColors;
+    final colors = context.waynColors;
 
     if (_categories.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding:
-              const EdgeInsets.fromLTRB(
-            20,
-            24,
-            20,
-            12,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
           child: Text(
             'استكشف حسب الفئة',
-            textDirection:
-                TextDirection.rtl,
+            textDirection: TextDirection.rtl,
             style: TextStyle(
               fontSize: 19,
-              fontWeight:
-                  FontWeight.w800,
-              color:
-                  colors.textPrimary,
+              fontWeight: FontWeight.w800,
+              color: colors.textPrimary,
             ),
           ),
         ),
         SizedBox(
           height: 108,
           child: ListView.separated(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 20,
-            ),
-            scrollDirection:
-                Axis.horizontal,
-            physics:
-                const BouncingScrollPhysics(),
-            itemCount:
-                _categories.length,
-            separatorBuilder:
-                (_, _) {
-              return const SizedBox(
-                width: 12,
-              );
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: _categories.length,
+            separatorBuilder: (_, _) {
+              return const SizedBox(width: 12);
             },
-            itemBuilder:
-                (context, index) {
-              final category =
-                  _categories[index];
+            itemBuilder: (context, index) {
+              final category = _categories[index];
 
-              final isSelected =
-                  _selectedCategory ==
-                      category.id;
+              final isSelected = _selectedCategory == category.id;
 
               return GestureDetector(
-                behavior:
-                    HitTestBehavior.opaque,
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  _onCategorySelected(
-                    category,
-                  );
+                  _onCategorySelected(category);
                 },
-                child:
-                    AnimatedContainer(
-                  duration:
-                      const Duration(
-                    milliseconds: 180,
-                  ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
                   width: 82,
-                  decoration:
-                      BoxDecoration(
-                    color: isSelected
-                        ? colors.surfaceAlt
-                        : colors.surface,
-                    borderRadius:
-                        BorderRadius
-                            .circular(
-                      18,
-                    ),
-                    border:
-                        Border.all(
-                      color: isSelected
-                          ? colors.brand
-                          : colors.divider,
+                  decoration: BoxDecoration(
+                    color: isSelected ? colors.surfaceAlt : colors.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isSelected ? colors.brand : colors.divider,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            colors.shadow,
+                        color: colors.shadow,
                         blurRadius: 10,
-                        offset:
-                            const Offset(
-                          0,
-                          3,
-                        ),
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
-                  child:
-                      Column(
-                    mainAxisAlignment:
-                        MainAxisAlignment
-                            .center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
                         width: 48,
                         height: 48,
-                        decoration:
-                            BoxDecoration(
-                          color:
-                              colors.surfaceAlt,
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            15,
-                          ),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceAlt,
+                          borderRadius: BorderRadius.circular(15),
                         ),
                         child: Icon(
-                          _iconFromName(
-                            category.icon,
-                          ),
-                          color:
-                              colors.brand,
+                          _iconFromName(category.icon),
+                          color: colors.brand,
                           size: 24,
                         ),
                       ),
-                      const SizedBox(
-                        height: 7,
-                      ),
+                      const SizedBox(height: 7),
                       Padding(
-                        padding:
-                            const EdgeInsets
-                                .symmetric(
-                          horizontal: 5,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
                         child: Text(
-                          category
-                              .nameAr,
-                          textDirection:
-                              TextDirection
-                                  .rtl,
+                          category.nameAr,
+                          textDirection: TextDirection.rtl,
                           maxLines: 1,
-                          overflow:
-                              TextOverflow
-                                  .ellipsis,
-                          textAlign:
-                              TextAlign
-                                  .center,
-                          style:
-                              TextStyle(
-                            fontSize:
-                                11,
-                            fontWeight:
-                                FontWeight
-                                    .w700,
-                            color: colors
-                                .textSecondary,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: colors.textSecondary,
                           ),
                         ),
                       ),
@@ -1758,86 +1401,67 @@ class _ExplorePageState extends State<ExplorePage> {
   // CATEGORY ICON
   // ================================================================
 
-  IconData _iconFromName(
-    String? iconName,
-  ) {
+  IconData _iconFromName(String? iconName) {
     switch (iconName) {
       case 'restaurant':
-        return Icons
-            .restaurant_rounded;
+        return Icons.restaurant_rounded;
 
       case 'park':
         return Icons.park_rounded;
 
       case 'beach_access':
-        return Icons
-            .beach_access_rounded;
+        return Icons.beach_access_rounded;
 
       case 'hotel':
-        return Icons
-            .hotel_rounded;
+        return Icons.hotel_rounded;
 
       case 'shopping_bag':
-        return Icons
-            .shopping_bag_rounded;
+        return Icons.shopping_bag_rounded;
 
       case 'sports_soccer':
-        return Icons
-            .sports_soccer_rounded;
+        return Icons.sports_soccer_rounded;
 
       case 'mosque':
-        return Icons
-            .mosque_rounded;
+        return Icons.mosque_rounded;
 
       case 'local_hospital':
-        return Icons
-            .local_hospital_rounded;
+        return Icons.local_hospital_rounded;
 
       case 'school':
         return Icons.school_rounded;
 
       case 'local_cafe':
-        return Icons
-            .local_cafe_rounded;
+        return Icons.local_cafe_rounded;
 
       case 'local_gas_station':
-        return Icons
-            .local_gas_station_rounded;
+        return Icons.local_gas_station_rounded;
 
       case 'pharmacy':
-        return Icons
-            .local_pharmacy_rounded;
+        return Icons.local_pharmacy_rounded;
 
       case 'museum':
-        return Icons
-            .museum_rounded;
+        return Icons.museum_rounded;
 
       case 'store':
         return Icons.store_rounded;
 
       case 'shopping_cart':
-        return Icons
-            .shopping_cart_rounded;
+        return Icons.shopping_cart_rounded;
 
       case 'local_parking':
-        return Icons
-            .local_parking_rounded;
+        return Icons.local_parking_rounded;
 
       case 'fitness_center':
-        return Icons
-            .fitness_center_rounded;
+        return Icons.fitness_center_rounded;
 
       case 'local_atm':
-        return Icons
-            .local_atm_rounded;
+        return Icons.local_atm_rounded;
 
       case 'bank':
-        return Icons
-            .account_balance_rounded;
+        return Icons.account_balance_rounded;
 
       case 'government':
-        return Icons
-            .account_balance_rounded;
+        return Icons.account_balance_rounded;
 
       default:
         return Icons.place_rounded;
@@ -1849,100 +1473,52 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildErrorState() {
-    final colors =
-        context.waynColors;
+    final colors = context.waynColors;
 
     return Padding(
-      padding:
-          const EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        10,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       child: Container(
         width: double.infinity,
-        padding:
-            const EdgeInsets.all(22),
-        decoration:
-            BoxDecoration(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius:
-              BorderRadius.circular(
-            20,
-          ),
-          border: Border.all(
-            color: colors.divider,
-          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colors.divider),
         ),
         child: Column(
           children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 42,
-              color:
-                  colors.textMuted,
-            ),
-            const SizedBox(
-              height: 12,
-            ),
+            Icon(Icons.cloud_off_rounded, size: 42, color: colors.textMuted),
+            const SizedBox(height: 12),
             Text(
               'تعذر تحميل الأماكن',
-              textDirection:
-                  TextDirection.rtl,
-              style:
-                  TextStyle(
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
                 fontSize: 15,
-                fontWeight:
-                    FontWeight.w800,
-                color:
-                    colors.textPrimary,
+                fontWeight: FontWeight.w800,
+                color: colors.textPrimary,
               ),
             ),
-            const SizedBox(
-              height: 6,
-            ),
+            const SizedBox(height: 6),
             Text(
               'تحقق من اتصال الإنترنت وحاول مرة أخرى.',
-              textDirection:
-                  TextDirection.rtl,
-              textAlign:
-                  TextAlign.center,
-              style:
-                  TextStyle(
-                fontSize: 12,
-                color:
-                    colors.textSecondary,
-              ),
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: colors.textSecondary),
             ),
-            const SizedBox(
-              height: 15,
-            ),
+            const SizedBox(height: 15),
             ElevatedButton(
-              onPressed:
-                  _reloadCurrentView,
-              style:
-                  ElevatedButton.styleFrom(
-                backgroundColor:
-                    colors.brand,
-                foregroundColor:
-                    Colors.white,
+              onPressed: _reloadCurrentView,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colors.brand,
+                foregroundColor: Colors.white,
                 elevation: 0,
-                shape:
-                    RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(
-                    13,
-                  ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
                 ),
               ),
               child: const Text(
                 'إعادة المحاولة',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight:
-                      FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
               ),
             ),
           ],
@@ -1956,78 +1532,42 @@ class _ExplorePageState extends State<ExplorePage> {
   // ================================================================
 
   Widget _buildEmptyState() {
-    String message =
-        'لا توجد أماكن متاحة حاليًا';
+    String message = 'لا توجد أماكن متاحة حاليًا';
 
     if (_searchQuery.isNotEmpty) {
-      message =
-          'لم نجد أماكن تطابق بحثك';
-    } else if (_selectedCategory !=
-        null) {
-      message =
-          'لا توجد أماكن في هذه الفئة';
-    } else if (_selectedFilterIndex ==
-        1) {
-      message =
-          'لا توجد أماكن مفتوحة الآن';
-    } else if (_selectedFilterIndex ==
-            0 &&
-        _hasLocationPermission) {
-      message =
-          'لا توجد أماكن قريبة منك حاليًا';
+      message = 'لم نجد أماكن تطابق بحثك';
+    } else if (_selectedCategory != null) {
+      message = 'لا توجد أماكن في هذه الفئة';
+    } else if (_selectedFilterIndex == 1) {
+      message = 'لا توجد أماكن مفتوحة الآن';
+    } else if (_selectedFilterIndex == 0 && _hasLocationPermission) {
+      message = 'لا توجد أماكن قريبة منك حاليًا';
     }
 
-    final colors =
-        context.waynColors;
+    final colors = context.waynColors;
 
     return Padding(
-      padding:
-          const EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        10,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       child: Container(
         width: double.infinity,
-        padding:
-            const EdgeInsets.all(22),
-        decoration:
-            BoxDecoration(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius:
-              BorderRadius.circular(
-            20,
-          ),
-          border: Border.all(
-            color: colors.divider,
-          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colors.divider),
         ),
         child: Column(
           children: [
-            Icon(
-              Icons
-                  .location_off_rounded,
-              size: 42,
-              color:
-                  colors.textMuted,
-            ),
-            const SizedBox(
-              height: 12,
-            ),
+            Icon(Icons.location_off_rounded, size: 42, color: colors.textMuted),
+            const SizedBox(height: 12),
             Text(
               message,
-              textDirection:
-                  TextDirection.rtl,
-              textAlign:
-                  TextAlign.center,
-              style:
-                  TextStyle(
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.center,
+              style: TextStyle(
                 fontSize: 15,
-                fontWeight:
-                    FontWeight.w800,
-                color:
-                    colors.textPrimary,
+                fontWeight: FontWeight.w800,
+                color: colors.textPrimary,
               ),
             ),
           ],
@@ -2060,32 +1600,36 @@ class _ExplorePageState extends State<ExplorePage> {
   // FAVORITE
   // ================================================================
 
-  Future<void> _onFavoritePressed(
-    Place place,
-  ) async {
+  Future<void> _loadFavorites() async {
     try {
-      if (_favoriteIds.contains(
-        place.id,
-      )) {
-        await _favoriteService
-            .remove(place.id);
+      final places = await _favoriteService.list();
+      if (!mounted) return;
+      setState(() {
+        _favoriteIds
+          ..clear()
+          ..addAll(places.map((place) => place.id));
+      });
+    } catch (_) {
+      // Favorites are user-specific; ignore for guests/offline.
+    }
+  }
+
+  Future<void> _onFavoritePressed(Place place) async {
+    try {
+      if (_favoriteIds.contains(place.id)) {
+        await _favoriteService.remove(place.id);
 
         if (mounted) {
           setState(() {
-            _favoriteIds.remove(
-              place.id,
-            );
+            _favoriteIds.remove(place.id);
           });
         }
       } else {
-        await _favoriteService
-            .add(place.id);
+        await _favoriteService.add(place.id);
 
         if (mounted) {
           setState(() {
-            _favoriteIds.add(
-              place.id,
-            );
+            _favoriteIds.add(place.id);
           });
         }
       }
@@ -2093,13 +1637,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(
-          SnackBar(
-            content: Text(
-              'تعذر تحديث المفضلة: $error',
-            ),
-          ),
-        );
+        ).showSnackBar(SnackBar(content: Text('تعذر تحديث المفضلة: $error')));
       }
     }
   }
@@ -2108,17 +1646,10 @@ class _ExplorePageState extends State<ExplorePage> {
   // PLACE DETAILS
   // ================================================================
 
-  void _onPlacePressed(
-    Place place,
-  ) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            PlaceDetailsPage(
-          place: place,
-        ),
-      ),
-    );
+  void _onPlacePressed(Place place) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => PlaceDetailsPage(place: place)));
   }
 }
 
@@ -2130,28 +1661,22 @@ class _PlaceDistance {
   final Place place;
   final double distance;
 
-  const _PlaceDistance({
-    required this.place,
-    required this.distance,
-  });
+  const _PlaceDistance({required this.place, required this.distance});
 }
 
 // ==================================================================
 // CATEGORY BOTTOM SHEET
 // ==================================================================
 
-class _CategoryBottomSheet
-    extends StatelessWidget {
+class _CategoryBottomSheet extends StatelessWidget {
   final List<Category> categories;
   final CategoryLoadStatus status;
   final String? selectedCategory;
 
   final VoidCallback onAllPressed;
-  final ValueChanged<Category>
-      onCategoryPressed;
+  final ValueChanged<Category> onCategoryPressed;
 
-  final IconData Function(String?)
-      iconFromName;
+  final IconData Function(String?) iconFromName;
 
   const _CategoryBottomSheet({
     required this.categories,
@@ -2162,151 +1687,89 @@ class _CategoryBottomSheet
     required this.iconFromName,
   });
 
-  bool get isLoading =>
-      status ==
-      CategoryLoadStatus.loading;
+  bool get isLoading => status == CategoryLoadStatus.loading;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(
-        maxHeight:
-            MediaQuery.of(context)
-                    .size
-                    .height *
-                0.75,
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
-      decoration:
-          const BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: SafeArea(
         top: false,
         child: Column(
           children: [
-            const SizedBox(
-              height: 12,
-            ),
+            const SizedBox(height: 12),
             Container(
               width: 42,
               height: 5,
-              decoration:
-                  BoxDecoration(
-                color:
-                    const Color(
-                  0xFFD9DEE7,
-                ),
-                borderRadius:
-                    BorderRadius.circular(
-                  10,
-                ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD9DEE7),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-            const SizedBox(
-              height: 18,
-            ),
+            const SizedBox(height: 18),
             const Padding(
-              padding:
-                  EdgeInsets.symmetric(
-                horizontal: 20,
-              ),
+              padding: EdgeInsets.symmetric(horizontal: 20),
               child: Align(
-                alignment:
-                    Alignment.centerRight,
+                alignment: Alignment.centerRight,
                 child: Text(
                   'اختر الفئة',
-                  textDirection:
-                      TextDirection.rtl,
+                  textDirection: TextDirection.rtl,
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight:
-                        FontWeight.w800,
-                    color:
-                        Color(0xFF172033),
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF172033),
                   ),
                 ),
               ),
             ),
-            const SizedBox(
-              height: 14,
-            ),
+            const SizedBox(height: 14),
             Expanded(
-              child: status ==
-                      CategoryLoadStatus
-                          .error
+              child: status == CategoryLoadStatus.error
                   ? const _CategoryStateMessage(
-                      icon: Icons
-                          .cloud_off_rounded,
+                      icon: Icons.cloud_off_rounded,
                       message:
                           'تعذر تحميل الفئات. تحقق من الاتصال وحاول مرة أخرى.',
                     )
                   : isLoading
-                      ? const Center(
-                          child:
-                              CircularProgressIndicator(
-                            color: Color(
-                              0xFF18A99A,
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF18A99A),
+                      ),
+                    )
+                  : categories.isEmpty
+                  ? status == CategoryLoadStatus.permissionDenied
+                        ? const _CategoryStateMessage(
+                            icon: Icons.lock_outline_rounded,
+                            message: 'تعذر الوصول إلى الفئات بسبب الصلاحيات.',
+                          )
+                        : status == CategoryLoadStatus.failure
+                        ? const _CategoryStateMessage(
+                            icon: Icons.cloud_off_rounded,
+                            message: 'تعذر تحميل الفئات. حاول مرة أخرى.',
+                          )
+                        : const Center(
+                            child: Text(
+                              'لا توجد فئات متاحة',
+                              textDirection: TextDirection.rtl,
+                              style: TextStyle(color: Color(0xFF8993A3)),
                             ),
-                          ),
-                        )
-                      : categories.isEmpty
-                          ? status ==
-                                  CategoryLoadStatus
-                                      .permissionDenied
-                              ? const _CategoryStateMessage(
-                                  icon: Icons
-                                      .lock_outline_rounded,
-                                  message:
-                                      'تعذر الوصول إلى الفئات بسبب الصلاحيات.',
-                                )
-                              : status ==
-                                      CategoryLoadStatus
-                                          .failure
-                                  ? const _CategoryStateMessage(
-                                      icon: Icons
-                                          .cloud_off_rounded,
-                                      message:
-                                          'تعذر تحميل الفئات. حاول مرة أخرى.',
-                                    )
-                                  : const Center(
-                                      child:
-                                          Text(
-                                        'لا توجد فئات متاحة',
-                                        textDirection:
-                                            TextDirection.rtl,
-                                        style:
-                                            TextStyle(
-                                          color:
-                                              Color(0xFF8993A3),
-                                        ),
-                                      ),
-                                    )
-                          : ListView(
-                              padding:
-                                  const EdgeInsets.fromLTRB(
-                                20,
-                                0,
-                                20,
-                                20,
-                              ),
-                              children: [
-                                _buildAllTile(),
-                                const SizedBox(
-                                  height: 8,
-                                ),
-                                ...categories.map(
-                                  (category) =>
-                                      _buildCategoryTile(
-                                    context,
-                                    category,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          )
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      children: [
+                        _buildAllTile(),
+                        const SizedBox(height: 8),
+                        ...categories.map(
+                          (category) => _buildCategoryTile(context, category),
+                        ),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -2319,67 +1782,39 @@ class _CategoryBottomSheet
   // ================================================================
 
   Widget _buildAllTile() {
-    final selected =
-        selectedCategory == null;
+    final selected = selectedCategory == null;
 
     return InkWell(
       onTap: onAllPressed,
-      borderRadius:
-          BorderRadius.circular(
-        18,
-      ),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding:
-            const EdgeInsets.all(14),
-        decoration:
-            BoxDecoration(
-          color: selected
-              ? const Color(
-                  0xFFE8F8F6,
-                )
-              : Colors.white,
-          borderRadius:
-              BorderRadius.circular(
-            18,
-          ),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFE8F8F6) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected
-                ? const Color(
-                    0xFF18A99A,
-                  )
-                : const Color(
-                    0xFFE8EBF0,
-                  ),
+            color: selected ? const Color(0xFF18A99A) : const Color(0xFFE8EBF0),
           ),
         ),
         child: Row(
           children: [
-            _iconContainer(
-              Icons.apps_rounded,
-            ),
-            const SizedBox(
-              width: 14,
-            ),
+            _iconContainer(Icons.apps_rounded),
+            const SizedBox(width: 14),
             const Expanded(
               child: Text(
                 'كل الأماكن',
-                textDirection:
-                    TextDirection.rtl,
+                textDirection: TextDirection.rtl,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight:
-                      FontWeight.w700,
-                  color:
-                      Color(0xFF283247),
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF283247),
                 ),
               ),
             ),
             if (selected)
               const Icon(
-                Icons
-                    .check_circle_rounded,
-                color:
-                    Color(0xFF18A99A),
+                Icons.check_circle_rounded,
+                color: Color(0xFF18A99A),
                 size: 22,
               ),
           ],
@@ -2392,93 +1827,53 @@ class _CategoryBottomSheet
   // CATEGORY TILE
   // ================================================================
 
-  Widget _buildCategoryTile(
-    BuildContext context,
-    Category category,
-  ) {
-    final selected =
-        selectedCategory ==
-            category.id;
+  Widget _buildCategoryTile(BuildContext context, Category category) {
+    final selected = selectedCategory == category.id;
 
     return Padding(
-      padding:
-          const EdgeInsets.only(
-        bottom: 8,
-      ),
+      padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         onTap: () {
-          onCategoryPressed(
-            category,
-          );
+          onCategoryPressed(category);
         },
-        borderRadius:
-            BorderRadius.circular(
-          18,
-        ),
+        borderRadius: BorderRadius.circular(18),
         child: Container(
-          padding:
-              const EdgeInsets.all(14),
-          decoration:
-              BoxDecoration(
-            color: selected
-                ? const Color(
-                    0xFFE8F8F6,
-                  )
-                : Colors.white,
-            borderRadius:
-                BorderRadius.circular(
-              18,
-            ),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFE8F8F6) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: selected
-                  ? const Color(
-                      0xFF18A99A,
-                    )
-                  : const Color(
-                      0xFFE8EBF0,
-                    ),
+                  ? const Color(0xFF18A99A)
+                  : const Color(0xFFE8EBF0),
             ),
           ),
           child: Row(
             children: [
-              _iconContainer(
-                iconFromName(
-                  category.icon,
-                ),
-              ),
-              const SizedBox(
-                width: 14,
-              ),
+              _iconContainer(iconFromName(category.icon)),
+              const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   category.nameAr,
-                  textDirection:
-                      TextDirection.rtl,
-                  style:
-                      const TextStyle(
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(
                     fontSize: 15,
-                    fontWeight:
-                        FontWeight.w700,
-                    color:
-                        Color(0xFF283247),
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF283247),
                   ),
                 ),
               ),
               if (selected)
                 const Icon(
-                  Icons
-                      .check_circle_rounded,
-                  color:
-                      Color(0xFF18A99A),
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF18A99A),
                   size: 22,
                 )
               else
                 const Icon(
-                  Icons
-                      .arrow_back_ios_new_rounded,
+                  Icons.arrow_back_ios_new_rounded,
                   size: 14,
-                  color:
-                      Color(0xFFB0B7C3),
+                  color: Color(0xFFB0B7C3),
                 ),
             ],
           ),
@@ -2491,27 +1886,15 @@ class _CategoryBottomSheet
   // ICON CONTAINER
   // ================================================================
 
-  Widget _iconContainer(
-    IconData icon,
-  ) {
+  Widget _iconContainer(IconData icon) {
     return Container(
       width: 46,
       height: 46,
-      decoration:
-          BoxDecoration(
-        color:
-            const Color(0xFFE8F8F6),
-        borderRadius:
-            BorderRadius.circular(
-          14,
-        ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F8F6),
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Icon(
-        icon,
-        color:
-            const Color(0xFF18A99A),
-        size: 23,
-      ),
+      child: Icon(icon, color: const Color(0xFF18A99A), size: 23),
     );
   }
 }
@@ -2520,49 +1903,27 @@ class _CategoryBottomSheet
 // CATEGORY STATE
 // ==================================================================
 
-class _CategoryStateMessage
-    extends StatelessWidget {
+class _CategoryStateMessage extends StatelessWidget {
   final IconData icon;
   final String message;
 
-  const _CategoryStateMessage({
-    required this.icon,
-    required this.message,
-  });
+  const _CategoryStateMessage({required this.icon, required this.message});
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding:
-            const EdgeInsets.symmetric(
-          horizontal: 28,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 28),
         child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color:
-                  const Color(
-                0xFF8993A3,
-              ),
-            ),
-            const SizedBox(
-              height: 10,
-            ),
+            Icon(icon, color: const Color(0xFF8993A3)),
+            const SizedBox(height: 10),
             Text(
               message,
-              textDirection:
-                  TextDirection.rtl,
-              textAlign:
-                  TextAlign.center,
-              style:
-                  const TextStyle(
-                color:
-                    Color(0xFF8993A3),
-              ),
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF8993A3)),
             ),
           ],
         ),
@@ -2575,23 +1936,17 @@ class _CategoryStateMessage
 // LOADING
 // ==================================================================
 
-class _LoadingPlaces
-    extends StatelessWidget {
+class _LoadingPlaces extends StatelessWidget {
   const _LoadingPlaces();
 
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding:
-          EdgeInsets.symmetric(
-        vertical: 45,
-      ),
+      padding: EdgeInsets.symmetric(vertical: 45),
       child: Center(
-        child:
-            CircularProgressIndicator(
+        child: CircularProgressIndicator(
           strokeWidth: 2.5,
-          color:
-              Color(0xFF18A99A),
+          color: Color(0xFF18A99A),
         ),
       ),
     );
