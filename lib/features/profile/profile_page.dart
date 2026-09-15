@@ -12,6 +12,7 @@ import '../../features/community/services/community_service.dart';
 import '../../features/community/widgets/comments_sheet.dart';
 import '../../features/community/widgets/community_post_card.dart';
 import '../../features/notifications/notifications_page.dart';
+import '../../features/points/points_page.dart';
 import '../../features/wallet/wallet_page.dart';
 import '../../models/store.dart';
 import '../../models/user.dart';
@@ -708,6 +709,12 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  void _openPoints() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PointsPage()),
+    );
+  }
+
   Widget _buildPointsButton(
     WaynColors colors,
   ) {
@@ -721,9 +728,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ? null
           : '$_points',
       loading: _pointsLoading,
-      onTap: () {
-        // النقاط معروضة من الرصيد الحقيقي للمستخدم.
-      },
+      onTap: _openPoints,
     );
   }
 

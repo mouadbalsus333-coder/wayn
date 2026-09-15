@@ -1,0 +1,125 @@
+﻿.points-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.points-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.points-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+}
+
+.points-card.is-inactive {
+  opacity: 0.72;
+}
+
+.points-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.points-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(24, 169, 154, 0.12);
+  color: #18a99a;
+}
+
+.status-pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.status-pill.is-active {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+.status-pill.is-muted {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+}
+
+.points-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.points-reward {
+  color: #18a99a;
+  font-size: 17px;
+}
+
+.points-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+
+.points-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.points-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.points-editor-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.points-editor-grid label span {
+  color: var(--text-muted, #64748b);
+}
+
+.points-editor-grid input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+}
+
+.points-editor-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.points-editor-wide {
+  grid-column: 1 / -1;
+}
+
+.points-editor-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.points-form-error {
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+}

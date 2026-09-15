@@ -1,4 +1,4 @@
-"""Repository for place_contributions table operations."""
+﻿"""Repository for place_contributions table operations."""
 
 from uuid import UUID
 
@@ -157,6 +157,7 @@ class PlaceContributionRepository:
         self.session.add(contribution)
 
         await self.session.flush()
+        await self.session.refresh(contribution)
 
         return contribution
 
@@ -165,6 +166,7 @@ class PlaceContributionRepository:
         contribution: PlaceContribution,
     ) -> PlaceContribution:
         await self.session.flush()
+        await self.session.refresh(contribution)
 
         return contribution
 

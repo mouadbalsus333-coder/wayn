@@ -17,6 +17,7 @@ export const permissions = {
   contributionsRead: 'contributions.read',
   contributionsApprove: 'contributions.approve',
   contributionsReject: 'contributions.reject',
+  pointsManage: 'points.manage',
   walletRead: 'wallet.read',
   walletRecharge: 'wallet.recharge',
   storeRead: 'store.read',

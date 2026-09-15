@@ -7,6 +7,7 @@ import { AdminUserCreatePage } from '../pages/AdminUsers/AdminUserCreatePage'
 import { CommunityPage } from '../pages/Community/CommunityPage'
 import { CommunityPostPage } from '../pages/Community/CommunityPostPage'
 import { ContributionsPage } from '../pages/Contributions/ContributionsPage'
+import { PointRulesPage } from '../pages/Points/PointRulesPage'
 import { CategoriesPage } from '../pages/Categories/CategoriesPage'
 import { PermissionsPage } from '../pages/Permissions/PermissionsPage'
 import { StorePage } from '../pages/Store/StorePage'
@@ -118,6 +119,14 @@ export function AppRouter() {
           element={
             <RequirePermission permission={permissions.contributionsRead}>
               <ContributionsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/point-rules"
+          element={
+            <RequirePermission permission={permissions.pointsManage}>
+              <PointRulesPage />
             </RequirePermission>
           }
         />

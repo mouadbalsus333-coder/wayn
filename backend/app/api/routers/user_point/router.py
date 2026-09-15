@@ -16,6 +16,8 @@ from app.models.user_point_transaction import (
     UserPointTransactionStatus,
     UserPointTransactionType,
 )
+from app.schemas.point_rule import RewardTaskRead
+from app.services.point_rule_service import PointRuleService
 from app.services.user_point.service import UserPointService
 
 
@@ -52,6 +54,26 @@ class PointTransactionResponse(BaseModel):
     reference_id: UUID | None
     extra_data: dict
     created_at: datetime
+
+
+# ============================================================
+# Get available (active) point tasks
+# ============================================================
+
+@router.get(
+    "/tasks",
+    response_model=list[RewardTaskRead],
+    status_code=status.HTTP_200_OK,
+)
+async def get_available_tasks(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[RewardTaskRead]:
+    service = PointRuleService(session)
+
+    rules = await service.list_rules(active_only=True)
+
+    return [RewardTaskRead.from_rule(rule) for rule in rules]
 
 
 # ============================================================

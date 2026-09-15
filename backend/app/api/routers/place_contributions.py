@@ -60,6 +60,8 @@ async def create_contribution(
             detail=str(exc),
         ) from exc
 
+    await session.commit()
+
     return contribution
 
 

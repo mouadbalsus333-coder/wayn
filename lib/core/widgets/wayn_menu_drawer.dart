@@ -4,10 +4,12 @@ import '../navigation/wayn_actions.dart';
 import '../navigation/wayn_shell.dart';
 import '../theme/wayn_colors.dart';
 import '../../features/community/saved_posts_page.dart';
+import '../../features/points/points_page.dart';
 import '../../features/settings/settings_page.dart';
 import '../../features/wallet/wallet_page.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../../services/user_service.dart';
 
 /// يفتح قائمة WAYN الجانبية من زر القائمة في الهيدر.
 ///
@@ -94,8 +96,10 @@ class WaynMenuDrawer extends StatefulWidget {
 
 class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
   final _auth = AuthService();
+  final UserService _userService = UserService();
 
   User? _user;
+  int _points = 0;
 
   @override
   void initState() {
@@ -112,6 +116,16 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
       }
     } catch (_) {
       // يبقى الرأس العام إذا تعذر تحميل المستخدم.
+    }
+
+    try {
+      final points = await _userService.getMyPoints();
+
+      if (mounted) {
+        setState(() => _points = points);
+      }
+    } catch (_) {
+      // الرصيد اختياري ولا يمنع فتح القائمة.
     }
   }
 
@@ -224,6 +238,12 @@ class _WaynMenuDrawerState extends State<WaynMenuDrawer> {
                             title: 'المحفظة',
                             subtitle: 'النقاط والعملات والتحويلات',
                             onTap: () => _open(const WalletPage()),
+                          ),
+                          _MenuTile(
+                            icon: Icons.stars_rounded,
+                            title: 'نقاطي',
+                            subtitle: '$_points نقطة',
+                            onTap: () => _open(const PointsPage()),
                           ),
                           _MenuTile(
                             icon: Icons.bookmark_border_rounded,

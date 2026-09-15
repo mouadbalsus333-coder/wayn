@@ -235,6 +235,7 @@ class UserPointService:
         reference_id: UUID | str | None = None,
         admin_id: int | UUID | str | None = None,
         extra_data: dict | None = None,
+        commit: bool = True,
     ) -> UserPointTransaction:
         """
         Add points to a user.
@@ -257,6 +258,7 @@ class UserPointService:
             reference_id=reference_id,
             admin_id=admin_id,
             extra_data=extra_data,
+            commit=commit,
         )
 
     # ============================================================

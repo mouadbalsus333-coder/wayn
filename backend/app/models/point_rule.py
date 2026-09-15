@@ -29,6 +29,11 @@ class PointRule(Base):
         nullable=False,
     )
 
+    title: Mapped[str] = mapped_column(
+        sa.String(255),
+        nullable=False,
+    )
+
     description: Mapped[str | None] = mapped_column(
         sa.String(255),
         nullable=True,
@@ -40,6 +45,18 @@ class PointRule(Base):
         default=True,
         server_default=sa.true(),
         index=True,
+    )
+
+    requires_approval: Mapped[bool] = mapped_column(
+        sa.Boolean,
+        nullable=False,
+        default=True,
+        server_default=sa.true(),
+    )
+
+    limit_per_user: Mapped[int | None] = mapped_column(
+        sa.Integer,
+        nullable=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

@@ -18,8 +18,12 @@ from app.repositories.place_contribution_repository import (
 )
 from app.repositories.place_repository import PlaceRepository
 from app.repositories.category_repository import CategoryRepository
+from app.repositories.device_repository import DeviceRepository
+from app.repositories.point_rule_repository import PointRuleRepository
 from app.schemas.place import PlaceCreate, PlaceUpdate
 from app.services.place_service import PlaceService
+from app.services.fcm_service import fcm_service
+from app.services.point_rule_service import PointRuleService
 from app.services.user_point.service import UserPointService
 
 
@@ -51,6 +55,10 @@ class PlaceContributionService:
         )
 
         self.point_service = UserPointService(session)
+
+        self.point_rule_service = PointRuleService(session)
+
+        self.device_repository = DeviceRepository(session)
 
     # ============================================================
     # Create contribution
@@ -227,8 +235,19 @@ class PlaceContributionService:
                 "Only pending contributions can be approved"
             )
 
+        # --------------------------------------------------------
+        # Reward comes from the configurable point rules table.
+        # An explicit admin override wins; otherwise the active
+        # rule for this contribution type is used; otherwise the
+        # built-in default.
+        # --------------------------------------------------------
+
+        rule_points = await self.point_rule_service.get_reward_for_contribution_type(
+            contribution.type
+        )
+
         if points is None:
-            points = self.DEFAULT_POINTS
+            points = rule_points if rule_points is not None else self.DEFAULT_POINTS
 
         if points < 0:
             raise ValueError(
@@ -311,11 +330,24 @@ class PlaceContributionService:
                     reference_type="PLACE_CONTRIBUTION",
                     reference_id=contribution.id,
                     admin_id=admin_id,
+                    commit=False,
                 )
 
             await self.contribution_repository.update_contribution(
                 contribution
             )
+
+            # ----------------------------------------------------
+            # In-app + push notification
+            # ----------------------------------------------------
+
+            await self._send_contribution_notification(
+                contribution=contribution,
+                approved=True,
+                points=points,
+            )
+
+            await self.point_service.repository.commit()
 
             return contribution
 
@@ -367,9 +399,110 @@ class PlaceContributionService:
 
         contribution.points_awarded = 0
 
-        return await self.contribution_repository.update_contribution(
+        await self.contribution_repository.update_contribution(
             contribution
         )
+
+        await self._send_contribution_notification(
+            contribution=contribution,
+            approved=False,
+            points=0,
+            rejection_reason=rejection_reason,
+        )
+
+        await self.point_service.repository.commit()
+
+        return contribution
+
+    # ============================================================
+    # Contribution notifications (in-app + push)
+    # ============================================================
+
+    async def _send_contribution_notification(
+        self,
+        *,
+        contribution: PlaceContribution,
+        approved: bool,
+        points: int,
+        rejection_reason: str | None = None,
+    ) -> None:
+        """Create an in-app UserNotification and send an FCM
+        push for a contribution review decision.
+
+        Push failures never roll back the contribution decision.
+        """
+
+        from datetime import datetime, timezone
+
+        from app.models.social import UserNotification
+
+        user_id = contribution.user_id
+
+        if approved:
+            title = "🎉 تهانينا!"
+            body = (
+                f"تم قبول المكان الذي أضفته. حصلت على "
+                f"+{points} نقطة. شكرًا لمساهمتك في تحسين WAYN 💚"
+            )
+            notification_type = "CONTRIBUTION_APPROVED"
+        else:
+            title = "لم تتم الموافقة على مساهمتك"
+            body = (
+                "لم تتم الموافقة على المكان الذي أرسلته إلى WAYN."
+            )
+
+            if rejection_reason:
+                body += f"\nالسبب: {rejection_reason}"
+
+            notification_type = "CONTRIBUTION_REJECTED"
+
+        # --------------------------------------------------------
+        # In-app notification
+        # --------------------------------------------------------
+
+        self.session.add(
+            UserNotification(
+                user_id=user_id,
+                type=notification_type,
+                source="contribution",
+                text=body,
+                data={
+                    "contribution_id": str(contribution.id),
+                    "place_id": (
+                        str(contribution.place_id)
+                        if contribution.place_id is not None
+                        else None
+                    ),
+                    "points": points,
+                    "approved": approved,
+                },
+                is_read=False,
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+
+        await self.session.flush()
+
+        # --------------------------------------------------------
+        # Push notification (best effort)
+        # --------------------------------------------------------
+
+        try:
+            devices = (
+                await self.device_repository.get_active_by_user(user_id)
+            )
+
+            tokens = [d.fcm_token for d in devices if d.fcm_token]
+
+            if tokens:
+                fcm_service.send_push(
+                    tokens=tokens,
+                    title=title,
+                    body=body,
+                )
+        except Exception:
+            # Push is best-effort only.
+            pass
 
     # ============================================================
     # Apply CREATE_PLACE

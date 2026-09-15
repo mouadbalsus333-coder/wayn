@@ -1,4 +1,4 @@
-import { LayoutDashboard, MapPin, MessagesSquare, Star, Users, UserRound, ClipboardCheck, Wallet, Tags, Store, Megaphone, ShieldCheck, Bell, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, MapPin, MessagesSquare, Star, Users, UserRound, ClipboardCheck, Wallet, Tags, Store, Megaphone, ShieldCheck, Bell, Award, type LucideIcon } from 'lucide-react'
 import { permissions } from './permissionNames'
 
 export type NavigationItem = {
@@ -17,6 +17,7 @@ export const navigationItems: NavigationItem[] = [
   { label: 'المستخدمين', path: '/regular-users', icon: UserRound, permission: permissions.usersRead },
   { label: 'المجتمع', path: '/community', icon: MessagesSquare, permission: permissions.communityRead },
   { label: 'المساهمات', path: '/contributions', icon: ClipboardCheck, permission: permissions.contributionsRead },
+  { label: 'مهام النقاط', path: '/point-rules', icon: Award, permission: permissions.pointsManage },
   { label: 'المراجعات', path: '/reviews', icon: Star, permission: permissions.reviewsRead },
   { label: 'المحفظة', path: '/wallet', icon: Wallet, permission: permissions.walletRead },
   { label: 'الفئات', path: '/categories', icon: Tags, permission: permissions.categoriesRead },

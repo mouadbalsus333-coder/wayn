@@ -16,7 +16,9 @@ import 'fastapi_auth_repository.dart';
 import 'fastapi_category_repository.dart';
 import 'fastapi_contribution_repository.dart';
 import 'fastapi_place_repository.dart';
+import 'fastapi_point_transaction_repository.dart';
 import 'fastapi_social_repository.dart';
+import 'fastapi_task_repository.dart';
 import 'fastapi_user_repository.dart';
 
 final DartHttpApiClient _fastApiClient = DartHttpApiClient(
@@ -130,9 +132,16 @@ CommunityRepository createCommunityRepository() {
 // ============================================================
 
 TaskRepository createTaskRepository() {
-  throw UnimplementedError(
-    'FastAPI TaskRepository has not been implemented yet.',
-  );
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return FastApiTaskRepository(_fastApiClient);
+
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
 }
 
 // ============================================================
@@ -159,7 +168,14 @@ ContributionRepository createContributionRepository() {
 // ============================================================
 
 PointTransactionRepository createPointTransactionRepository() {
-  throw UnimplementedError(
-    'FastAPI PointTransactionRepository has not been implemented yet.',
-  );
+  switch (BackendConfig.backendType) {
+    case 'fastapi':
+      return FastApiPointTransactionRepository(_fastApiClient);
+
+    default:
+      throw UnsupportedError(
+        'Unsupported repository backend: '
+        '${BackendConfig.backendType}',
+      );
+  }
 }

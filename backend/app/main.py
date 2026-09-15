@@ -16,6 +16,7 @@ from app.api.routers import (
     admin_dashboard,
     admin_notifications,
     admin_permissions,
+    admin_point_rules,
     admin_places,
     admin_regular_users,
     admin_reviews,
@@ -131,6 +132,7 @@ async def sqlalchemy_exception_handler(
     # Keep the production log generic.
     logger.error(
         "Database operation failed.",
+        exc_info=True,
     )
 
     return JSONResponse(
@@ -366,6 +368,14 @@ app.include_router(
 # ============================================================
 app.include_router(
     admin_notifications.router,
+    prefix="/api/v1",
+)
+
+# ============================================================
+# Admin Point Rules (Tasks)
+# ============================================================
+app.include_router(
+    admin_point_rules.router,
     prefix="/api/v1",
 )
 
