@@ -521,10 +521,17 @@ class PlaceRepository:
     async def create_place(
         self,
         place: Place,
+        *,
+        commit: bool = True,
     ) -> Place:
         self.session.add(place)
 
-        await self.session.commit()
+        if commit:
+            await self.session.commit()
+        else:
+            # Caller owns the transaction (e.g. contribution approval
+            # keeps place + points + notification atomic).
+            await self.session.flush()
 
         await self.session.refresh(place)
 

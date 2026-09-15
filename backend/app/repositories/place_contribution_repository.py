@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.place_contribution import (
     PlaceContribution,
@@ -21,7 +22,9 @@ class PlaceContributionRepository:
         contribution_id: UUID | str,
     ) -> PlaceContribution | None:
         result = await self.session.execute(
-            select(PlaceContribution).where(
+            select(PlaceContribution)
+            .options(selectinload(PlaceContribution.user))
+            .where(
                 PlaceContribution.id == str(contribution_id),
             )
         )
@@ -80,6 +83,7 @@ class PlaceContributionRepository:
 
         query = (
             select(PlaceContribution)
+            .options(selectinload(PlaceContribution.user))
             .where(*conditions)
             .order_by(
                 PlaceContribution.created_at.desc(),
@@ -138,6 +142,7 @@ class PlaceContributionRepository:
 
         query = (
             select(PlaceContribution)
+            .options(selectinload(PlaceContribution.user))
             .where(*conditions)
             .order_by(
                 PlaceContribution.created_at.desc(),

@@ -17,6 +17,7 @@ import type {
   ContributionStatus,
   ContributionType,
 } from '../../types/contribution'
+import { ContributionPreviewModal } from './ContributionPreviewModal'
 import './contributions.css'
 
 const PAGE_SIZE = 20
@@ -58,6 +59,7 @@ export function ContributionsPage() {
   const [type, setType] = useState<ContributionType | undefined>(undefined)
   const [pendingApprove, setPendingApprove] = useState<ContributionRead | null>(null)
   const [pendingReject, setPendingReject] = useState<ContributionRead | null>(null)
+  const [previewing, setPreviewing] = useState<ContributionRead | null>(null)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -162,6 +164,7 @@ export function ContributionsPage() {
         canReject={canReject}
         onApproveRequest={setPendingApprove}
         onRejectRequest={setPendingReject}
+        onPreviewRequest={setPreviewing}
         onRetry={() => void refetch()}
         onPageChange={setPage}
       />
@@ -180,6 +183,12 @@ export function ContributionsPage() {
           onClose={() => setPendingReject(null)}
         />
       )}
+      {previewing && (
+        <ContributionPreviewModal
+          contribution={previewing}
+          onClose={() => setPreviewing(null)}
+        />
+      )}
     </div>
   )
 }
@@ -193,6 +202,7 @@ function ContributionsResult({
   canReject,
   onApproveRequest,
   onRejectRequest,
+  onPreviewRequest,
   onRetry,
   onPageChange,
 }: {
@@ -205,6 +215,7 @@ function ContributionsResult({
   canReject: boolean
   onApproveRequest: (contribution: ContributionRead) => void
   onRejectRequest: (contribution: ContributionRead) => void
+  onPreviewRequest: (contribution: ContributionRead) => void
   onRetry: () => void
   onPageChange: (page: number) => void
 }) {
@@ -260,7 +271,11 @@ function ContributionsResult({
                       <p className="contribution-desc">{contribution.description}</p>
                     )}
                   </td>
-                  <td className="mono cell-muted">{contribution.user_id}</td>
+                  <td className="mono cell-muted">
+                    <span>{contribution.user_email ?? '—'}</span>
+                    <br />
+                    <span className="mono" dir="ltr">{contribution.user_id}</span>
+                  </td>
                   <td className="mono cell-muted">
                     {contribution.place_id ?? '—'}
                   </td>
@@ -269,6 +284,13 @@ function ContributionsResult({
                   <td>{contribution.points_awarded}</td>
                   <td className="cell-muted">{formatDate(contribution.created_at)}</td>
                   <td className="actions-cell">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => onPreviewRequest(contribution)}
+                    >
+                      <ClipboardCheck size={14} /> معاينة
+                    </button>
                     {contribution.status === 'PENDING' && (
                       <>
                         {canApprove && (

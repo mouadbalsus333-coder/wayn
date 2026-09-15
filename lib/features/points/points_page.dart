@@ -4,10 +4,9 @@ import '../../core/theme/wayn_colors.dart';
 import '../map/location_picker_page.dart';
 import '../../models/contribution.dart';
 import '../../models/task.dart';
-import '../../services/auth_service.dart';
-import '../../services/contribution_service.dart';
 import '../../services/task_service.dart';
 import '../../services/user_service.dart';
+import 'my_contributions_page.dart';
 import 'widgets/add_place_sheet.dart';
 
 /// صفحة «نقاطي» — تعرض رصيد المستخدم والمهام النشطة من Backend.
@@ -27,14 +26,9 @@ class _PointsPageState extends State<PointsPage> {
 
   final UserService _userService = UserService();
   final TaskService _taskService = TaskService();
-  final AuthService _auth = AuthService();
-  final ContributionService _contributionService = ContributionService();
 
   int _points = 0;
   List<Task> _tasks = [];
-
-  bool _hasPendingCreate = false;
-  bool _hasApprovedCreate = false;
 
   bool _loading = true;
   bool _loadFailed = false;
@@ -56,32 +50,6 @@ class _PointsPageState extends State<PointsPage> {
     try {
       final points = await _userService.getMyPoints();
       final tasks = await _taskService.getActiveTasks();
-      final user = await _auth.getCurrentUser();
-
-      var hasPending = false;
-      var hasApproved = false;
-
-      if (user != null) {
-        final pending = await _contributionService.getContributionsByUser(
-          user.id,
-          status: ContributionStatus.pending,
-          limit: 100,
-        );
-
-        final approved = await _contributionService.getContributionsByUser(
-          user.id,
-          status: ContributionStatus.approved,
-          limit: 100,
-        );
-
-        hasPending = pending.any(
-          (c) => c.type == ContributionType.createPlace,
-        );
-
-        hasApproved = approved.any(
-          (c) => c.type == ContributionType.createPlace,
-        );
-      }
 
       if (!mounted) {
         return;
@@ -90,8 +58,6 @@ class _PointsPageState extends State<PointsPage> {
       setState(() {
         _points = points;
         _tasks = tasks;
-        _hasPendingCreate = hasPending;
-        _hasApprovedCreate = hasApproved;
         _loading = false;
       });
     } catch (_) {
@@ -206,18 +172,26 @@ class _PointsPageState extends State<PointsPage> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       children: [
         _balanceHero(colors),
+        const SizedBox(height: 14),
+        _myTasksButton(colors, context),
         const SizedBox(height: 22),
-        Text(
-          'المهام',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-            color: colors.textPrimary,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'المهام المتاحة',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: colors.textPrimary,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         Text(
-          'أكمل المهام التالية واكسب نقاطًا تساهم في تحسين WAYN.',
+          'نفّذ أي مهمة من القائمة التالية واكسب نقاطًا. يمكنك تنفيذ كل مهمة عدة مرات.',
           style: TextStyle(fontSize: 12, color: colors.textMuted),
         ),
         const SizedBox(height: 14),
@@ -282,7 +256,73 @@ class _PointsPageState extends State<PointsPage> {
     );
   }
 
-Widget _taskCard(
+  /// زر «مهامي» — يفتح صفحة سجل عمليات المستخدم (المساهمات السابقة).
+  Widget _myTasksButton(WaynColors colors, BuildContext context) {
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const MyContributionsPage(),
+            ),
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.divider),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.history_rounded,
+                  color: colors.brand,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'مهامي',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+              Text(
+                'سجل عملياتك',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colors.textMuted,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.chevron_left_rounded,
+                size: 20,
+                color: colors.textMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _taskCard(
     WaynColors colors,
     BuildContext context,
     Task task,
@@ -389,24 +429,8 @@ Widget _taskCard(
       );
     }
 
-    if (_hasPendingCreate) {
-      return _statusPill(
-        colors,
-        label: 'قيد المراجعة ⏳',
-        color: colors.warning,
-        background: colors.warning.withValues(alpha: 0.12),
-      );
-    }
-
-    if (_hasApprovedCreate) {
-      return _statusPill(
-        colors,
-        label: 'تمت الموافقة ✓',
-        color: colors.brand,
-        background: colors.surfaceAlt,
-      );
-    }
-
+    // المهمة قابلة للتكرار: كل تنفيذ ينشئ مساهمة مستقلة،
+    // لذلك يظل زر البدء متاحًا دائمًا بغض النظر عن المساهمات السابقة.
     return FilledButton(
       onPressed: () => _startAddPlace(context),
       style: FilledButton.styleFrom(

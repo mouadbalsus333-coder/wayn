@@ -29,6 +29,7 @@ export type ContributionStatus = (typeof CONTRIBUTION_STATUSES)[number]
 export type ContributionRead = {
   id: string
   user_id: string
+  user_email: string | null
   place_id: string | null
   type: ContributionType
   status: ContributionStatus

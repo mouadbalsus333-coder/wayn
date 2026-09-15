@@ -150,3 +150,21 @@ class PlaceContribution(Base):
         "AdminUser",
         foreign_keys=[reviewed_by],
     )
+
+    # ------------------------------------------------------------
+    # Computed: email of the contributing user.
+    #
+    # Exposed for the admin contribution response
+    # (PlaceContributionRead.user_email). Reads the eager-loaded
+    # ``user`` relationship; never triggers a lazy load when queries
+    # use selectinload(PlaceContribution.user).
+    # ------------------------------------------------------------
+
+    @property
+    def user_email(self) -> str | None:
+        user = self.__dict__.get("user")
+
+        if user is None:
+            return None
+
+        return getattr(user, "email", None)

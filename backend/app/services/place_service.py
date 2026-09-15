@@ -189,6 +189,8 @@ class PlaceService:
     async def create_place(
         self,
         data: PlaceCreate,
+        *,
+        commit: bool = True,
     ) -> Place:
 
         category = await self._get_category_or_none(
@@ -252,7 +254,10 @@ class PlaceService:
             working_hours_json=working_hours,
         )
 
-        return await self.repository.create_place(place)
+        return await self.repository.create_place(
+            place,
+            commit=commit,
+        )
 
     # ============================================================
     # Update

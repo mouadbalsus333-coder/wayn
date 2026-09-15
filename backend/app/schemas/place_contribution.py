@@ -46,6 +46,9 @@ class PlaceContributionRead(BaseModel):
 
     user_id: UUID
 
+    # Email of the contributing user (joined via the user relationship).
+    user_email: str | None = None
+
     place_id: UUID | None
 
     type: PlaceContributionType

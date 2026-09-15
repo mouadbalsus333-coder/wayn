@@ -517,8 +517,13 @@ class PlaceContributionService:
             contribution.payload
         )
 
+        # The admin approval is what makes the place live. Never trust a
+        # client-provided is_active value (Flutter sends false).
+        data.is_active = True
+
         place = await self.place_service.create_place(
-            data
+            data,
+            commit=False,
         )
 
         contribution.place_id = place.id

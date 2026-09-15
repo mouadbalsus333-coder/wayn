@@ -27,6 +27,9 @@ import '../../../core/navigation/wayn_actions.dart';
 import '../../../features/notifications/notifications_page.dart';
 import '../community/widgets/community_post_card.dart';
 import '../../../features/location/saved_locations_store.dart';
+import '../../../models/contribution.dart';
+import '../../../services/task_service.dart';
+import '../points/widgets/add_place_sheet.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -92,6 +95,11 @@ class _MapPageState extends State<MapPage> {
   List<Category> _categories = [];
 
   final CategoryService _categoryService = CategoryService();
+
+  final TaskService _taskService = TaskService();
+
+  /// مفتاح مهمة «إضافة مكان» في Point Rules (action_key في Backend).
+  static const String _addPlaceActionKey = 'add_place';
 
   bool _showVisitorOpinions = false;
 
@@ -1647,6 +1655,152 @@ class _MapPageState extends State<MapPage> {
             _resetPlaceCarousel();
           }
         },
+        onMapLongClick: _onMapLongClick,
+      ),
+    );
+  }
+
+  // ===============================================================
+  // LONG PRESS → ADD PLACE
+  // ===============================================================
+
+  /// جلب مكافأة مهمة «إضافة مكان» من Point Rules عبر Backend.
+  /// لا قيم hardcoded — القيمة تأتي من task.rewardPoints.
+  Future<int?> _fetchAddPlaceRewardPoints() async {
+    try {
+      final tasks = await _taskService.getActiveTasks();
+
+      for (final task in tasks) {
+        if ((task.metadata['action_key']?.toString() ?? '') ==
+            _addPlaceActionKey) {
+          return task.rewardPoints;
+        }
+      }
+    } catch (_) {
+      // لا نمنع فتح الـ Bottom Sheet إذا فشل جلب النقاط.
+    }
+
+    return null;
+  }
+
+  /// عند الضغط المطوّل على الخريطة: عرض Bottom Sheet
+  /// بإحداثيات النقطة المختارة وخيار «إضافة مكان».
+  Future<void> _onMapLongClick(
+    math.Point<double> _,
+    LatLng coordinates,
+  ) async {
+    final point = coordinates;
+    if (!mounted) {
+      return;
+    }
+
+    final rewardPoints = await _fetchAddPlaceRewardPoints();
+
+    if (!mounted) {
+      return;
+    }
+
+    final wantsAddPlace = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final colors = sheetContext.waynColors;
+
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 26),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(22),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'هل يوجد مكان غير موجود في وين؟',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'ساعدنا في إضافة الأماكن الناقصة واحصل على نقاط عند الموافقة',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (rewardPoints != null && rewardPoints > 0) ...[
+                  Text(
+                    '+$rewardPoints نقطة',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: colors.brand,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                FilledButton.icon(
+                  onPressed: () =>
+                      Navigator.of(sheetContext).pop(true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.brand,
+                    foregroundColor: colors.onBrand,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_location_alt_rounded, size: 19),
+                  label: const Text(
+                    'إضافة مكان',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || wantsAddPlace != true) {
+      return;
+    }
+
+    // فتح نموذج إضافة المكان بالإحداثيات المختارة مباشرة —
+    // لا يختار المستخدم الموقع مرة ثانية.
+    final contribution = await Navigator.of(context).push<Contribution>(
+      MaterialPageRoute(
+        builder: (_) => AddPlaceSheet(
+          latitude: point.latitude,
+          longitude: point.longitude,
+        ),
+      ),
+    );
+
+    if (!mounted || contribution == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: const Text(
+          'تم إرسال المكان للمراجعة',
+          textDirection: TextDirection.rtl,
+        ),
       ),
     );
   }
