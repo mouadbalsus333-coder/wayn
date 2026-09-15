@@ -181,7 +181,7 @@ class _ProfilePageState extends State<ProfilePage> {
     await _loadOwnership();
   }
 
-    Future<void> _loadUser() async {
+  Future<void> _loadUser() async {
     try {
       final user = await _auth.getCurrentUser();
 
@@ -363,6 +363,10 @@ class _ProfilePageState extends State<ProfilePage> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           content: Row(
             children: [
               const Icon(
@@ -459,15 +463,17 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               Expanded(
                 child: _initialLoading
-                    ? const Center(
+                    ? Center(
                         child: CircularProgressIndicator(
-                          color: Color(0xFF18A99A),
+                          color: colors.brand,
+                          strokeWidth: 2.4,
                         ),
                       )
                     : _user == null
                         ? _buildGuestProfile(colors)
                         : RefreshIndicator(
                             color: colors.brand,
+                            backgroundColor: colors.surface,
                             onRefresh: _refresh,
                             child: ListView(
                               physics:
@@ -477,34 +483,26 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               padding:
                                   const EdgeInsets.fromLTRB(
-                                20,
-                                10,
-                                20,
-                                35,
+                                18,
+                                14,
+                                18,
+                                40,
                               ),
                               children: [
                                 _buildAccountHeader(
                                   colors,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 18),
                                 _buildDescriptionCard(
                                   colors,
                                 ),
-                                const SizedBox(height: 12),
-                                _buildProfileDivider(
-                                  colors,
-                                ),
-                                const SizedBox(height: 14),
-
-                                // تم حذف بطاقة النقاط
-                                // وزر "الحصول على النقاط".
-
+                                const SizedBox(height: 18),
                                 _buildStatsRow(colors),
                                 const SizedBox(height: 22),
                                 _buildSectionToggle(
                                   colors,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 16),
                                 if (_activeSection ==
                                     _SectionTab.ratings)
                                   _buildRatingsContent(
@@ -552,27 +550,31 @@ class _ProfilePageState extends State<ProfilePage> {
               MainAxisAlignment.center,
           children: [
             Container(
-              width: 100,
-              height: 100,
+              width: 104,
+              height: 104,
               decoration: BoxDecoration(
-                color: colors.brand.withValues(
-                  alpha: 0.12,
-                ),
                 shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colors.brand.withValues(alpha: 0.16),
+                    colors.brand.withValues(alpha: 0.05),
+                  ],
+                ),
               ),
               child: Icon(
                 Icons.person_outline_rounded,
-                size: 48,
+                size: 46,
                 color: colors.brand,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 26),
             Text(
               'مرحباً بك كزائر',
               style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+                fontSize: 21,
+                fontWeight: FontWeight.w800,
                 color: colors.textPrimary,
+                letterSpacing: -0.2,
               ),
               textAlign: TextAlign.center,
             ),
@@ -582,29 +584,29 @@ class _ProfilePageState extends State<ProfilePage> {
               style: TextStyle(
                 fontSize: 14,
                 color: colors.textSecondary,
-                height: 1.5,
+                height: 1.6,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 34),
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 54,
               child: FilledButton(
                 onPressed: _navigateToLogin,
                 style: FilledButton.styleFrom(
                   backgroundColor: colors.brand,
-                  foregroundColor: Colors.white,
+                  foregroundColor: colors.onBrand,
                   shape: RoundedRectangleBorder(
                     borderRadius:
-                        BorderRadius.circular(16),
+                        BorderRadius.circular(17),
                   ),
                   elevation: 0,
                 ),
                 child: const Text(
                   'قم بتسجيل الدخول',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -630,69 +632,88 @@ class _ProfilePageState extends State<ProfilePage> {
             ? user.displayName!.trim()
             : 'مستخدم WAYN';
 
-    final username =
-        user.username?.trim() ?? '';
+    final username = user.username?.trim() ?? '';
 
-    final avatarLetter = displayName.isEmpty
-        ? 'و'
-        : displayName.substring(0, 1);
+    final avatarLetter =
+        displayName.isEmpty ? 'و' : displayName.substring(0, 1);
 
-    return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        CircleAvatar(
-          radius: 34,
-          backgroundColor: colors.surfaceAlt,
-          child: Text(
-            avatarLetter,
-            style: TextStyle(
-              fontSize: 27,
-              fontWeight: FontWeight.w900,
-              color: colors.brand,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: .03),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: colors.brand.withValues(alpha: 0.22),
+                width: 1.6,
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 32,
+              backgroundColor:
+                  colors.brand.withValues(alpha: 0.10),
+              child: Text(
+                avatarLetter,
+                style: TextStyle(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w800,
+                  color: colors.brand,
+                ),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Padding(
-            padding:
-                const EdgeInsets.only(top: 2),
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayName,
-                  overflow:
-                      TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: colors.textPrimary,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: colors.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '@$username',
-                  overflow:
-                      TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colors.textSecondary,
-                    fontWeight:
-                        FontWeight.w600,
+                  const SizedBox(height: 3),
+                  Text(
+                    '@$username',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: colors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 5),
-                _buildCopyableId(colors),
-              ],
+                  const SizedBox(height: 8),
+                  _buildCopyableId(colors),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        _buildAccountBalances(colors),
-      ],
+          const SizedBox(width: 8),
+          _buildAccountBalances(colors),
+        ],
+      ),
     );
   }
 
@@ -703,7 +724,7 @@ class _ProfilePageState extends State<ProfilePage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildPointsButton(colors),
-        const SizedBox(height: 6),
+        const SizedBox(height: 7),
         _buildWalletButton(colors),
       ],
     );
@@ -721,12 +742,10 @@ class _ProfilePageState extends State<ProfilePage> {
     return _buildHeaderActionButton(
       colors,
       icon: Icons.stars_rounded,
-      iconColor: Colors.orange,
+      iconColor: const Color(0xFFF5A524),
       iconBackground:
-          Colors.orange.withValues(alpha: .12),
-      value: _pointsLoading
-          ? null
-          : '$_points',
+          const Color(0xFFF5A524).withValues(alpha: .12),
+      value: _pointsLoading ? null : formatCount(_points),
       loading: _pointsLoading,
       onTap: _openPoints,
     );
@@ -735,26 +754,20 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildWalletButton(
     WaynColors colors,
   ) {
-    final coins =
-        _wallet?.coinsBalance ?? 0;
+    final coins = _wallet?.coinsBalance ?? 0;
 
     return _buildHeaderActionButton(
       colors,
-      icon:
-          Icons.account_balance_wallet_rounded,
+      icon: Icons.account_balance_wallet_rounded,
       iconColor: colors.brand,
-      iconBackground:
-          colors.brand.withValues(alpha: .12),
-      value: _walletLoading
-          ? null
-          : '$coins',
+      iconBackground: colors.brand.withValues(alpha: .12),
+      value: _walletLoading ? null : formatCount(coins),
       loading: _walletLoading,
       onTap: _openWallet,
     );
   }
 
-  /// زر أصغر قليلاً من التصميم السابق،
-  /// مع الحفاظ على نفس الشكل والوظيفة.
+  /// بطاقة أنيقة وهادئة لعرض النقاط والمحفظة في رأس الصفحة.
   Widget _buildHeaderActionButton(
     WaynColors colors, {
     required IconData icon,
@@ -768,62 +781,39 @@ class _ProfilePageState extends State<ProfilePage> {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-            BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          height: 42,
-          constraints:
-              const BoxConstraints(
-            minWidth: 42,
-          ),
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 7,
-            vertical: 6,
+          height: 40,
+          constraints: const BoxConstraints(minWidth: 78),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 9,
           ),
           decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius:
-                BorderRadius.circular(13),
-            border: Border.all(
-              color: colors.divider,
-            ),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 9,
-                offset: const Offset(0, 3),
-                color:
-                    Colors.black.withValues(
-                  alpha: .04,
-                ),
-              ),
-            ],
+            color: colors.surfaceAlt,
+            borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
-            mainAxisSize:
-                MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 29,
-                height: 29,
+                width: 26,
+                height: 26,
                 decoration: BoxDecoration(
                   color: iconBackground,
-                  borderRadius:
-                      BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
-                  size: 16,
+                  size: 15,
                   color: iconColor,
                 ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 7),
               if (loading)
                 SizedBox(
-                  width: 15,
-                  height: 15,
-                  child:
-                      CircularProgressIndicator(
+                  width: 13,
+                  height: 13,
+                  child: CircularProgressIndicator(
                     strokeWidth: 2,
                     color: iconColor,
                   ),
@@ -832,11 +822,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight:
-                        FontWeight.w900,
-                    color:
-                        colors.textPrimary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary,
                   ),
                 ),
             ],
@@ -849,8 +837,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void _openWallet() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            const WalletPage(),
+        builder: (_) => const WalletPage(),
       ),
     );
   }
@@ -860,43 +847,43 @@ class _ProfilePageState extends State<ProfilePage> {
   ) {
     final id = _user!.id;
 
-    final displayId =
-        id.length > 10
-            ? id.substring(0, 10)
-            : id;
+    final displayId = id.length > 10 ? id.substring(0, 10) : id;
 
     final truncated =
-        id.length > 10
-            ? '$displayId...'
-            : displayId;
+        id.length > 10 ? '$displayId…' : displayId;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'ID: $truncated',
-          textDirection:
-              TextDirection.ltr,
-          style: TextStyle(
-            fontSize: 10,
-            color: colors.textSecondary,
-            fontWeight:
-                FontWeight.w600,
-          ),
+    return GestureDetector(
+      onTap: () => _copyToClipboard(id, 'تم نسخ المعرف'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4,
         ),
-        const SizedBox(width: 4),
-        GestureDetector(
-          onTap: () => _copyToClipboard(
-            id,
-            'تم نسخ المعرف',
-          ),
-          child: Icon(
-            Icons.copy_rounded,
-            size: 14,
-            color: colors.brand,
-          ),
+        decoration: BoxDecoration(
+          color: colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(8),
         ),
-      ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ID  $truncated',
+              textDirection: TextDirection.ltr,
+              style: TextStyle(
+                fontSize: 10.5,
+                color: colors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Icon(
+              Icons.copy_rounded,
+              size: 12,
+              color: colors.brand,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -909,13 +896,16 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           content: Text(
             message,
-            textDirection:
-                TextDirection.rtl,
+            textDirection: TextDirection.rtl,
           ),
         ),
       );
@@ -929,67 +919,61 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildDescriptionCard(
     WaynColors colors,
   ) {
-    final bio =
-        _user!.bio?.trim().isNotEmpty == true
-            ? _user!.bio!.trim()
-            : null;
+    final bio = _user!.bio?.trim().isNotEmpty == true
+        ? _user!.bio!.trim()
+        : null;
 
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        Text(
-          'الوصف',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: colors.textMuted,
-          ),
-        ),
-        const SizedBox(height: 6),
-        if (bio != null)
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            bio,
+            'الوصف',
             style: TextStyle(
-              fontSize: 13,
-              height: 1.5,
-              color: colors.textPrimary,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: colors.textMuted,
+              letterSpacing: 0.2,
             ),
-          )
-        else
-          Row(
-            children: [
-              Icon(
-                Icons.edit_note_rounded,
-                size: 17,
-                color: colors.textMuted,
+          ),
+          const SizedBox(height: 8),
+          if (bio != null)
+            Text(
+              bio,
+              style: TextStyle(
+                fontSize: 13.5,
+                height: 1.6,
+                color: colors.textPrimary,
               ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  'لا يوجد وصف بعد. يمكنك إضافته من قائمة الإعدادات.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color:
-                        colors.textSecondary,
+            )
+          else
+            Row(
+              children: [
+                Icon(
+                  Icons.edit_note_rounded,
+                  size: 18,
+                  color: colors.textMuted,
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'لا يوجد وصف بعد. يمكنك إضافته من قائمة الإعدادات.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: colors.textSecondary,
+                      height: 1.5,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-
-  Widget _buildProfileDivider(
-    WaynColors colors,
-  ) {
-    return SizedBox(
-      width: double.infinity,
-      child: Divider(
-        height: 1,
-        thickness: 0.7,
-        color: colors.divider,
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -1002,15 +986,13 @@ class _ProfilePageState extends State<ProfilePage> {
     WaynColors colors,
   ) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: 6,
-        vertical: 14,
+        vertical: 16,
       ),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
@@ -1047,18 +1029,19 @@ class _ProfilePageState extends State<ProfilePage> {
           Text(
             formatCount(value),
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color:
-                  colors.textPrimary,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: colors.textPrimary,
+              letterSpacing: -0.3,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
               color: colors.textMuted,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -1071,8 +1054,8 @@ class _ProfilePageState extends State<ProfilePage> {
   ) {
     return Container(
       width: 1,
-      height: 34,
-      color: colors.divider,
+      height: 32,
+      color: colors.divider.withValues(alpha: 0.7),
     );
   }
 
@@ -1084,37 +1067,28 @@ class _ProfilePageState extends State<ProfilePage> {
     WaynColors colors,
   ) {
     return Container(
-      padding:
-          const EdgeInsets.all(5),
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
         children: [
           _toggleButton(
             colors,
-            icon:
-                Icons.rate_review_outlined,
+            icon: Icons.rate_review_outlined,
             label: 'التقييمات',
-            active:
-                _activeSection ==
-                    _SectionTab.ratings,
+            active: _activeSection == _SectionTab.ratings,
             onTap: () => setState(
-              () => _activeSection =
-                  _SectionTab.ratings,
+              () => _activeSection = _SectionTab.ratings,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           _toggleButton(
             colors,
-            icon:
-                Icons.inventory_2_outlined,
+            icon: Icons.inventory_2_outlined,
             label: 'الخزانة',
-            active:
-                _activeSection ==
-                    _SectionTab.treasury,
+            active: _activeSection == _SectionTab.treasury,
             onTap: _openTreasury,
           ),
         ],
@@ -1133,33 +1107,19 @@ class _ProfilePageState extends State<ProfilePage> {
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration:
-              const Duration(
-            milliseconds: 180,
-          ),
-          padding:
-              const EdgeInsets.symmetric(
-            vertical: 11,
-          ),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: active
-                ? colors.brand
-                : Colors.transparent,
-            borderRadius:
-                BorderRadius.circular(15),
-            border: active
-                ? null
-                : Border.all(
-                    color: colors.divider,
-                  ),
+            color: active ? colors.brand : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
-                size: 18,
+                size: 17,
                 color: active
                     ? colors.onBrand
                     : colors.textSecondary,
@@ -1169,8 +1129,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: active
                       ? colors.onBrand
                       : colors.textSecondary,
@@ -1193,8 +1152,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (_myPosts.isEmpty) {
       return _emptySection(
         colors,
-        icon:
-            Icons.rate_review_outlined,
+        icon: Icons.rate_review_outlined,
         title: 'لا توجد تقييمات بعد',
         subtitle:
             'منشورات المجتمع التي تشير إلى أماكن ستظهر هنا.',
@@ -1203,43 +1161,22 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Column(
       children: [
-        for (
-          int index = 0;
-          index < _myPosts.length;
-          index++
-        )
+        for (int index = 0; index < _myPosts.length; index++)
           Padding(
-            padding:
-                const EdgeInsets.only(
-              bottom: 12,
-            ),
+            padding: const EdgeInsets.only(bottom: 12),
             child: CommunityPostCard(
               post: _myPosts[index],
-              onLike: () =>
-                  _toggleLike(
-                _myPosts[index],
-              ),
-              onSave: () =>
-                  _toggleSave(
-                _myPosts[index],
-              ),
+              onLike: () => _toggleLike(_myPosts[index]),
+              onSave: () => _toggleSave(_myPosts[index]),
               onComments: () =>
-                  _showComments(
-                _myPosts[index],
-                index,
-              ),
-              onAuthorTap: (authorId) =>
-                  openUserProfile(
+                  _showComments(_myPosts[index], index),
+              onAuthorTap: (authorId) => openUserProfile(
                 context,
                 userId: authorId,
-                isOwner:
-                    _myPosts[index].isOwner,
+                isOwner: _myPosts[index].isOwner,
               ),
               onPlaceTap: (placeId) =>
-                  openPlaceFromId(
-                context,
-                placeId,
-              ),
+                  openPlaceFromId(context, placeId),
             ),
           ),
       ],
@@ -1253,41 +1190,35 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildTreasuryContent(
     WaynColors colors,
   ) {
-    if (_wardrobeLoading &&
-        !_wardrobeLoaded) {
-      return const Padding(
-        padding: EdgeInsets.all(35),
+    if (_wardrobeLoading && !_wardrobeLoaded) {
+      return Padding(
+        padding: const EdgeInsets.all(40),
         child: Center(
-          child:
-              CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            color: colors.brand,
+            strokeWidth: 2.4,
+          ),
         ),
       );
     }
 
-    if (_wardrobeError != null &&
-        !_wardrobeLoaded) {
-      return _wardrobeErrorSection(
-        colors,
-      );
+    if (_wardrobeError != null && !_wardrobeLoaded) {
+      return _wardrobeErrorSection(colors);
     }
 
     if (_ownerships.isEmpty) {
       return _emptySection(
         colors,
-        icon:
-            Icons.inventory_2_outlined,
+        icon: Icons.inventory_2_outlined,
         title: 'خزانتك فارغة',
-        subtitle:
-            'ابدأ بشراء أول عنصر من متجر WAYN.',
+        subtitle: 'ابدأ بشراء أول عنصر من متجر WAYN.',
       );
     }
 
     return GridView.builder(
       shrinkWrap: true,
-      physics:
-          const NeverScrollableScrollPhysics(),
-      itemCount:
-          _ownerships.length,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _ownerships.length,
       gridDelegate:
           const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -1295,12 +1226,8 @@ class _ProfilePageState extends State<ProfilePage> {
         mainAxisSpacing: 12,
         childAspectRatio: .72,
       ),
-      itemBuilder:
-          (context, index) =>
-              _ownershipCard(
-        colors,
-        _ownerships[index],
-      ),
+      itemBuilder: (context, index) =>
+          _ownershipCard(colors, _ownerships[index]),
     );
   }
 
@@ -1310,33 +1237,26 @@ class _ProfilePageState extends State<ProfilePage> {
   ) {
     final item = ownership.item;
 
-    final expired =
-        ownership.expiresAt != null &&
-        ownership.expiresAt!.isBefore(
-          DateTime.now(),
-        );
+    final expired = ownership.expiresAt != null &&
+        ownership.expiresAt!.isBefore(DateTime.now());
 
     final image = item.imageUrl == null
         ? Container(
             color: colors.surfaceAlt,
-            alignment:
-                Alignment.center,
+            alignment: Alignment.center,
             child: Icon(
               Icons.storefront_rounded,
-              size: 40,
-              color: colors.brand,
+              size: 38,
+              color: colors.brand.withValues(alpha: 0.7),
             ),
           )
         : WaynNetworkImage(
             imageUrl: item.imageUrl!,
             width: double.infinity,
             fit: BoxFit.cover,
-            errorBuilder:
-                (_, _, _) => Container(
-              color:
-                  colors.surfaceAlt,
-              alignment:
-                  Alignment.center,
+            errorBuilder: (_, _, _) => Container(
+              color: colors.surfaceAlt,
+              alignment: Alignment.center,
               child: Icon(
                 Icons.storefront_rounded,
                 color: colors.brand,
@@ -1345,64 +1265,68 @@ class _ProfilePageState extends State<ProfilePage> {
           );
 
     return Opacity(
-      opacity: expired ? .58 : 1,
+      opacity: expired ? .55 : 1,
       child: Container(
-        padding:
-            const EdgeInsets.all(9),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius:
-              BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(13),
                 child: SizedBox(
                   width: double.infinity,
                   child: image,
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 9),
             Text(
               item.nameAr,
               maxLines: 2,
-              overflow:
-                  TextOverflow.ellipsis,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontWeight:
-                    FontWeight.w800,
-                color:
-                    colors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: colors.textPrimary,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'الكمية: ${ownership.quantity}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    FontWeight.w800,
-                color: colors.brand,
-              ),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.brand.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'x${ownership.quantity}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: colors.brand,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 5),
             Text(
-              _expiryLabel(
-                ownership.expiresAt,
-              ),
+              _expiryLabel(ownership.expiresAt),
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 color: expired
                     ? colors.danger
                     : colors.textSecondary,
-                fontWeight:
-                    FontWeight.w700,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -1418,15 +1342,11 @@ class _ProfilePageState extends State<ProfilePage> {
       return 'دائم';
     }
 
-    if (expiresAt.isBefore(
-      DateTime.now(),
-    )) {
+    if (expiresAt.isBefore(DateTime.now())) {
       return 'منتهي';
     }
 
-    final days = expiresAt
-        .difference(DateTime.now())
-        .inDays;
+    final days = expiresAt.difference(DateTime.now()).inDays;
 
     if (days < 1) {
       return 'ينتهي اليوم';
@@ -1445,33 +1365,42 @@ class _ProfilePageState extends State<ProfilePage> {
     WaynColors colors,
   ) {
     return Container(
-      padding:
-          const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: [
+          Icon(
+            Icons.cloud_off_rounded,
+            size: 34,
+            color: colors.textMuted,
+          ),
+          const SizedBox(height: 10),
           Text(
             _wardrobeError!,
-            textAlign:
-                TextAlign.center,
+            textAlign: TextAlign.center,
             style: TextStyle(
-              color:
-                  colors.textSecondary,
+              color: colors.textSecondary,
+              height: 1.5,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           FilledButton.icon(
-            onPressed:
-                _loadOwnership,
-            icon: const Icon(
-              Icons.refresh_rounded,
+            onPressed: _loadOwnership,
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.brand,
+              foregroundColor: colors.onBrand,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(13),
+              ),
             ),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text(
               'إعادة المحاولة',
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -1486,48 +1415,48 @@ class _ProfilePageState extends State<ProfilePage> {
     required String subtitle,
   }) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
         horizontal: 24,
-        vertical: 40,
+        vertical: 44,
       ),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            size: 52,
-            color: colors.brand.withValues(
-              alpha: 0.4,
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colors.brand.withValues(alpha: 0.08),
+            ),
+            child: Icon(
+              icon,
+              size: 32,
+              color: colors.brand.withValues(alpha: 0.55),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Text(
             title,
-            textAlign:
-                TextAlign.center,
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
-              fontWeight:
-                  FontWeight.w800,
-              color:
-                  colors.textPrimary,
+              fontSize: 15.5,
+              fontWeight: FontWeight.w800,
+              color: colors.textPrimary,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 7),
           Text(
             subtitle,
-            textAlign:
-                TextAlign.center,
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 13,
-              height: 1.5,
-              color:
-                  colors.textSecondary,
+              fontSize: 12.5,
+              height: 1.6,
+              color: colors.textSecondary,
             ),
           ),
         ],
@@ -1539,12 +1468,13 @@ class _ProfilePageState extends State<ProfilePage> {
     WaynColors colors,
   ) {
     return Container(
-      padding:
-          const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(16),
+        color: colors.danger.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.danger.withValues(alpha: 0.16),
+        ),
       ),
       child: Row(
         children: [
@@ -1559,8 +1489,8 @@ class _ProfilePageState extends State<ProfilePage> {
               'تعذر تحديث بعض البيانات، اسحب للأسفل لإعادة المحاولة.',
               style: TextStyle(
                 fontSize: 12,
-                color:
-                    colors.textSecondary,
+                color: colors.textSecondary,
+                height: 1.5,
               ),
             ),
           ),

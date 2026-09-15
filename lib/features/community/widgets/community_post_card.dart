@@ -9,6 +9,15 @@ import '../../../services/auth_service.dart';
 import '../../../services/social_service.dart';
 import '../models/community_post.dart';
 
+// ============================================================
+// SHARED ACCENT
+// ============================================================
+//
+// نفس اللون الكهرماني المستخدم في بطاقة "حسابي" وبطاقة المكان،
+// حتى تبقى لغة الألوان موحّدة عبر التطبيق.
+//
+const Color _kAmber = Color(0xFFF5A524);
+
 /// بطاقة منشور المجتمع الموحّدة.
 ///
 /// تستخدم في مجتمع والصفحات التي تعرض منشورات مثل:
@@ -77,6 +86,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           content: Text(
             message,
             textDirection: TextDirection.rtl,
@@ -92,6 +105,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           content: Row(
             children: [
               const Icon(
@@ -219,6 +236,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       ),
       padding: EdgeInsets.zero,
       menuPadding: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      elevation: 6,
     );
   }
 
@@ -442,8 +463,8 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         boxShadow: [
           BoxShadow(
             color: colors.shadow,
-            blurRadius: 16,
-            offset: const Offset(0, 5),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -464,7 +485,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 
             Divider(
               height: 1,
-              color: colors.divider,
+              color: colors.divider.withValues(alpha: 0.7),
             ),
 
             const SizedBox(height: 12),
@@ -482,7 +503,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   customBorder: const CircleBorder(),
                   child: CircleAvatar(
                     radius: 18,
-                    backgroundColor: colors.surfaceAlt,
+                    backgroundColor: colors.brand.withValues(
+                      alpha: 0.10,
+                    ),
                     child: Text(
                       avatarLetter,
                       style: TextStyle(
@@ -494,7 +517,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   ),
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(width: 9),
 
                 Expanded(
                   child: InkWell(
@@ -511,7 +534,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                           text: TextSpan(
                             children: [
                               TextSpan(
-                                text: 'تقييم من ',
+                                text: '',
                                 style: TextStyle(
                                   color: colors.textSecondary,
                                   fontSize: 12,
@@ -530,7 +553,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                           ),
                         ),
 
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
 
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -541,7 +564,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                               textDirection: TextDirection.rtl,
                               style: TextStyle(
                                 color: colors.textMuted,
-                                fontSize: 9,
+                                fontSize: 9.5,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -549,12 +572,20 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                             if (placeCity != null) ...[
                               const SizedBox(width: 6),
                               Text(
+                                '•',
+                                style: TextStyle(
+                                  color: colors.textMuted,
+                                  fontSize: 9.5,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
                                 placeCity,
                                 textDirection: TextDirection.rtl,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: colors.textMuted,
-                                  fontSize: 9,
+                                  fontSize: 9.5,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -566,12 +597,14 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   ),
                 ),
 
+                const SizedBox(width: 6),
+
                 _AuthorPointsChip(
                   points: post.authorPoints,
                   colors: colors,
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
 
                 if (!post.isOwner)
                   _FollowButton(
@@ -581,7 +614,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     colors: colors,
                   ),
 
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
 
                 _buildOptionsMenu(colors),
               ],
@@ -625,12 +658,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                       ) {
                         if (progress == null) return child;
 
-                        return const SizedBox(
+                        return SizedBox(
                           height: 180,
                           child: Center(
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Color(0xFF18A99A),
+                              color: colors.brand,
                             ),
                           ),
                         );
@@ -640,12 +673,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                         error,
                         stackTrace,
                       ) {
-                        return const SizedBox(
+                        return SizedBox(
                           height: 180,
                           child: Center(
                             child: Icon(
                               Icons.image_not_supported_outlined,
-                              color: Color(0xFF8B94A3),
+                              color: colors.textMuted,
                               size: 40,
                             ),
                           ),
@@ -661,10 +694,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 
             Divider(
               height: 1,
-              color: colors.divider,
+              color: colors.divider.withValues(alpha: 0.7),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
 
             // =========================================================
             // ACTIONS
@@ -678,6 +711,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                         : Icons.favorite_border_rounded,
                     label: formatCount(post.likesCount),
                     active: post.isLiked,
+                    activeColor: const Color(0xFFE0555C),
                     colors: colors,
                     onTap: widget.onLike,
                   ),
@@ -751,11 +785,11 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           borderRadius: BorderRadius.circular(22),
         ),
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
+        padding: const EdgeInsets.only(right: 22),
         child: const Icon(
           Icons.visibility_off_outlined,
           color: Colors.white,
-          size: 28,
+          size: 26,
         ),
       ),
 
@@ -806,8 +840,16 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            icon: Icon(
+              Icons.visibility_off_outlined,
+              color: colors.textSecondary,
+            ),
             title: const Text(
               'إخفاء المنشور',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -815,8 +857,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             ),
             content: const Text(
               'هل أنت متأكد أنك تريد إخفاء المنشور؟',
+              textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14),
             ),
+            actionsAlignment: MainAxisAlignment.center,
             actions: [
               TextButton(
                 onPressed: () =>
@@ -864,8 +908,16 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: Colors.redAccent,
+            ),
             title: const Text(
               'حذف المنشور',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -873,8 +925,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             ),
             content: const Text(
               'هل أنت متأكد أنك تريد الحذف؟',
+              textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14),
             ),
+            actionsAlignment: MainAxisAlignment.center,
             actions: [
               TextButton(
                 onPressed: () =>
@@ -935,10 +989,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         if (post.rating != null)
           _CompactRatingBadge(
             rating: post.rating!,
-            colors: colors,
           ),
 
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
 
         // =========================================================
         // اسم المكان - المنتصف
@@ -948,35 +1001,45 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             onTap: widget.onPlaceTap == null
                 ? null
                 : () => widget.onPlaceTap!(post.placeId),
-            borderRadius: BorderRadius.circular(6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.location_on_rounded,
-                  size: 14,
-                  color: colors.accentPurple,
-                ),
-                const SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    placeName,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: colors.accentPurple,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: colors.accentPurple.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.location_on_rounded,
+                    size: 14,
+                    color: colors.accentPurple,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      placeName,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: colors.accentPurple,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
 
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
 
         // =========================================================
         // طعن - يظهر فقط في البطاقة الخاصة بغير المالك
@@ -988,15 +1051,26 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 4,
-                vertical: 4,
+                vertical: 6,
               ),
-              child: Text(
-                'طعن',
-                style: TextStyle(
-                  color: colors.textMuted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.flag_outlined,
+                    size: 13,
+                    color: colors.textMuted,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'طعن',
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1015,8 +1089,16 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            icon: const Icon(
+              Icons.flag_outlined,
+              color: Colors.redAccent,
+            ),
             title: const Text(
               'إبلاغ عن المنشور',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -1024,8 +1106,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             ),
             content: const Text(
               'هل تريد الإبلاغ عن هذا المنشور؟',
+              textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14),
             ),
+            actionsAlignment: MainAxisAlignment.center,
             actions: [
               TextButton(
                 onPressed: () =>
@@ -1076,7 +1160,7 @@ class _AuthorPointsChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 8,
-        vertical: 4,
+        vertical: 5,
       ),
       decoration: BoxDecoration(
         color: colors.surfaceAlt,
@@ -1128,10 +1212,11 @@ class _FollowButton extends StatelessWidget {
 
     return GestureDetector(
       onTap: busy ? null : onPressed,
-      child: Container(
-        height: 28,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: 29,
         padding: const EdgeInsets.symmetric(
-          horizontal: 10,
+          horizontal: 12,
         ),
         decoration: BoxDecoration(
           color: following
@@ -1141,7 +1226,7 @@ class _FollowButton extends StatelessWidget {
           border: following
               ? Border.all(
                   color: colors.brand.withValues(
-                    alpha: 0.4,
+                    alpha: 0.35,
                   ),
                 )
               : null,
@@ -1192,11 +1277,9 @@ class _FollowButton extends StatelessWidget {
 /// غير متناسقة بصريًا.
 class _CompactRatingBadge extends StatelessWidget {
   final double rating;
-  final WaynColors colors;
 
   const _CompactRatingBadge({
     required this.rating,
-    required this.colors,
   });
 
   @override
@@ -1204,25 +1287,22 @@ class _CompactRatingBadge extends StatelessWidget {
     final ratingValue = rating.clamp(1.0, 5.0);
     final ratingInt = ratingValue.round();
 
-    // اللون الأصلي ثابت.
-    const Color starColor = Color(0xFFF59E0B);
-
     // نجمة واحدة ثابتة وجميلة لجميع المستويات.
-    const double starSize = 24;
+    const double starSize = 23;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
+        const Icon(
           Icons.star_rounded,
           size: starSize,
-          color: starColor,
+          color: _kAmber,
         ),
         const SizedBox(width: 4),
         Text(
           ratingInt.toString(),
           style: const TextStyle(
-            color: starColor,
+            color: _kAmber,
             fontSize: 14,
             fontWeight: FontWeight.w900,
           ),
@@ -1259,7 +1339,7 @@ class _StarsRow extends StatelessWidget {
                 ? Icons.star_rounded
                 : Icons.star_border_rounded,
             size: 15,
-            color: const Color(0xFFF5A623),
+            color: _kAmber,
           ),
         );
       }),
@@ -1328,7 +1408,7 @@ class _ExpandablePostTextState
 
     final textStyle = TextStyle(
       color: colors.textPrimary,
-      fontSize: 15,
+      fontSize: 14.5,
       height: 1.6,
     );
 
@@ -1397,6 +1477,7 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
+  final Color? activeColor;
   final WaynColors colors;
   final VoidCallback? onTap;
 
@@ -1405,21 +1486,29 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.colors,
     this.active = false,
+    this.activeColor,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = active
-        ? colors.brand
+        ? (activeColor ?? colors.brand)
         : colors.textSecondary;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
-      child: Padding(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(
           vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: active
+              ? color.withValues(alpha: 0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

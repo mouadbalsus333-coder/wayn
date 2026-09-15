@@ -652,10 +652,10 @@ class _CommunityPageState extends State<CommunityPage> {
 }
 
 // ============================================================================
-// شريط إنشاء المنشور أسفل الشاشة
+// زر إنشاء المنشور — يظهر كزر عائم (pill) أنيق أسفل الشاشة
 // ============================================================================
 
-class _AddPostBar extends StatelessWidget {
+class _AddPostBar extends StatefulWidget {
   final bool visible;
   final VoidCallback onPressed;
 
@@ -665,70 +665,114 @@ class _AddPostBar extends StatelessWidget {
   });
 
   @override
+  State<_AddPostBar> createState() => _AddPostBarState();
+}
+
+class _AddPostBarState extends State<_AddPostBar> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!visible) {
+    if (!widget.visible) {
       return const SizedBox.shrink();
     }
 
     final colors = context.waynColors;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: colors.shadow,
-            blurRadius: 18,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Material(
-            color: Colors.transparent,
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onPressed,
-              child: Ink(
-                height: 54,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF18A99A),
-                      Color(0xFF087F78),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colors.brand.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 4, 22, 14),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF22C7B2),
+                  Color(0xFF0C8B80),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.brand.withValues(alpha: 0.38),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'إضافة منشور جديد',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(28),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: widget.onPressed,
+                onHighlightChanged: _setPressed,
+                splashColor: Colors.white.withValues(alpha: 0.14),
+                highlightColor: Colors.white.withValues(alpha: 0.08),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // لمعة علوية خفيفة تعطي إحساسًا زجاجيًا هادئًا.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.white.withValues(alpha: 0.10),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.55],
+                          ),
+                        ),
                       ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 27,
+                          height: 27,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.18),
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'إضافة منشور جديد',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15.5,
+                            letterSpacing: -0.1,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
