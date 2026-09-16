@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:like_button/like_button.dart';
 
 import '../../../core/config/backend_config.dart';
 import '../../../core/navigation/wayn_actions.dart';
@@ -10,25 +14,17 @@ import '../../../services/social_service.dart';
 import '../models/community_post.dart';
 
 // ============================================================
-// SHARED ACCENT
+// SHARED ACCENTS
 // ============================================================
-//
-// نفس اللون الكهرماني المستخدم في بطاقة "حسابي" وبطاقة المكان،
-// حتى تبقى لغة الألوان موحّدة عبر التطبيق.
-//
-const Color _kAmber = Color(0xFFF5A524);
 
-/// بطاقة منشور المجتمع الموحّدة.
-///
-/// تستخدم في مجتمع والصفحات التي تعرض منشورات مثل:
-/// - المجتمع
-/// - آراء الزوار داخل الخريطة
-/// - تقييمات الحساب
-///
-/// القواعد:
-/// - السحب = إخفاء المنشور عن المستخدم الحالي فقط.
-/// - حذف المنشور نهائيًا متاح من قائمة الخيارات لصاحب المنشور فقط.
-/// - منشور شخص آخر يحتوي في الخيارات على الإخفاء والإبلاغ.
+const Color _kAmber = Color(0xFFF5A524);
+const Color _kLikeColor = Color(0xFFE0555C);
+const Color _kSuccessColor = Color(0xFF18A99A);
+
+// ============================================================
+// COMMUNITY POST CARD
+// ============================================================
+
 class CommunityPostCard extends StatefulWidget {
   final CommunityPost post;
 
@@ -37,16 +33,12 @@ class CommunityPostCard extends StatefulWidget {
   final VoidCallback? onComments;
   final VoidCallback? onDelete;
 
-  /// يستقبل userId الخاص بصاحب المنشور.
   final ValueChanged<String>? onAuthorTap;
 
-  /// يستقبل placeId المكان المرتبط.
   final ValueChanged<String>? onPlaceTap;
 
-  /// نص يصف نوع المنشور.
   final String? postDescriptionText;
 
-  /// callback لإخفاء المنشور عن المستخدم الحالي فقط.
   final VoidCallback? onHide;
 
   const CommunityPostCard({
@@ -70,7 +62,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   final SocialService _socialService = SocialService();
 
   late bool _isFollowing;
+
   bool _followBusy = false;
+  bool _followSuccess = false;
 
   CommunityPost get post => widget.post;
 
@@ -80,6 +74,29 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     _isFollowing = post.isFollowingAuthor;
   }
 
+  @override
+  void didUpdateWidget(
+    covariant CommunityPostCard oldWidget,
+  ) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.post.userId != widget.post.userId) {
+      _isFollowing = widget.post.isFollowingAuthor;
+      _followBusy = false;
+      _followSuccess = false;
+      return;
+    }
+
+    if (oldWidget.post.isFollowingAuthor !=
+        widget.post.isFollowingAuthor) {
+      _isFollowing = widget.post.isFollowingAuthor;
+    }
+  }
+
+  // ============================================================
+  // FEEDBACK
+  // ============================================================
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -87,18 +104,27 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          margin: const EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16,
+          ),
+          elevation: 6,
           content: Text(
             message,
             textDirection: TextDirection.rtl,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       );
   }
 
-  /// يعرض رسالة لطيفة تطلب تسجيل الدخول ولا ينفّذ الطلب على الـ backend.
   void _promptLogin() {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -106,22 +132,30 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          margin: const EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16,
+          ),
+          backgroundColor: _kSuccessColor,
+          duration: const Duration(seconds: 4),
           content: Row(
             children: [
               const Icon(
-                Icons.login_rounded,
+                Iconsax.login_1,
                 color: Colors.white,
                 size: 20,
               ),
               const SizedBox(width: 10),
-              Expanded(
+              const Expanded(
                 child: Text(
                   'سجّل دخولك لتتمكن من متابعة الأعضاء',
                   textDirection: TextDirection.rtl,
-                  style: const TextStyle(
+                  style: TextStyle(
+                    color: Colors.white,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -129,14 +163,19 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
               ),
               TextButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context)
+                      .hideCurrentSnackBar();
+
                   openLoginAndRebuild(context);
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                  ),
                   minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  tapTargetSize:
+                      MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text(
                   'تسجيل الدخول',
@@ -147,8 +186,6 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
               ),
             ],
           ),
-          backgroundColor: const Color(0xFF18A99A),
-          duration: const Duration(seconds: 4),
         ),
       );
   }
@@ -157,89 +194,69 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   // OPTIONS MENU
   // ============================================================
 
-  /// قائمة الخيارات:
-  ///
-  /// صاحب المنشور:
-  /// - حذف المنشور نهائيًا.
-  ///
-  /// منشور شخص آخر:
-  /// - إخفاء المنشور عني.
-  /// - إبلاغ عن المنشور.
   Widget _buildOptionsMenu(WaynColors colors) {
-    final List<PopupMenuEntry<String>> items = [];
-
-    if (post.isOwner) {
-      if (widget.onDelete != null) {
-        items.add(
-          PopupMenuItem(
-            value: 'delete',
-            child: _buildMenuItem(
-              'حذف المنشور',
-              Icons.delete_outline_rounded,
-              Colors.redAccent,
-            ),
-          ),
-        );
-      }
-    } else {
-      items.add(
-        PopupMenuItem(
-          value: 'hide',
-          child: _buildMenuItem(
-            'إخفاء المنشور',
-            Icons.visibility_off_outlined,
-            colors.textSecondary,
-          ),
-        ),
-      );
-
-      items.add(
-        PopupMenuItem(
-          value: 'report',
-          child: _buildMenuItem(
-            'إبلاغ عن المنشور',
-            Icons.flag_outlined,
-            Colors.redAccent,
-          ),
-        ),
-      );
-    }
-
-    if (items.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return PopupMenuButton<String>(
-      icon: Icon(
-        Icons.more_vert_rounded,
-        color: colors.textMuted,
-        size: 20,
-      ),
+    return _AnimatedMoreButton(
+      colors: colors,
       onSelected: (value) {
         switch (value) {
           case 'delete':
-            widget.onDelete?.call();
-            break;
-
-          case 'hide':
-            _hidePost();
+            _showDeleteConfirmation(colors);
             break;
 
           case 'report':
             _showReportDialog(colors);
             break;
+
+          case 'hide':
+            _showHideConfirmation(colors).then((confirmed) {
+              if (!mounted || !confirmed) return;
+              _hidePost();
+            });
+            break;
         }
       },
-      itemBuilder: (context) => items,
-      constraints: const BoxConstraints(
-        minWidth: 165,
-      ),
-      padding: EdgeInsets.zero,
-      menuPadding: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
-      elevation: 6,
+      itemBuilder: (context) {
+        final items = <PopupMenuEntry<String>>[];
+
+        if (post.isOwner) {
+          if (widget.onDelete != null) {
+            items.add(
+              PopupMenuItem<String>(
+                value: 'delete',
+                child: _buildMenuItem(
+                  'حذف المنشور',
+                  Iconsax.trash,
+                  Colors.redAccent,
+                ),
+              ),
+            );
+          }
+        } else {
+          items.add(
+            PopupMenuItem<String>(
+              value: 'report',
+              child: _buildMenuItem(
+                'طعن على المنشور',
+                Iconsax.flag,
+                Colors.redAccent,
+              ),
+            ),
+          );
+
+          items.add(
+            PopupMenuItem<String>(
+              value: 'hide',
+              child: _buildMenuItem(
+                'إخفاء المنشور',
+                Iconsax.eye_slash,
+                colors.textSecondary,
+              ),
+            ),
+          );
+        }
+
+        return items;
+      },
     );
   }
 
@@ -249,12 +266,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     Color color,
   ) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Expanded(
           child: Text(
             label,
             textAlign: TextAlign.right,
+            textDirection: TextDirection.rtl,
             style: TextStyle(
               color: color,
               fontSize: 13,
@@ -262,24 +279,20 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
         Icon(
           icon,
           color: color,
-          size: 18,
+          size: 19,
         ),
       ],
     );
   }
 
   // ============================================================
-  // HIDE POST
+  // HIDE
   // ============================================================
 
-  /// يخفي المنشور عن المستخدم الحالي فقط.
-  ///
-  /// لا يحذف المنشور من قاعدة البيانات ولا يؤثر على ظهوره
-  /// عند بقية المستخدمين.
   void _hidePost() {
     widget.onHide?.call();
 
@@ -295,6 +308,8 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   Future<void> _toggleFollow() async {
     if (_followBusy) return;
 
+    HapticFeedback.selectionClick();
+
     try {
       final user = await AuthService().getCurrentUser();
 
@@ -306,11 +321,15 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       }
     } catch (_) {
       if (!mounted) return;
+
       _promptLogin();
       return;
     }
 
-    setState(() => _followBusy = true);
+    setState(() {
+      _followBusy = true;
+      _followSuccess = false;
+    });
 
     try {
       if (_isFollowing) {
@@ -318,8 +337,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 
         if (!mounted) return;
 
+        HapticFeedback.lightImpact();
+
         setState(() {
           _isFollowing = false;
+          _followBusy = false;
+          _followSuccess = false;
         });
 
         _showMessage('تم إلغاء المتابعة');
@@ -328,19 +351,54 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 
         if (!mounted) return;
 
+        HapticFeedback.mediumImpact();
+
         setState(() {
           _isFollowing = true;
+          _followSuccess = true;
         });
 
         _showMessage('تمت متابعة المستخدم');
+
+        await Future<void>.delayed(
+          const Duration(milliseconds: 700),
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _followBusy = false;
+          _followSuccess = false;
+        });
       }
     } catch (_) {
       if (!mounted) return;
+
+      setState(() {
+        _followBusy = false;
+        _followSuccess = false;
+      });
+
+      HapticFeedback.heavyImpact();
+
       _showMessage('تعذر تنفيذ المتابعة');
-    } finally {
-      if (mounted) {
-        setState(() => _followBusy = false);
-      }
+    }
+  }
+
+  // ============================================================
+  // LIKE
+  // ============================================================
+
+  Future<bool> _handleLike(bool isLiked) async {
+    HapticFeedback.lightImpact();
+
+    try {
+      widget.onLike?.call();
+
+      return !isLiked;
+    } catch (_) {
+      HapticFeedback.heavyImpact();
+      return isLiked;
     }
   }
 
@@ -392,7 +450,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                       stackTrace,
                     ) {
                       return const Icon(
-                        Icons.image_not_supported_outlined,
+                        Iconsax.gallery_slash,
                         color: Colors.white70,
                         size: 56,
                       );
@@ -403,21 +461,8 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
               Positioned(
                 top: 12,
                 right: 12,
-                child: Material(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => Navigator.pop(dialogContext),
-                    child: const Padding(
-                      padding: EdgeInsets.all(9),
-                      child: Icon(
-                        Icons.close_rounded,
-                        color: Colors.white,
-                        size: 25,
-                      ),
-                    ),
-                  ),
+                child: _ImageCloseButton(
+                  onTap: () => Navigator.pop(dialogContext),
                 ),
               ),
             ],
@@ -473,9 +518,6 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // =========================================================
-            // RATING + PLACE + REPORT SECTION
-            // =========================================================
             _buildRatingAndPlaceSection(
               colors,
               placeName,
@@ -490,31 +532,21 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 
             const SizedBox(height: 12),
 
-            // =========================================================
+            // =====================================================
             // USER HEADER
-            // =========================================================
+            // =====================================================
+
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                InkWell(
+                _AvatarButton(
+                  letter: avatarLetter,
+                  colors: colors,
                   onTap: widget.onAuthorTap == null
                       ? null
-                      : () => widget.onAuthorTap!(post.userId),
-                  customBorder: const CircleBorder(),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: colors.brand.withValues(
-                      alpha: 0.10,
-                    ),
-                    child: Text(
-                      avatarLetter,
-                      style: TextStyle(
-                        color: colors.brand,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
+                      : () => widget.onAuthorTap!(
+                            post.userId,
+                          ),
                 ),
 
                 const SizedBox(width: 9),
@@ -523,76 +555,75 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   child: InkWell(
                     onTap: widget.onAuthorTap == null
                         ? null
-                        : () => widget.onAuthorTap!(post.userId),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        RichText(
-                          textDirection: TextDirection.rtl,
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '',
-                                style: TextStyle(
-                                  color: colors.textSecondary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                              TextSpan(
-                                text: authorName,
-                                style: TextStyle(
-                                  color: colors.brand,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
+                        : () => widget.onAuthorTap!(
+                            post.userId,
                           ),
-                        ),
-
-                        const SizedBox(height: 3),
-
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          textDirection: TextDirection.rtl,
-                          children: [
-                            Text(
-                              _formatPostTime(post.createdAt),
-                              textDirection: TextDirection.rtl,
-                              style: TextStyle(
-                                color: colors.textMuted,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w500,
-                              ),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 2,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            authorName,
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                              color: colors.brand,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
                             ),
-
-                            if (placeCity != null) ...[
-                              const SizedBox(width: 6),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            textDirection: TextDirection.rtl,
+                            children: [
                               Text(
-                                '•',
-                                style: TextStyle(
-                                  color: colors.textMuted,
-                                  fontSize: 9.5,
+                                _formatPostTime(
+                                  post.createdAt,
                                 ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                placeCity,
-                                textDirection: TextDirection.rtl,
-                                overflow: TextOverflow.ellipsis,
+                                textDirection:
+                                    TextDirection.rtl,
                                 style: TextStyle(
                                   color: colors.textMuted,
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
+                              if (placeCity != null) ...[
+                                const SizedBox(width: 6),
+                                Text(
+                                  '•',
+                                  style: TextStyle(
+                                    color: colors.textMuted,
+                                    fontSize: 9.5,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    placeCity,
+                                    textDirection:
+                                        TextDirection.rtl,
+                                    overflow:
+                                        TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: colors.textMuted,
+                                      fontSize: 9.5,
+                                      fontWeight:
+                                          FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -610,19 +641,17 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                   _FollowButton(
                     isFollowing: _isFollowing,
                     busy: _followBusy,
+                    success: _followSuccess,
                     onPressed: _toggleFollow,
                     colors: colors,
                   ),
-
-                const SizedBox(width: 4),
-
-                _buildOptionsMenu(colors),
               ],
             ),
 
-            // =========================================================
+            // =====================================================
             // TEXT
-            // =========================================================
+            // =====================================================
+
             if (post.text != null &&
                 post.text!.trim().isNotEmpty) ...[
               const SizedBox(height: 14),
@@ -631,9 +660,10 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
               ),
             ],
 
-            // =========================================================
+            // =====================================================
             // IMAGE
-            // =========================================================
+            // =====================================================
+
             if (fullImageUrl != null &&
                 fullImageUrl.isNotEmpty) ...[
               const SizedBox(height: 14),
@@ -656,7 +686,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                         child,
                         progress,
                       ) {
-                        if (progress == null) return child;
+                        if (progress == null) {
+                          return child;
+                        }
 
                         return SizedBox(
                           height: 180,
@@ -677,7 +709,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                           height: 180,
                           child: Center(
                             child: Icon(
-                              Icons.image_not_supported_outlined,
+                              Iconsax.gallery_slash,
                               color: colors.textMuted,
                               size: 40,
                             ),
@@ -697,42 +729,52 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
               color: colors.divider.withValues(alpha: 0.7),
             ),
 
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
 
-            // =========================================================
+            // =====================================================
             // ACTIONS
-            // =========================================================
+            // =====================================================
+
             Row(
               children: [
                 Expanded(
-                  child: _ActionButton(
-                    icon: post.isLiked
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    label: formatCount(post.likesCount),
-                    active: post.isLiked,
-                    activeColor: const Color(0xFFE0555C),
+                  child: _LikeActionButton(
+                    isLiked: post.isLiked,
+                    likeCount: post.likesCount,
                     colors: colors,
-                    onTap: widget.onLike,
+                    onTap: _handleLike,
                   ),
                 ),
                 Expanded(
-                  child: _ActionButton(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    label: formatCount(post.commentsCount),
+                  child: _AnimatedActionButton(
+                    icon: Iconsax.message_2,
+                    activeIcon: Iconsax.message_2,
+                    label: formatCount(
+                      post.commentsCount,
+                    ),
+                    active: false,
+                    activeColor: colors.brand,
                     colors: colors,
-                    onTap: widget.onComments,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      widget.onComments?.call();
+                    },
                   ),
                 ),
                 Expanded(
-                  child: _ActionButton(
-                    icon: post.isSaved
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                    label: formatCount(post.savesCount),
+                  child: _AnimatedActionButton(
+                    icon: Iconsax.bookmark,
+                    activeIcon: Iconsax.bookmark_2,
+                    label: formatCount(
+                      post.savesCount,
+                    ),
                     active: post.isSaved,
+                    activeColor: colors.brand,
                     colors: colors,
-                    onTap: widget.onSave,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      widget.onSave?.call();
+                    },
                   ),
                 ),
               ],
@@ -742,63 +784,22 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
       ),
     );
 
-    // ==========================================================
-    // SWIPE TO HIDE
-    // ==========================================================
-    //
-    // مهم جدًا:
-    // السحب لم يعد له أي علاقة بالحذف.
-    //
-    // سواء كان المنشور:
-    // - منشور المستخدم الحالي
-    // - منشور مستخدم آخر
-    //
-    // السحب يقوم فقط بإخفائه عن المستخدم الحالي.
-    //
-    // الحذف النهائي موجود فقط في قائمة الخيارات لصاحب المنشور.
-    return Dismissible(
-      key: Key(post.id),
-
-      // نفس اتجاه الإخفاء المستخدم حاليًا في البطاقة.
-      // لا يوجد اتجاه حذف.
-      direction: DismissDirection.endToStart,
-
-      confirmDismiss: (direction) async {
-        if (direction != DismissDirection.endToStart) {
-          return false;
-        }
-
-        final result = await _showHideConfirmation(colors);
-
-        if (result && widget.onHide != null) {
-          widget.onHide!();
-        }
-
-        // الإزالة من القائمة تتم عن طريق onHide.
-        // لا نحذف المنشور من backend من هنا.
-        return false;
-      },
-
-      background: Container(
-        decoration: BoxDecoration(
-          color: colors.textMuted,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 22),
-        child: const Icon(
-          Icons.visibility_off_outlined,
-          color: Colors.white,
-          size: 26,
-        ),
-      ),
-
-      child: cardContent,
-    );
+    return cardContent
+        .animate()
+        .fadeIn(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOut,
+        )
+        .slideY(
+          begin: 0.018,
+          end: 0,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        );
   }
 
   // ============================================================
-  // TIME FORMAT
+  // TIME
   // ============================================================
 
   String _formatPostTime(DateTime dateTime) {
@@ -809,12 +810,11 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 
     final period = hour < 12 ? 'صباحا' : 'مساء';
 
-    final displayHour =
-        hour > 12
-            ? hour - 12
-            : hour == 0
-                ? 12
-                : hour;
+    final displayHour = hour > 12
+        ? hour - 12
+        : hour == 0
+            ? 12
+            : hour;
 
     if (minute == 0) {
       return '$displayHour $period';
@@ -830,7 +830,6 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   // HIDE CONFIRMATION
   // ============================================================
 
-  /// تأكيد إخفاء المنشور عن المستخدم الحالي فقط.
   Future<bool> _showHideConfirmation(
     WaynColors colors,
   ) async {
@@ -841,11 +840,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
             ),
             icon: Icon(
-              Icons.visibility_off_outlined,
+              Iconsax.eye_slash,
               color: colors.textSecondary,
+              size: 28,
             ),
             title: const Text(
               'إخفاء المنشور',
@@ -896,9 +896,6 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   // DELETE CONFIRMATION
   // ============================================================
 
-  /// حذف المنشور نهائيًا.
-  ///
-  /// هذه العملية تستخدم فقط من قائمة الخيارات الخاصة بصاحب المنشور.
   Future<bool> _showDeleteConfirmation(
     WaynColors colors,
   ) async {
@@ -909,11 +906,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
             ),
             icon: const Icon(
-              Icons.delete_outline_rounded,
+              Iconsax.trash,
               color: Colors.redAccent,
+              size: 28,
             ),
             title: const Text(
               'حذف المنشور',
@@ -958,6 +956,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     );
 
     if (result == true) {
+      HapticFeedback.mediumImpact();
       widget.onDelete?.call();
     }
 
@@ -965,17 +964,9 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   }
 
   // ============================================================
-  // RATING + PLACE + REPORT SECTION
+  // RATING + PLACE + MORE
   // ============================================================
 
-  /// يبني قسم التقييم والمكان والطعن في أعلى البطاقة.
-  ///
-  /// الترتيب RTL:
-  /// نجمة التقييم (يمين)
-  /// →
-  /// اسم المكان (منتصف)
-  /// →
-  /// طعن (يسار)
   Widget _buildRatingAndPlaceSection(
     WaynColors colors,
     String placeName,
@@ -983,9 +974,6 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // =========================================================
-        // نجمة التقييم - موقعها ثابت
-        // =========================================================
         if (post.rating != null)
           _CompactRatingBadge(
             rating: post.rating!,
@@ -993,93 +981,31 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 
         const SizedBox(width: 10),
 
-        // =========================================================
-        // اسم المكان - المنتصف
-        // =========================================================
         Expanded(
-          child: InkWell(
+          child: _PlaceButton(
+            placeName: placeName,
+            colors: colors,
             onTap: widget.onPlaceTap == null
                 ? null
-                : () => widget.onPlaceTap!(post.placeId),
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: colors.accentPurple.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.location_on_rounded,
-                    size: 14,
-                    color: colors.accentPurple,
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      placeName,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: colors.accentPurple,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                : () {
+                    HapticFeedback.selectionClick();
+
+                    widget.onPlaceTap!(
+                      post.placeId,
+                    );
+                  },
           ),
         ),
 
-        const SizedBox(width: 10),
+        const SizedBox(width: 6),
 
-        // =========================================================
-        // طعن - يظهر فقط في البطاقة الخاصة بغير المالك
-        // =========================================================
-        if (!post.isOwner)
-          InkWell(
-            onTap: () => _showReportDialog(colors),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 6,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.flag_outlined,
-                    size: 13,
-                    color: colors.textMuted,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'طعن',
-                    style: TextStyle(
-                      color: colors.textMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        _buildOptionsMenu(colors),
       ],
     );
   }
 
   // ============================================================
-  // REPORT DIALOG
+  // REPORT
   // ============================================================
 
   void _showReportDialog(WaynColors colors) {
@@ -1090,14 +1016,15 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
             ),
             icon: const Icon(
-              Icons.flag_outlined,
+              Iconsax.flag,
               color: Colors.redAccent,
+              size: 28,
             ),
             title: const Text(
-              'إبلاغ عن المنشور',
+              'طعن على المنشور',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -1105,7 +1032,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
               ),
             ),
             content: const Text(
-              'هل تريد الإبلاغ عن هذا المنشور؟',
+              'هل تريد إرسال طعن على هذا المنشور؟',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14),
             ),
@@ -1124,7 +1051,12 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
               TextButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  _showMessage('تم إرسال البلاغ عن المنشور');
+
+                  HapticFeedback.mediumImpact();
+
+                  _showMessage(
+                    'تم إرسال البلاغ عن المنشور',
+                  );
                 },
                 child: const Text(
                   'إبلاغ',
@@ -1143,7 +1075,300 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 }
 
 // ============================================================
-// AUTHOR POINTS CHIP
+// THREE DOTS MENU
+// ============================================================
+
+class _AnimatedMoreButton extends StatefulWidget {
+  final WaynColors colors;
+  final PopupMenuItemBuilder<String> itemBuilder;
+  final ValueChanged<String> onSelected;
+
+  const _AnimatedMoreButton({
+    required this.colors,
+    required this.itemBuilder,
+    required this.onSelected,
+  });
+
+  @override
+  State<_AnimatedMoreButton> createState() =>
+      _AnimatedMoreButtonState();
+}
+
+class _AnimatedMoreButtonState
+    extends State<_AnimatedMoreButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (!mounted) return;
+
+    setState(() {
+      _pressed = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'المزيد',
+      onSelected: widget.onSelected,
+      itemBuilder: widget.itemBuilder,
+      constraints: const BoxConstraints(
+        minWidth: 185,
+      ),
+      padding: EdgeInsets.zero,
+      menuPadding: const EdgeInsets.symmetric(
+        vertical: 5,
+      ),
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      elevation: 8,
+      onOpened: () => _setPressed(true),
+      onCanceled: () => _setPressed(false),
+      child: Listener(
+        onPointerDown: (_) => _setPressed(true),
+        onPointerUp: (_) => _setPressed(false),
+        onPointerCancel: (_) => _setPressed(false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.86 : 1,
+          duration: const Duration(milliseconds: 130),
+          curve: Curves.easeOutCubic,
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: _pressed
+                      ? widget.colors.surfaceAlt
+                      : widget.colors.surfaceAlt.withValues(
+                          alpha: 0.55,
+                        ),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.more_horiz_rounded,
+                  color: widget.colors.textMuted,
+                  size: 23,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// PLACE BUTTON
+// ============================================================
+
+class _PlaceButton extends StatefulWidget {
+  final String placeName;
+  final WaynColors colors;
+  final VoidCallback? onTap;
+
+  const _PlaceButton({
+    required this.placeName,
+    required this.colors,
+    required this.onTap,
+  });
+
+  @override
+  State<_PlaceButton> createState() => _PlaceButtonState();
+}
+
+class _PlaceButtonState extends State<_PlaceButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) {
+        setState(() => _pressed = true);
+      },
+      onTapCancel: () {
+        setState(() => _pressed = false);
+      },
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+
+        if (widget.onTap != null) {
+          widget.onTap!();
+        }
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.975 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 11,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: widget.colors.accentPurple.withValues(
+              alpha: _pressed ? 0.13 : 0.08,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Iconsax.location,
+                size: 15,
+                color: widget.colors.accentPurple,
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  widget.placeName,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: TextStyle(
+                    color: widget.colors.accentPurple,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// AVATAR
+// ============================================================
+
+class _AvatarButton extends StatefulWidget {
+  final String letter;
+  final WaynColors colors;
+  final VoidCallback? onTap;
+
+  const _AvatarButton({
+    required this.letter,
+    required this.colors,
+    required this.onTap,
+  });
+
+  @override
+  State<_AvatarButton> createState() => _AvatarButtonState();
+}
+
+class _AvatarButtonState extends State<_AvatarButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) {
+        setState(() => _pressed = true);
+      },
+      onTapCancel: () {
+        setState(() => _pressed = false);
+      },
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+
+        if (widget.onTap != null) {
+          HapticFeedback.selectionClick();
+          widget.onTap!();
+        }
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.92 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: CircleAvatar(
+          radius: 18,
+          backgroundColor: widget.colors.brand.withValues(
+            alpha: 0.10,
+          ),
+          child: Text(
+            widget.letter,
+            style: TextStyle(
+              color: widget.colors.brand,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// IMAGE CLOSE BUTTON
+// ============================================================
+
+class _ImageCloseButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _ImageCloseButton({
+    required this.onTap,
+  });
+
+  @override
+  State<_ImageCloseButton> createState() =>
+      _ImageCloseButtonState();
+}
+
+class _ImageCloseButtonState
+    extends State<_ImageCloseButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() => _pressed = true);
+      },
+      onTapCancel: () {
+        setState(() => _pressed = false);
+      },
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.86 : 1,
+        duration: const Duration(milliseconds: 120),
+        child: Material(
+          color: Colors.black.withValues(alpha: 0.55),
+          shape: const CircleBorder(),
+          child: const Padding(
+            padding: EdgeInsets.all(9),
+            child: Icon(
+              Iconsax.close_circle,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// AUTHOR POINTS
 // ============================================================
 
 class _AuthorPointsChip extends StatelessWidget {
@@ -1170,7 +1395,7 @@ class _AuthorPointsChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.stars_rounded,
+            Iconsax.medal_star,
             size: 14,
             color: colors.warning,
           ),
@@ -1196,63 +1421,151 @@ class _AuthorPointsChip extends StatelessWidget {
 class _FollowButton extends StatelessWidget {
   final bool isFollowing;
   final bool busy;
+  final bool success;
   final VoidCallback onPressed;
   final WaynColors colors;
 
   const _FollowButton({
     required this.isFollowing,
     required this.busy,
+    required this.success,
     required this.onPressed,
     required this.colors,
   });
 
   @override
   Widget build(BuildContext context) {
-    final following = isFollowing;
+    final backgroundColor = success
+        ? colors.brand
+        : isFollowing
+            ? colors.surfaceAlt
+            : colors.brand;
+
+    final foregroundColor = isFollowing && !success
+        ? colors.brand
+        : colors.onBrand;
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: busy ? null : onPressed,
-      child: AnimatedContainer(
+      child: AnimatedScale(
+        scale: busy ? 0.95 : 1,
         duration: const Duration(milliseconds: 180),
-        height: 29,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-        ),
-        decoration: BoxDecoration(
-          color: following
-              ? colors.surfaceAlt
-              : colors.brand,
-          borderRadius: BorderRadius.circular(10),
-          border: following
-              ? Border.all(
-                  color: colors.brand.withValues(
-                    alpha: 0.35,
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+          height: 31,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 11,
+          ),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(10),
+            border: isFollowing && !success
+                ? Border.all(
+                    color: colors.brand.withValues(
+                      alpha: 0.30,
+                    ),
+                  )
+                : null,
+            boxShadow: success
+                ? [
+                    BoxShadow(
+                      color: colors.brand.withValues(
+                        alpha: 0.22,
+                      ),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(
+                milliseconds: 260,
+              ),
+              switchInCurve: Curves.easeOutBack,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (
+                child,
+                animation,
+              ) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: animation,
+                    child: child,
                   ),
-                )
-              : null,
-        ),
-        child: Center(
-          child: busy
-              ? SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: following
-                        ? colors.brand
-                        : colors.onBrand,
-                  ),
-                )
-              : Text(
-                  following ? 'متابَع' : 'متابعة',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: following
-                        ? colors.brand
-                        : colors.onBrand,
-                  ),
-                ),
+                );
+              },
+              child: success
+                  ? Row(
+                      key: const ValueKey(
+                        'follow-success',
+                      ),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Iconsax.tick_circle,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'تمت المتابعة',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    )
+                  : busy
+                      ? SizedBox(
+                          key: const ValueKey(
+                            'follow-loading',
+                          ),
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: foregroundColor,
+                          ),
+                        )
+                      : Row(
+                          key: ValueKey(
+                            isFollowing
+                                ? 'following'
+                                : 'follow',
+                          ),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isFollowing
+                                  ? Iconsax.tick_circle
+                                  : Iconsax.user_add,
+                              color: foregroundColor,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isFollowing
+                                  ? 'متابَع'
+                                  : 'متابعة',
+                              style: TextStyle(
+                                color: foregroundColor,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+            ),
+          ),
         ),
       ),
     );
@@ -1260,22 +1573,10 @@ class _FollowButton extends StatelessWidget {
 }
 
 // ============================================================
-// COMPACT RATING
+// RATING STAR
 // ============================================================
 
-/// نجمة التقييم.
-///
-/// التصميم:
-/// - نجمة واحدة ثابتة الشكل من 1 إلى 5.
-/// - نفس اللون البرتقالي/الأصفر.
-/// - الرقم بجانب النجمة.
-/// - بدون Badge.
-/// - بدون مربع.
-/// - بدون تغيير في موقعها.
-///
-/// لا نستخدم أشكالًا مختلفة لكل مستوى لأن ذلك يجعل البطاقة
-/// غير متناسقة بصريًا.
-class _CompactRatingBadge extends StatelessWidget {
+class _CompactRatingBadge extends StatefulWidget {
   final double rating;
 
   const _CompactRatingBadge({
@@ -1283,66 +1584,104 @@ class _CompactRatingBadge extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final ratingValue = rating.clamp(1.0, 5.0);
-    final ratingInt = ratingValue.round();
-
-    // نجمة واحدة ثابتة وجميلة لجميع المستويات.
-    const double starSize = 23;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(
-          Icons.star_rounded,
-          size: starSize,
-          color: _kAmber,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          ratingInt.toString(),
-          style: const TextStyle(
-            color: _kAmber,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
+  State<_CompactRatingBadge> createState() =>
+      _CompactRatingBadgeState();
 }
 
-// ============================================================
-// STARS ROW
-// ============================================================
-
-class _StarsRow extends StatelessWidget {
-  final double rating;
-  final WaynColors colors;
-
-  const _StarsRow({
-    required this.rating,
-    required this.colors,
-  });
+class _CompactRatingBadgeState
+    extends State<_CompactRatingBadge> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final rounded = rating.round().clamp(0, 5);
+    final ratingValue =
+        widget.rating.clamp(0.0, 5.0).toDouble();
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (index) {
-        return Padding(
-          padding: const EdgeInsets.only(left: 1),
-          child: Icon(
-            index < rounded
-                ? Icons.star_rounded
-                : Icons.star_border_rounded,
-            size: 15,
-            color: _kAmber,
+    final ratingText =
+        ratingValue.toStringAsFixed(
+      ratingValue.truncateToDouble() == ratingValue
+          ? 0
+          : 1,
+    );
+
+    return Semantics(
+      label: 'التقييم $ratingText من 5',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) {
+          setState(() => _pressed = true);
+        },
+        onTapCancel: () {
+          setState(() => _pressed = false);
+        },
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          HapticFeedback.selectionClick();
+        },
+        child: AnimatedScale(
+          scale: _pressed ? 0.90 : 1,
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutBack,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Outer soft glow.
+                Icon(
+                  Icons.star_rounded,
+                  size: 48,
+                  color: _kAmber.withValues(
+                    alpha: 0.12,
+                  ),
+                ),
+
+                // Main star.
+                Icon(
+                  Icons.star_rounded,
+                  size: 44,
+                  color: _kAmber,
+                ),
+
+                // Slight inner highlight.
+                Icon(
+                  Icons.star_rounded,
+                  size: 39,
+                  color: _kAmber.withValues(
+                    alpha: 0.94,
+                  ),
+                ),
+
+                // Number is physically centered INSIDE the star.
+                Center(
+                  child: Transform.translate(
+                    offset: const Offset(0, 0.5),
+                    child: Text(
+                      ratingText,
+                      textDirection: TextDirection.ltr,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                        shadows: [
+                          Shadow(
+                            color: Color(0x70000000),
+                            blurRadius: 2.5,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      }),
+        ),
+      ),
     );
   }
 }
@@ -1366,8 +1705,6 @@ class _ExpandablePostText extends StatefulWidget {
 class _ExpandablePostTextState
     extends State<_ExpandablePostText> {
   static const int _collapsedMaxLines = 4;
-  static const String _moreLabel = 'قراءة المزيد';
-  static const String _lessLabel = 'عرض أقل';
 
   bool _expanded = false;
 
@@ -1428,36 +1765,48 @@ class _ExpandablePostTextState
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.text,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              maxLines: _expanded
-                  ? null
-                  : _collapsedMaxLines,
-              overflow: _expanded
-                  ? null
-                  : TextOverflow.ellipsis,
-              style: textStyle,
+            AnimatedSize(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              child: Text(
+                widget.text,
+                textAlign: TextAlign.right,
+                textDirection: TextDirection.rtl,
+                maxLines: _expanded
+                    ? null
+                    : _collapsedMaxLines,
+                overflow: _expanded
+                    ? null
+                    : TextOverflow.ellipsis,
+                style: textStyle,
+              ),
             ),
             if (overflows)
               GestureDetector(
                 onTap: () {
+                  HapticFeedback.selectionClick();
+
                   setState(() {
                     _expanded = !_expanded;
                   });
                 },
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.only(
+                    top: 6,
+                  ),
                   child: Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      _expanded
-                          ? _lessLabel
-                          : _moreLabel,
-                      textDirection: TextDirection.rtl,
+                    child: AnimatedDefaultTextStyle(
+                      duration:
+                          const Duration(milliseconds: 180),
                       style: linkStyle,
+                      child: Text(
+                        _expanded
+                            ? 'عرض أقل'
+                            : 'قراءة المزيد',
+                        textDirection: TextDirection.rtl,
+                      ),
                     ),
                   ),
                 ),
@@ -1470,19 +1819,106 @@ class _ExpandablePostTextState
 }
 
 // ============================================================
-// ACTION BUTTON
+// LIKE ACTION
 // ============================================================
 
-class _ActionButton extends StatelessWidget {
+class _LikeActionButton extends StatelessWidget {
+  final bool isLiked;
+  final int likeCount;
+  final WaynColors colors;
+  final Future<bool?> Function(bool isLiked) onTap;
+
+  const _LikeActionButton({
+    required this.isLiked,
+    required this.likeCount,
+    required this.colors,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LikeButton(
+      size: 21,
+      isLiked: isLiked,
+      likeCount: likeCount,
+      onTap: onTap,
+      animationDuration:
+          const Duration(milliseconds: 720),
+      likeCountAnimationDuration:
+          const Duration(milliseconds: 360),
+      mainAxisAlignment: MainAxisAlignment.center,
+      likeCountPadding:
+          const EdgeInsetsDirectional.only(
+        start: 6,
+      ),
+      circleColor: const CircleColor(
+        start: Color(0xFFFFCDD2),
+        end: Color(0xFFE0555C),
+      ),
+      bubblesColor: const BubblesColor(
+        dotPrimaryColor: Color(0xFFFF8A8A),
+        dotSecondaryColor: Color(0xFFE0555C),
+        dotThirdColor: Color(0xFFFFB3B3),
+        dotLastColor: Color(0xFFFFCDD2),
+      ),
+      likeBuilder: (liked) {
+        return _ActionIconShell(
+          active: liked,
+          activeColor: _kLikeColor,
+          colors: colors,
+          child: Icon(
+            liked
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            size: 20,
+            color: liked
+                ? _kLikeColor
+                : colors.textSecondary,
+          ),
+        );
+      },
+      countBuilder: (
+        count,
+        liked,
+        text,
+      ) {
+        return Text(
+          formatCount(count ?? 0),
+          style: TextStyle(
+            color: liked
+                ? _kLikeColor
+                : colors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        );
+      },
+      countDecoration: (
+        Widget count,
+        int? likeCount,
+      ) {
+        return count;
+      },
+    );
+  }
+}
+
+// ============================================================
+// UNIFIED ACTION BUTTON
+// ============================================================
+
+class _AnimatedActionButton extends StatefulWidget {
   final IconData icon;
+  final IconData? activeIcon;
   final String label;
   final bool active;
   final Color? activeColor;
   final WaynColors colors;
   final VoidCallback? onTap;
 
-  const _ActionButton({
+  const _AnimatedActionButton({
     required this.icon,
+    this.activeIcon,
     required this.label,
     required this.colors,
     this.active = false,
@@ -1491,45 +1927,149 @@ class _ActionButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final color = active
-        ? (activeColor ?? colors.brand)
-        : colors.textSecondary;
+  State<_AnimatedActionButton> createState() =>
+      _AnimatedActionButtonState();
+}
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          color: active
-              ? color.withValues(alpha: 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: color,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+class _AnimatedActionButtonState
+    extends State<_AnimatedActionButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.active
+        ? (widget.activeColor ?? widget.colors.brand)
+        : widget.colors.textSecondary;
+
+    final displayIcon =
+        widget.active && widget.activeIcon != null
+            ? widget.activeIcon!
+            : widget.icon;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) {
+        setState(() => _pressed = true);
+      },
+      onTapCancel: () {
+        setState(() => _pressed = false);
+      },
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+
+        HapticFeedback.selectionClick();
+
+        widget.onTap?.call();
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.91 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(
+            horizontal: 3,
+          ),
+          padding: const EdgeInsets.symmetric(
+            vertical: 7,
+          ),
+          decoration: BoxDecoration(
+            color: widget.active
+                ? color.withValues(alpha: 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _ActionIconShell(
+                active: widget.active,
+                activeColor: color,
+                colors: widget.colors,
+                child: AnimatedSwitcher(
+                  duration: const Duration(
+                    milliseconds: 220,
+                  ),
+                  switchInCurve: Curves.easeOutBack,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (
+                    child,
+                    animation,
+                  ) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(
+                        scale: animation,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Icon(
+                    displayIcon,
+                    key: ValueKey(displayIcon),
+                    size: 19,
+                    color: color,
+                  ),
+                ),
               ),
-            ),
-          ],
+
+              const SizedBox(width: 5),
+
+              AnimatedDefaultTextStyle(
+                duration: const Duration(
+                  milliseconds: 180,
+                ),
+                curve: Curves.easeOutCubic,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+                child: Text(
+                  widget.label,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// UNIFIED ACTION ICON SHELL
+// ============================================================
+
+class _ActionIconShell extends StatelessWidget {
+  final bool active;
+  final Color activeColor;
+  final WaynColors colors;
+  final Widget child;
+
+  const _ActionIconShell({
+    required this.active,
+    required this.activeColor,
+    required this.colors,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      width: 31,
+      height: 31,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: active
+            ? activeColor.withValues(alpha: 0.10)
+            : colors.surfaceAlt.withValues(alpha: 0.55),
+        shape: BoxShape.circle,
+      ),
+      child: child,
     );
   }
 }
