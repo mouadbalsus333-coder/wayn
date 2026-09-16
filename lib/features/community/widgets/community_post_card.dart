@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
-import 'package:like_button/like_button.dart';
 
 import '../../../core/config/backend_config.dart';
 import '../../../core/navigation/wayn_actions.dart';
@@ -19,6 +18,7 @@ import '../models/community_post.dart';
 
 const Color _kAmber = Color(0xFFF5A524);
 const Color _kLikeColor = Color(0xFFE0555C);
+const Color _kSaveColor = Color(0xFFF59E0B);
 const Color _kSuccessColor = Color(0xFF18A99A);
 
 // ============================================================
@@ -34,11 +34,9 @@ class CommunityPostCard extends StatefulWidget {
   final VoidCallback? onDelete;
 
   final ValueChanged<String>? onAuthorTap;
-
   final ValueChanged<String>? onPlaceTap;
 
   final String? postDescriptionText;
-
   final VoidCallback? onHide;
 
   const CommunityPostCard({
@@ -745,6 +743,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     onTap: _handleLike,
                   ),
                 ),
+
                 Expanded(
                   child: _AnimatedActionButton(
                     icon: Iconsax.message_2,
@@ -761,6 +760,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                     },
                   ),
                 ),
+
                 Expanded(
                   child: _AnimatedActionButton(
                     icon: Iconsax.bookmark,
@@ -769,7 +769,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
                       post.savesCount,
                     ),
                     active: post.isSaved,
-                    activeColor: colors.brand,
+                    activeColor: _kSaveColor,
                     colors: colors,
                     onTap: () {
                       HapticFeedback.lightImpact();
@@ -1078,7 +1078,7 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
 // THREE DOTS MENU
 // ============================================================
 
-class _AnimatedMoreButton extends StatefulWidget {
+class _AnimatedMoreButton extends StatelessWidget {
   final WaynColors colors;
   final PopupMenuItemBuilder<String> itemBuilder;
   final ValueChanged<String> onSelected;
@@ -1090,28 +1090,17 @@ class _AnimatedMoreButton extends StatefulWidget {
   });
 
   @override
-  State<_AnimatedMoreButton> createState() =>
-      _AnimatedMoreButtonState();
-}
-
-class _AnimatedMoreButtonState
-    extends State<_AnimatedMoreButton> {
-  bool _pressed = false;
-
-  void _setPressed(bool value) {
-    if (!mounted) return;
-
-    setState(() {
-      _pressed = value;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
       tooltip: 'المزيد',
-      onSelected: widget.onSelected,
-      itemBuilder: widget.itemBuilder,
+      onSelected: onSelected,
+      itemBuilder: itemBuilder,
+      popUpAnimationStyle: const AnimationStyle(
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+        duration: Duration(milliseconds: 220),
+        reverseDuration: Duration(milliseconds: 160),
+      ),
       constraints: const BoxConstraints(
         minWidth: 185,
       ),
@@ -1125,38 +1114,23 @@ class _AnimatedMoreButtonState
         borderRadius: BorderRadius.circular(16),
       ),
       elevation: 8,
-      onOpened: () => _setPressed(true),
-      onCanceled: () => _setPressed(false),
-      child: Listener(
-        onPointerDown: (_) => _setPressed(true),
-        onPointerUp: (_) => _setPressed(false),
-        onPointerCancel: (_) => _setPressed(false),
-        child: AnimatedScale(
-          scale: _pressed ? 0.86 : 1,
-          duration: const Duration(milliseconds: 130),
-          curve: Curves.easeOutCubic,
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: _pressed
-                      ? widget.colors.surfaceAlt
-                      : widget.colors.surfaceAlt.withValues(
-                          alpha: 0.55,
-                        ),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.more_horiz_rounded,
-                  color: widget.colors.textMuted,
-                  size: 23,
-                ),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Center(
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: colors.surfaceAlt.withValues(
+                alpha: 0.55,
               ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.more_horiz_rounded,
+              color: colors.textMuted,
+              size: 23,
             ),
           ),
         ),
@@ -1575,110 +1549,81 @@ class _FollowButton extends StatelessWidget {
 // ============================================================
 // RATING STAR
 // ============================================================
+//
+// نجمة تقييم عادية وثابتة.
+//
+// - نجمة واحدة فقط.
+// - الشكل لا يتغير حسب التقييم.
+// - اللون ثابت.
+// - الرقم فقط يتغير حسب قيمة التقييم.
+// - لا توجد نجمة داخلية.
+// - لا توجد لمعات.
+// - لا توجد ماسات.
+// - لا توجد طبقات.
+// - لا توجد ألوان مختلفة حسب مستوى التقييم.
+//
 
-class _CompactRatingBadge extends StatefulWidget {
+class _CompactRatingBadge extends StatelessWidget {
   final double rating;
 
   const _CompactRatingBadge({
     required this.rating,
   });
 
-  @override
-  State<_CompactRatingBadge> createState() =>
-      _CompactRatingBadgeState();
-}
+  double get _rating {
+    return rating.clamp(0.0, 5.0).toDouble();
+  }
 
-class _CompactRatingBadgeState
-    extends State<_CompactRatingBadge> {
-  bool _pressed = false;
+  String get _ratingText {
+    final value = _rating;
+
+    return value.truncateToDouble() == value
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(1);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final ratingValue =
-        widget.rating.clamp(0.0, 5.0).toDouble();
-
-    final ratingText =
-        ratingValue.toStringAsFixed(
-      ratingValue.truncateToDouble() == ratingValue
-          ? 0
-          : 1,
-    );
-
     return Semantics(
-      label: 'التقييم $ratingText من 5',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) {
-          setState(() => _pressed = true);
-        },
-        onTapCancel: () {
-          setState(() => _pressed = false);
-        },
-        onTapUp: (_) {
-          setState(() => _pressed = false);
-          HapticFeedback.selectionClick();
-        },
-        child: AnimatedScale(
-          scale: _pressed ? 0.90 : 1,
-          duration: const Duration(milliseconds: 140),
-          curve: Curves.easeOutBack,
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Outer soft glow.
-                Icon(
-                  Icons.star_rounded,
-                  size: 48,
-                  color: _kAmber.withValues(
-                    alpha: 0.12,
-                  ),
-                ),
+      label: 'التقييم $_ratingText من 5',
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Center(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(
+                Icons.star_rounded,
+                size: 44,
+                color: _kAmber,
+              ),
 
-                // Main star.
-                Icon(
-                  Icons.star_rounded,
-                  size: 44,
-                  color: _kAmber,
-                ),
-
-                // Slight inner highlight.
-                Icon(
-                  Icons.star_rounded,
-                  size: 39,
-                  color: _kAmber.withValues(
-                    alpha: 0.94,
-                  ),
-                ),
-
-                // Number is physically centered INSIDE the star.
-                Center(
-                  child: Transform.translate(
-                    offset: const Offset(0, 0.5),
-                    child: Text(
-                      ratingText,
-                      textDirection: TextDirection.ltr,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
-                        shadows: [
-                          Shadow(
-                            color: Color(0x70000000),
-                            blurRadius: 2.5,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
-                      ),
+              Center(
+                child: Transform.translate(
+                  offset: const Offset(0, 0.5),
+                  child: Text(
+                    _ratingText,
+                    textDirection: TextDirection.ltr,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                      letterSpacing: -0.2,
+                      shadows: [
+                        Shadow(
+                          color: Color(0x55000000),
+                          blurRadius: 2,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1819,10 +1764,10 @@ class _ExpandablePostTextState
 }
 
 // ============================================================
-// LIKE ACTION
+// LIKE ACTION — SAME DESIGN SYSTEM AS COMMENT + SAVE
 // ============================================================
 
-class _LikeActionButton extends StatelessWidget {
+class _LikeActionButton extends StatefulWidget {
   final bool isLiked;
   final int likeCount;
   final WaynColors colors;
@@ -1836,69 +1781,229 @@ class _LikeActionButton extends StatelessWidget {
   });
 
   @override
+  State<_LikeActionButton> createState() =>
+      _LikeActionButtonState();
+}
+
+class _LikeActionButtonState
+    extends State<_LikeActionButton>
+    with SingleTickerProviderStateMixin {
+  late bool _isLiked;
+  late int _likeCount;
+
+  bool _pressed = false;
+  bool _busy = false;
+
+  late final AnimationController _heartController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _isLiked = widget.isLiked;
+    _likeCount = widget.likeCount;
+
+    _heartController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 360),
+    );
+  }
+
+  @override
+  void didUpdateWidget(
+    covariant _LikeActionButton oldWidget,
+  ) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.isLiked != widget.isLiked) {
+      _isLiked = widget.isLiked;
+    }
+
+    if (oldWidget.likeCount != widget.likeCount) {
+      _likeCount = widget.likeCount;
+    }
+  }
+
+  @override
+  void dispose() {
+    _heartController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleTap() async {
+    if (_busy) return;
+
+    setState(() {
+      _busy = true;
+      _pressed = false;
+    });
+
+    HapticFeedback.lightImpact();
+
+    final oldLiked = _isLiked;
+
+    try {
+      final result = await widget.onTap(oldLiked);
+
+      if (!mounted) return;
+
+      final newLiked = result ?? !oldLiked;
+
+      setState(() {
+        _isLiked = newLiked;
+
+        if (newLiked && !oldLiked) {
+          _likeCount++;
+        } else if (!newLiked && oldLiked) {
+          _likeCount =
+              _likeCount > 0 ? _likeCount - 1 : 0;
+        }
+      });
+
+      if (newLiked && !oldLiked) {
+        HapticFeedback.mediumImpact();
+
+        _heartController
+          ..reset()
+          ..forward();
+      }
+    } catch (_) {
+      if (!mounted) return;
+
+      HapticFeedback.heavyImpact();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return LikeButton(
-      size: 21,
-      isLiked: isLiked,
-      likeCount: likeCount,
-      onTap: onTap,
-      animationDuration:
-          const Duration(milliseconds: 720),
-      likeCountAnimationDuration:
-          const Duration(milliseconds: 360),
-      mainAxisAlignment: MainAxisAlignment.center,
-      likeCountPadding:
-          const EdgeInsetsDirectional.only(
-        start: 6,
-      ),
-      circleColor: const CircleColor(
-        start: Color(0xFFFFCDD2),
-        end: Color(0xFFE0555C),
-      ),
-      bubblesColor: const BubblesColor(
-        dotPrimaryColor: Color(0xFFFF8A8A),
-        dotSecondaryColor: Color(0xFFE0555C),
-        dotThirdColor: Color(0xFFFFB3B3),
-        dotLastColor: Color(0xFFFFCDD2),
-      ),
-      likeBuilder: (liked) {
-        return _ActionIconShell(
-          active: liked,
-          activeColor: _kLikeColor,
-          colors: colors,
-          child: Icon(
-            liked
-                ? Icons.favorite_rounded
-                : Icons.favorite_border_rounded,
-            size: 20,
-            color: liked
-                ? _kLikeColor
-                : colors.textSecondary,
+    final colors = widget.colors;
+
+    final color = _isLiked
+        ? _kLikeColor
+        : colors.textSecondary;
+
+    final displayIcon = _isLiked
+        ? Icons.favorite_rounded
+        : Icons.favorite_border_rounded;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) {
+        if (!_busy) {
+          setState(() {
+            _pressed = true;
+          });
+        }
+      },
+      onTapCancel: () {
+        if (mounted) {
+          setState(() {
+            _pressed = false;
+          });
+        }
+      },
+      onTapUp: (_) {
+        if (!_busy) {
+          _handleTap();
+        }
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.91 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(
+            horizontal: 3,
           ),
-        );
-      },
-      countBuilder: (
-        count,
-        liked,
-        text,
-      ) {
-        return Text(
-          formatCount(count ?? 0),
-          style: TextStyle(
-            color: liked
-                ? _kLikeColor
-                : colors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+          padding: const EdgeInsets.symmetric(
+            vertical: 7,
           ),
-        );
-      },
-      countDecoration: (
-        Widget count,
-        int? likeCount,
-      ) {
-        return count;
-      },
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedBuilder(
+                animation: _heartController,
+                builder: (context, child) {
+                  final animationValue =
+                      Curves.easeOutBack.transform(
+                    _heartController.value,
+                  );
+
+                  final scale = _isLiked
+                      ? 1.0 +
+                          (0.10 * animationValue)
+                      : 1.0;
+
+                  return Transform.scale(
+                    scale: scale,
+                    child: _ActionIconShell(
+                      active: _isLiked,
+                      activeColor: _kLikeColor,
+                      colors: colors,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(
+                          milliseconds: 200,
+                        ),
+                        switchInCurve: Curves.easeOutBack,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (
+                          child,
+                          animation,
+                        ) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(
+                              scale: animation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: Icon(
+                          displayIcon,
+                          key: ValueKey(
+                            displayIcon,
+                          ),
+                          size: 19,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(width: 5),
+
+              AnimatedDefaultTextStyle(
+                duration: const Duration(
+                  milliseconds: 180,
+                ),
+                curve: Curves.easeOutCubic,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+                child: Text(
+                  formatCount(_likeCount),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
