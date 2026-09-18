@@ -60,6 +60,29 @@ from app.models.community import (
     CommunityPost,
     CommunityPostLike,
     CommunityPostSave,
+    PostVisibilityState,
+)
+
+# ============================================================
+# Moderation (appeals + reports + admin audit trail)
+# ============================================================
+
+from app.models.post_appeal import (
+    AppealPostAction,
+    AppealStatus,
+    AppealType,
+    PostAppeal,
+)
+from app.models.post_report import (
+    PostReport,
+    ReportCategory,
+    ReportPostAction,
+    ReportStatus,
+)
+from app.models.admin_action_log import (
+    AdminActionEntity,
+    AdminActionLog,
+    AdminActionType,
 )
 
 # ============================================================
@@ -149,6 +172,23 @@ __all__ = [
     "CommunityPostLike",
     "CommunityPostSave",
     "CommunityComment",
+    "PostVisibilityState",
+
+    # ========================================================
+    # Moderation (appeals + reports + admin audit trail)
+    # ========================================================
+
+    "PostAppeal",
+    "AppealType",
+    "AppealStatus",
+    "AppealPostAction",
+    "PostReport",
+    "ReportCategory",
+    "ReportStatus",
+    "ReportPostAction",
+    "AdminActionLog",
+    "AdminActionEntity",
+    "AdminActionType",
 
     # ========================================================
     # User Points

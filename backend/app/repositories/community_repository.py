@@ -2,6 +2,7 @@
 
 from uuid import UUID
 
+import sqlalchemy as sa
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -638,6 +639,51 @@ class CommunityRepository:
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def list_user_posts_by_state(
+        self,
+        user_id: UUID | str,
+        state: str,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[CommunityPost], int]:
+        """List a user's own posts in a lifecycle state.
+
+        Used by the "المنشورات المحذوفة" / "المنشورات المخفية" sections in
+        the app settings. ``state`` is the ``visibility_state`` value
+        (VISIBLE / HIDDEN / DELETED).
+        """
+
+        conditions = [
+            CommunityPost.user_id == user_id,
+            CommunityPost.visibility_state == state,
+        ]
+
+        count = await self.session.execute(
+            select(func.count())
+            .select_from(CommunityPost)
+            .where(*conditions)
+        )
+        total = int(count.scalar_one())
+
+        query = (
+            select(CommunityPost)
+            .where(*conditions)
+            .order_by(
+                sa.func.coalesce(
+                    CommunityPost.deleted_at,
+                    CommunityPost.hidden_at,
+                    CommunityPost.updated_at,
+                ).desc()
+            )
+            .offset(offset)
+            .limit(limit)
+        )
+
+        result = await self.session.execute(query)
+
+        return list(result.scalars().all()), total
 
     async def get_user(
         self,

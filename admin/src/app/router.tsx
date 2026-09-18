@@ -26,6 +26,10 @@ import { RegularUsersPage } from '../pages/RegularUsers/RegularUsersPage'
 import { RegularUserDetailsPage } from '../pages/RegularUsers/RegularUserDetailsPage'
 import { ReviewsPage } from '../pages/Reviews/ReviewsPage'
 import { NotificationsPage } from '../pages/Notifications/NotificationsPage'
+import { AppealsPage } from '../pages/Moderation/AppealsPage'
+import { AppealDetailsPage } from '../pages/Moderation/AppealDetailsPage'
+import { ReportsPage } from '../pages/Moderation/ReportsPage'
+import { ReportDetailsPage } from '../pages/Moderation/ReportDetailsPage'
 
 function ProtectedLayout() {
   return (
@@ -191,6 +195,38 @@ export function AppRouter() {
           element={
             <RequirePermission permission={permissions.reviewsRead}>
               <ReviewsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/moderation/appeals"
+          element={
+            <RequirePermission permission={permissions.appealsRead}>
+              <AppealsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/moderation/appeals/:id"
+          element={
+            <RequirePermission permission={permissions.appealsRead}>
+              <AppealDetailsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/moderation/reports"
+          element={
+            <RequirePermission permission={permissions.reportsRead}>
+              <ReportsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/moderation/reports/:id"
+          element={
+            <RequirePermission permission={permissions.reportsRead}>
+              <ReportDetailsPage />
             </RequirePermission>
           }
         />

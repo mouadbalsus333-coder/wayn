@@ -17,6 +17,7 @@ from app.api.dependencies.auth import (
 )
 from app.core.config import settings
 from app.core.database import get_session
+from app.models.community import PostVisibilityState
 from app.models.user import User
 from app.schemas.community import (
     CommunityCommentCreate,
@@ -25,8 +26,18 @@ from app.schemas.community import (
     CommunityPostRead,
     CommunityPostUpdate,
 )
+from app.schemas.moderation import (
+    AppealCreate,
+    AppealRead,
+    ReportCreate,
+    ReportRead,
+)
 from app.services.community_service import CommunityService
 from app.services.media.media_service import media_service
+from app.services.moderation_service import (
+    ModerationError,
+    ModerationService,
+)
 
 
 router = APIRouter()
@@ -387,6 +398,156 @@ async def list_saved_posts(
     ]
 
 
+# ============================================================
+# Post lifecycle (owner)
+# ============================================================
+
+
+async def _get_owned_post_or_404(
+    service: CommunityService,
+    post_id: UUID,
+    user_id: UUID,
+):
+    """Load a post owned by the current user (hidden/deleted included)."""
+
+    post = await service.get_post(post_id)
+
+    if post is None or post.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    return post
+
+
+@router.get(
+    "/community/posts/mine",
+    response_model=list[CommunityPostRead],
+)
+async def list_my_posts_by_state(
+    state: str = Query(
+        default="DELETED",
+        pattern="^(VISIBLE|HIDDEN|DELETED)$",
+    ),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[CommunityPostRead]:
+    """List the current user's own posts by lifecycle state.
+
+    Powers "المنشورات المحذوفة" (DELETED) and "المنشورات المخفية"
+    (HIDDEN) inside the app settings.
+    """
+
+    service = CommunityService(session)
+
+    posts, _total = await service.list_user_posts_by_state(
+        user_id=current_user.id,
+        state=state,
+        offset=offset,
+        limit=limit,
+    )
+
+    feed_data = await service.get_posts_feed_data(
+        posts=posts,
+        user_id=current_user.id,
+    )
+
+    return [
+        await _build_post_response(
+            service,
+            post,
+            current_user.id,
+            session,
+            feed_data,
+        )
+        for post in posts
+    ]
+
+
+@router.patch(
+    "/community/posts/{post_id}/hide",
+    response_model=CommunityPostRead,
+)
+async def hide_post(
+    post_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> CommunityPostRead:
+    service = CommunityService(session)
+
+    post = await _get_owned_post_or_404(
+        service,
+        post_id,
+        current_user.id,
+    )
+
+    try:
+        post = await service.hide_post(
+            post=post,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return await _build_post_response(
+        service,
+        post,
+        current_user.id,
+        session,
+    )
+
+
+@router.patch(
+    "/community/posts/{post_id}/restore",
+    response_model=CommunityPostRead,
+)
+async def restore_post(
+    post_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> CommunityPostRead:
+    service = CommunityService(session)
+
+    post = await _get_owned_post_or_404(
+        service,
+        post_id,
+        current_user.id,
+    )
+
+    # A post removed by moderation may not be restored by its owner.
+    moderation_service = ModerationService(session)
+
+    if await moderation_service.post_was_removed_by_moderation(post.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This post was removed after a moderation review",
+        )
+
+    try:
+        post = await service.restore_post(
+            post=post,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return await _build_post_response(
+        service,
+        post,
+        current_user.id,
+        session,
+    )
+
+
 @router.get(
     "/community/posts/{post_id}",
     response_model=CommunityPostRead,
@@ -463,21 +624,59 @@ async def delete_post(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
+    """Soft delete an owned post.
+
+    The post moves to "المنشورات المحذوفة" in the app settings where the
+    owner can restore it or delete it permanently.
+    """
+
     service = CommunityService(session)
 
-    post = await _get_post_or_404(
+    post = await _get_owned_post_or_404(
         service,
         post_id,
+        current_user.id,
     )
 
     try:
-        await service.delete_post(
+        await service.soft_delete_post(
             post=post,
             user_id=current_user.id,
         )
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete(
+    "/community/posts/{post_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def permanently_delete_post(
+    post_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Definitively delete an owned post (no way back)."""
+
+    service = CommunityService(session)
+
+    post = await _get_owned_post_or_404(
+        service,
+        post_id,
+        current_user.id,
+    )
+
+    try:
+        await service.permanently_delete_post(
+            post=post,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
 
@@ -719,3 +918,168 @@ async def delete_comment(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(exc),
         ) from exc
+
+
+# ============================================================
+# Rating appeals (الطعن في التقييم)
+# ============================================================
+
+
+async def _get_moderatable_post_or_404(
+    service: CommunityService,
+    post_id: UUID,
+):
+    """Load a post that can be appealed/reported.
+
+    Deleted posts are treated as gone; hidden posts still exist, so they
+    are returned (the service applies the remaining rules).
+    """
+
+    post = await service.get_post(post_id)
+
+    if post is None or post.visibility_state == (
+        PostVisibilityState.DELETED.value
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
+    return post
+
+
+@router.post(
+    "/community/posts/{post_id}/appeals",
+    response_model=AppealRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_post_appeal(
+    post_id: UUID,
+    data: AppealCreate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AppealRead:
+    service = CommunityService(session)
+
+    post = await _get_moderatable_post_or_404(service, post_id)
+
+    moderation = ModerationService(session)
+
+    try:
+        appeal = await moderation.submit_appeal(
+            post=post,
+            user_id=current_user.id,
+            type=data.type,
+            reason=data.reason,
+        )
+    except ModerationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    return AppealRead.model_validate(appeal)
+
+
+@router.get(
+    "/community/posts/{post_id}/appeals/me",
+    response_model=AppealRead | None,
+)
+async def get_my_post_appeal(
+    post_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AppealRead | None:
+    """The current user's own appeal for a post (or null)."""
+
+    moderation = ModerationService(session)
+
+    appeal = await moderation.get_my_appeal(
+        post_id=post_id,
+        user_id=current_user.id,
+    )
+
+    if appeal is None:
+        return None
+
+    return AppealRead.model_validate(appeal)
+
+
+@router.get(
+    "/community/appeals/mine",
+    response_model=list[AppealRead],
+)
+async def list_my_appeals(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[AppealRead]:
+    moderation = ModerationService(session)
+
+    appeals, _total = await moderation.list_my_appeals(
+        user_id=current_user.id,
+        offset=offset,
+        limit=limit,
+    )
+
+    return [AppealRead.model_validate(appeal) for appeal in appeals]
+
+
+# ============================================================
+# Post reports (الإبلاغ عن منشور)
+# ============================================================
+
+
+@router.post(
+    "/community/posts/{post_id}/reports",
+    response_model=ReportRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_post_report(
+    post_id: UUID,
+    data: ReportCreate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ReportRead:
+    service = CommunityService(session)
+
+    post = await _get_moderatable_post_or_404(service, post_id)
+
+    moderation = ModerationService(session)
+
+    try:
+        report = await moderation.submit_report(
+            post=post,
+            user_id=current_user.id,
+            category=data.category,
+            description=data.description,
+        )
+    except ModerationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    return ReportRead.model_validate(report)
+
+
+@router.get(
+    "/community/reports/mine",
+    response_model=list[ReportRead],
+)
+async def list_my_reports(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ReportRead]:
+    moderation = ModerationService(session)
+
+    reports, _total = await moderation.list_my_reports(
+        user_id=current_user.id,
+        offset=offset,
+        limit=limit,
+    )
+
+    return [ReportRead.model_validate(report) for report in reports]

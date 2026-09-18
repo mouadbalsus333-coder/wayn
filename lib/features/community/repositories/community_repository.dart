@@ -387,6 +387,129 @@ class CommunityRepository {
   }
 
   // ============================================================
+  // Post lifecycle (hide / restore / permanent delete)
+  // ============================================================
+
+  /// Soft-hides an owned post (moves to "المنشورات المخفية").
+  Future<CommunityPost> hidePost(
+    String postId,
+  ) async {
+    final response = await _apiClient.patch(
+      '/api/v1/community/posts/$postId/hide',
+    );
+
+    if (response == null || response is! Map) {
+      throw ApiClientException(
+        'Invalid response while hiding community post',
+      );
+    }
+
+    return CommunityPost.fromJson(
+      Map<String, dynamic>.from(response),
+    );
+  }
+
+  /// Restores an owned post from the deleted/hidden state.
+  Future<CommunityPost> restorePost(
+    String postId,
+  ) async {
+    final response = await _apiClient.patch(
+      '/api/v1/community/posts/$postId/restore',
+    );
+
+    if (response == null || response is! Map) {
+      throw ApiClientException(
+        'Invalid response while restoring community post',
+      );
+    }
+
+    return CommunityPost.fromJson(
+      Map<String, dynamic>.from(response),
+    );
+  }
+
+  /// Permanently deletes an owned post (irreversible).
+  Future<void> permanentlyDeletePost(
+    String postId,
+  ) async {
+    await _apiClient.delete(
+      '/api/v1/community/posts/$postId/permanent',
+    );
+  }
+
+  /// Lists the current user's own posts filtered by lifecycle state
+  /// (VISIBLE / HIDDEN / DELETED).
+  Future<List<CommunityPost>> getMyPostsByState({
+    required String state,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _apiClient.get(
+      '/api/v1/community/posts/mine',
+      queryParams: <String, dynamic>{
+        'state': state,
+        'offset': (page - 1) * limit,
+        'limit': limit,
+      },
+    );
+
+    return _postsFromResponse(response);
+  }
+
+  // ============================================================
+  // Appeals (الطعن في التقييم)
+  // ============================================================
+
+  /// Files an appeal against the rating of a post owned by another user.
+  Future<void> submitAppeal(
+    String postId, {
+    required String type,
+    required String reason,
+  }) async {
+    await _apiClient.post(
+      '/api/v1/community/posts/$postId/appeals',
+      body: <String, dynamic>{
+        'type': type,
+        'reason': reason,
+      },
+    );
+  }
+
+  /// Returns the current user's own appeal for a post, or null.
+  Future<Map<String, dynamic>?> getMyAppeal(
+    String postId,
+  ) async {
+    final response = await _apiClient.get(
+      '/api/v1/community/posts/$postId/appeals/me',
+    );
+
+    if (response == null || response is! Map) {
+      return null;
+    }
+
+    return Map<String, dynamic>.from(response);
+  }
+
+  // ============================================================
+  // Reports (الإبلاغ عن منشور)
+  // ============================================================
+
+    /// Reports a post owned by another user.
+  Future<void> submitReport(
+    String postId, {
+    required String category,
+    required String description,
+  }) async {
+    await _apiClient.post(
+      '/api/v1/community/posts/$postId/reports',
+      body: <String, dynamic>{
+        'category': category,
+        'description': description,
+      },
+    );
+  }
+
+  // ============================================================
   // Upload Image & Saved Posts
   // ============================================================
 

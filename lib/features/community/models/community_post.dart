@@ -20,6 +20,15 @@ class CommunityPost {
 
   final bool isVisible;
 
+  /// Lifecycle state from the backend (ACTIVE / HIDDEN / DELETED).
+  final String? visibilityState;
+
+  /// When the owner deleted the post (soft delete) — null otherwise.
+  final DateTime? deletedAt;
+
+  /// When the owner hid the post — null otherwise.
+  final DateTime? hiddenAt;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -47,6 +56,9 @@ class CommunityPost {
     this.isFollowingAuthor = false,
     this.isOwner = false,
     required this.isVisible,
+    this.visibilityState,
+    this.deletedAt,
+    this.hiddenAt,
     required this.createdAt,
     required this.updatedAt,
     this.likesCount = 0,
@@ -106,6 +118,15 @@ class CommunityPost {
       isVisible: _boolValue(
         json['is_visible'],
         defaultValue: true,
+      ),
+      visibilityState: _nullableString(
+        json['visibility_state'],
+      ),
+      deletedAt: _nullableDateTime(
+        json['deleted_at'],
+      ),
+      hiddenAt: _nullableDateTime(
+        json['hidden_at'],
       ),
       createdAt: _dateTimeValue(
         json['created_at'],
@@ -284,5 +305,23 @@ class CommunityPost {
     }
 
     return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  static DateTime? _nullableDateTime(
+    dynamic value,
+  ) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+
+    return null;
   }
 }

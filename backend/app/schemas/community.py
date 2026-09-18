@@ -1,4 +1,4 @@
-"""Pydantic schemas for WAYN Community."""
+﻿"""Pydantic schemas for WAYN Community."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -50,6 +50,9 @@ class CommunityPostRead(BaseModel):
     image_url: str | None
     rating: Decimal | None
     is_visible: bool
+    visibility_state: str | None = None
+    deleted_at: datetime | None = None
+    hidden_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

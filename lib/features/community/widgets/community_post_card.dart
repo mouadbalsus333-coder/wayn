@@ -11,6 +11,8 @@ import '../../../core/widgets/wayn_network_image.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/social_service.dart';
 import '../models/community_post.dart';
+import 'post_appeal_sheet.dart';
+import 'post_report_sheet.dart';
 
 // ============================================================
 // SHARED ACCENTS
@@ -201,8 +203,19 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
             _showDeleteConfirmation(colors);
             break;
 
+          case 'appeal':
+            HapticFeedback.selectionClick();
+            showPostAppealSheet(context, post.id);
+            break;
+
           case 'report':
-            _showReportDialog(colors);
+            HapticFeedback.selectionClick();
+            showPostReportSheet(context, post.id);
+            break;
+
+          case 'block':
+            // Placeholder only: full blocking system comes later.
+            _showMessage('حظر المستخدم سيكون متاحًا قريبًا');
             break;
 
           case 'hide':
@@ -229,25 +242,66 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
               ),
             );
           }
+
+          if (widget.onHide != null) {
+            items.add(
+              PopupMenuItem<String>(
+                value: 'hide',
+                child: _buildMenuItem(
+                  'إخفاء المنشور',
+                  Iconsax.eye_slash,
+                  colors.textSecondary,
+                ),
+              ),
+            );
+          }
         } else {
+          if (post.rating != null) {
+            items.add(
+              PopupMenuItem<String>(
+                value: 'appeal',
+                child: _buildMenuItem(
+                  'الطعن في التقييم',
+                  Iconsax.star,
+                  colors.brand,
+                ),
+              ),
+            );
+          }
+
           items.add(
             PopupMenuItem<String>(
               value: 'report',
               child: _buildMenuItem(
-                'طعن على المنشور',
+                'الإبلاغ عن المنشور',
                 Iconsax.flag,
                 Colors.redAccent,
               ),
             ),
           );
 
+          if (widget.onHide != null) {
+            items.add(
+              PopupMenuItem<String>(
+                value: 'hide',
+                child: _buildMenuItem(
+                  'إخفاء المنشور عني',
+                  Iconsax.eye_slash,
+                  colors.textSecondary,
+                ),
+              ),
+            );
+          }
+
+          // Placeholder: real blocking system comes later.
           items.add(
             PopupMenuItem<String>(
-              value: 'hide',
+              enabled: false,
+              value: 'block',
               child: _buildMenuItem(
-                'إخفاء المنشور',
-                Iconsax.eye_slash,
-                colors.textSecondary,
+                'حظر المستخدم (قريبًا)',
+                Iconsax.forbidden,
+                colors.textMuted,
               ),
             ),
           );
@@ -295,7 +349,11 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
     widget.onHide?.call();
 
     if (mounted) {
-      _showMessage('تم إخفاء المنشور عنك');
+      _showMessage(
+        post.isOwner
+            ? 'تم إخفاء المنشور — يمكنك إعادته من "منشوراتي" في الإعدادات'
+            : 'تم إخفاء المنشور عنك',
+      );
     }
   }
 
@@ -1005,73 +1063,11 @@ class _CommunityPostCardState extends State<CommunityPostCard> {
   }
 
   // ============================================================
-  // REPORT
+  // RATING + PLACE + MORE
   // ============================================================
-
-  void _showReportDialog(WaynColors colors) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
-            ),
-            icon: const Icon(
-              Iconsax.flag,
-              color: Colors.redAccent,
-              size: 28,
-            ),
-            title: const Text(
-              'طعن على المنشور',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            content: const Text(
-              'هل تريد إرسال طعن على هذا المنشور؟',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14),
-            ),
-            actionsAlignment: MainAxisAlignment.center,
-            actions: [
-              TextButton(
-                onPressed: () =>
-                    Navigator.of(dialogContext).pop(),
-                child: Text(
-                  'إلغاء',
-                  style: TextStyle(
-                    color: colors.textSecondary,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-
-                  HapticFeedback.mediumImpact();
-
-                  _showMessage(
-                    'تم إرسال البلاغ عن المنشور',
-                  );
-                },
-                child: const Text(
-                  'إبلاغ',
-                  style: TextStyle(
-                    color: Colors.redAccent,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  // (the options menu is rendered by _buildOptionsMenu above;
+  // the duplicate fake report dialog was removed in favor of the
+  // real report sheet — see post_report_sheet.dart)
 }
 
 // ============================================================

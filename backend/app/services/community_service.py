@@ -1,5 +1,6 @@
 """Business logic for WAYN Community."""
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,11 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.community import (
     CommunityComment,
     CommunityPost,
+    PostVisibilityState,
 )
 from app.repositories.community_repository import (
     CommunityRepository,
 )
 from app.services.media.media_service import media_service
+
+
+# ============================================================
+# Post lifecycle states (shared with the routers/services)
+# ============================================================
+
+VISIBILITY_VISIBLE = PostVisibilityState.VISIBLE.value
+VISIBILITY_HIDDEN = PostVisibilityState.HIDDEN.value
+VISIBILITY_DELETED = PostVisibilityState.DELETED.value
 
 
 class CommunityService:
@@ -176,7 +187,124 @@ class CommunityService:
 
         return updated_post
 
-    async def delete_post(
+    async def hide_post(
+        self,
+        *,
+        post: CommunityPost,
+        user_id: UUID,
+    ) -> CommunityPost:
+        """Hide an owned post from the public feed (reversible)."""
+
+        self._ensure_post_owner(post=post, user_id=user_id)
+
+        if post.visibility_state == VISIBILITY_DELETED:
+            raise ValueError(
+                "Deleted post cannot be hidden"
+            )
+
+        post.visibility_state = VISIBILITY_HIDDEN
+        post.hidden_at = datetime.now(timezone.utc)
+        post.deleted_at = None
+        post.is_visible = False
+
+        return await self.repository.update_post(post)
+
+    async def restore_post(
+        self,
+        *,
+        post: CommunityPost,
+        user_id: UUID,
+    ) -> CommunityPost:
+        """Bring a hidden or soft-deleted post back to the feed."""
+
+        self._ensure_post_owner(post=post, user_id=user_id)
+
+        if post.visibility_state == VISIBILITY_VISIBLE:
+            return post
+
+        was_rated = post.rating is not None
+
+        post.visibility_state = VISIBILITY_VISIBLE
+        post.hidden_at = None
+        post.deleted_at = None
+        post.is_visible = True
+
+        restored = await self.repository.update_post(post)
+
+        if was_rated and post.place_id is not None:
+            await self.repository.recalculate_place_rating(
+                post.place_id,
+            )
+
+        return restored
+
+    async def soft_delete_post(
+        self,
+        *,
+        post: CommunityPost,
+        user_id: UUID,
+    ) -> CommunityPost:
+        """Soft delete an owned post (moves it to the deleted list)."""
+
+        self._ensure_post_owner(post=post, user_id=user_id)
+
+        if post.visibility_state == VISIBILITY_DELETED:
+            raise ValueError(
+                "Post is already deleted"
+            )
+
+        was_rated = post.rating is not None
+
+        post.visibility_state = VISIBILITY_DELETED
+        post.deleted_at = datetime.now(timezone.utc)
+        post.hidden_at = None
+        post.is_visible = False
+
+        deleted = await self.repository.update_post(post)
+
+        if was_rated and post.place_id is not None:
+            await self.repository.recalculate_place_rating(
+                post.place_id,
+            )
+
+        return deleted
+
+    async def permanently_delete_post(
+        self,
+        *,
+        post: CommunityPost,
+        user_id: UUID,
+    ) -> None:
+        """Definitively delete an owned post (no way back)."""
+
+        self._ensure_post_owner(post=post, user_id=user_id)
+
+        if post.visibility_state not in (
+            VISIBILITY_DELETED,
+            VISIBILITY_HIDDEN,
+        ):
+            raise ValueError(
+                "Post must be deleted or hidden first"
+            )
+
+        await self._purge_post(post)
+
+    async def list_user_posts_by_state(
+        self,
+        *,
+        user_id: UUID,
+        state: str,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[CommunityPost], int]:
+        return await self.repository.list_user_posts_by_state(
+            user_id,
+            state,
+            offset=offset,
+            limit=limit,
+        )
+
+    def _ensure_post_owner(
         self,
         *,
         post: CommunityPost,
@@ -184,8 +312,14 @@ class CommunityService:
     ) -> None:
         if post.user_id != user_id:
             raise ValueError(
-                "You can only delete your own post"
+                "You can only manage your own post"
             )
+
+    async def _purge_post(
+        self,
+        post: CommunityPost,
+    ) -> None:
+        """Hard delete a post row (media + place rating included)."""
 
         place_id = post.place_id
         image_url = post.image_url

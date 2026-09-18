@@ -17,6 +17,7 @@ from app.api.routers import (
     admin_auth,
     admin_community,
     admin_dashboard,
+    admin_moderation,
     admin_notifications,
     admin_permissions,
     admin_point_rules,
@@ -309,6 +310,15 @@ app.include_router(
 
 app.include_router(
     admin_community.router,
+    prefix="/api/v1",
+)
+
+
+# ============================================================
+# Admin Moderation (rating appeals + post reports)
+# ============================================================
+app.include_router(
+    admin_moderation.router,
     prefix="/api/v1",
 )
 

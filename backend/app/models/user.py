@@ -253,6 +253,22 @@ class User(Base):
         order_by="CommunityPost.created_at.desc()",
     )
 
+    # Rating appeals filed by this user
+    appeals = relationship(
+        "PostAppeal",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="PostAppeal.created_at.desc()",
+    )
+
+    # Reports filed by this user
+    reports = relationship(
+        "PostReport",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="PostReport.created_at.desc()",
+    )
+
     # ============================================================
     # Devices (FCM tokens)
     # ============================================================

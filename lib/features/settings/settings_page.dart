@@ -5,6 +5,7 @@ import '../../core/theme/theme_controller.dart';
 import '../../core/theme/wayn_colors.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import 'my_posts_manager_page.dart';
 
 /// صفحة الإعدادات المستقلة.
 ///
@@ -257,6 +258,23 @@ class _SettingsPageState extends State<SettingsPage> {
                                     : 'أضف وصفًا تعرّف به عن نفسك',
                                 multiline: true,
                                 onPressed: _editBio,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          _sectionTitle(colors, 'منشوراتي'),
+                          const SizedBox(height: 10),
+                          _card(
+                            colors,
+                            children: [
+                              _row(
+                                colors,
+                                icon: Icons.auto_awesome_motion_rounded,
+                                title: 'المنشورات المحذوفة والمخفية',
+                                subtitle:
+                                    'استرجاع منشوراتك أو حذفها نهائيًا',
+                                onPressed: () =>
+                                    openMyPostsManager(context),
                               ),
                             ],
                           ),

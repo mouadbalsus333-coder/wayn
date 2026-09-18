@@ -23,5 +23,9 @@ export const permissions = {
   storeRead: 'store.read',
   storeWrite: 'store.write',
   storeDelete: 'store.delete',
+  appealsRead: 'appeals.read',
+  appealsManage: 'appeals.manage',
+  reportsRead: 'reports.read',
+  reportsWrite: 'reports.write',
   manageAdmins: 'admin.manage_admins',
 } as const

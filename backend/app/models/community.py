@@ -2,12 +2,27 @@
 
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+
+
+class PostVisibilityState(str, Enum):
+    """Lifecycle state of a community post.
+
+    VISIBLE: published in the public feed.
+    HIDDEN: hidden by its owner (reversible, see "المنشورات المخفية").
+    DELETED: soft deleted by its owner (reversible, see
+        "المنشورات المحذوفة").
+    """
+
+    VISIBLE = "VISIBLE"
+    HIDDEN = "HIDDEN"
+    DELETED = "DELETED"
 
 
 class CommunityPost(Base):
@@ -63,6 +78,29 @@ class CommunityPost(Base):
         index=True,
     )
 
+    visibility_state: Mapped[PostVisibilityState] = mapped_column(
+        sa.Enum(
+            PostVisibilityState,
+            name="post_visibility_state",
+            native_enum=True,
+            create_type=False,
+        ),
+        nullable=False,
+        server_default=sa.text("'VISIBLE'::post_visibility_state"),
+        index=True,
+    )
+
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+
+    hidden_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
@@ -104,6 +142,18 @@ class CommunityPost(Base):
         back_populates="post",
         cascade="all, delete-orphan",
         order_by="CommunityComment.created_at.asc()",
+    )
+
+    appeals = relationship(
+        "PostAppeal",
+        back_populates="post",
+        cascade="all, delete-orphan",
+    )
+
+    reports = relationship(
+        "PostReport",
+        back_populates="post",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (

@@ -81,6 +81,21 @@ from app.models.store_banner import StoreBanner  # noqa: F401
 from app.models.store_ownership import StoreOwnership  # noqa: F401
 from app.models.store_purchase import StorePurchase  # noqa: F401
 
+
+# ============================================================
+# Community / Moderation models
+# ============================================================
+
+from app.models.community import (  # noqa: F401
+    CommunityComment,
+    CommunityPost,
+    CommunityPostLike,
+    CommunityPostSave,
+)
+from app.models.post_appeal import PostAppeal  # noqa: F401
+from app.models.post_report import PostReport  # noqa: F401
+from app.models.admin_action_log import AdminActionLog  # noqa: F401
+
 config = context.config
 
 if config.config_file_name is not None:
