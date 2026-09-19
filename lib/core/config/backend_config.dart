@@ -7,10 +7,20 @@ class BackendConfig {
       );
 
   /// Example: 'http://127.0.0.1:8000'
+  ///
+  /// NOTE: this must match the machine that is actually running the
+  /// FastAPI backend. A stale LAN IP here makes the app talk to a
+  /// dead/old server, so posts can appear to be created while the
+  /// community feed reads from a different (stale) backend instance.
+  ///
+  /// Override per run with:
+  ///   --dart-define=BACKEND_URL=http://`your-lan-ip`:8000
+  /// (use your machine's LAN IP for physical Android/iOS devices, or
+  ///  `adb reverse tcp:8000 tcp:8000` with 127.0.0.1 for emulators).
   static const String backendUrl =
       String.fromEnvironment(
         'BACKEND_URL',
-        defaultValue: 'http://10.14.102.24:8000',
+        defaultValue: 'http://127.0.0.1:8000',
       );
 
   /// Converts a relative media path (for example

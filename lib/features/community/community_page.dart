@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/navigation/wayn_actions.dart';
@@ -44,6 +45,12 @@ class _CommunityPageState extends State<CommunityPage> {
 
   User? _currentUser;
 
+  // رقم إصدار طلبات تحميل المنشورات.
+  //
+  // إذا بدأ طلب قديم ثم بدأ طلب أحدث، لا نسمح للطلب القديم
+  // بالعودة لاحقًا وكتابة بياناته فوق القائمة الجديدة.
+  int _postsRequestGeneration = 0;
+
   @override
   void initState() {
     super.initState();
@@ -52,7 +59,6 @@ class _CommunityPageState extends State<CommunityPage> {
       createCommunityRepository(),
     );
 
-    // Infinite scroll: حمّل الصفحة التالية عند اقتراب المستخدم من النهاية.
     _scrollController.addListener(_onScroll);
 
     _loadPosts();
@@ -78,6 +84,7 @@ class _CommunityPageState extends State<CommunityPage> {
     try {
       final auth = AuthService();
       final user = await auth.getCurrentUser();
+
       if (mounted) {
         setState(() => _currentUser = user);
       }
@@ -86,9 +93,9 @@ class _CommunityPageState extends State<CommunityPage> {
     }
   }
 
-
   void _showLoginPrompt() {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -96,13 +103,20 @@ class _CommunityPageState extends State<CommunityPage> {
           behavior: SnackBarBehavior.floating,
           content: Row(
             children: [
-              Icon(Icons.login_rounded, color: Colors.white, size: 20),
+              const Icon(
+                Icons.login_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               const SizedBox(width: 10),
-              Expanded(
+              const Expanded(
                 child: Text(
                   'يرجى تسجيل الدخول للتفاعل مع المنشورات',
                   textDirection: TextDirection.rtl,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               TextButton(
@@ -116,7 +130,12 @@ class _CommunityPageState extends State<CommunityPage> {
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text('تسجيل الدخول', style: TextStyle(fontWeight: FontWeight.w800)),
+                child: const Text(
+                  'تسجيل الدخول',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ],
           ),
@@ -134,20 +153,33 @@ class _CommunityPageState extends State<CommunityPage> {
     bool refresh = false,
     bool loadMore = false,
   }) async {
-    // منع الطلبات المتزامنة المكررة.
     if (loadMore) {
-      if (_isLoadingMore || !_hasMore) return;
+      if (_isLoadingMore || !_hasMore || _isLoading) return;
+
       setState(() {
         _isLoadingMore = true;
       });
     } else {
+      // أي تحميل جديد للصفحة الأولى يصبح أحدث إصدار.
+      _postsRequestGeneration++;
+
       setState(() {
         _isLoading = true;
+        _isLoadingMore = false;
         _errorMessage = null;
       });
     }
 
+    final requestGeneration = _postsRequestGeneration;
     final requestPage = loadMore ? _currentPage + 1 : 1;
+
+    debugPrint(
+      'COMMUNITY DEBUG: START GET '
+      'page=$requestPage '
+      'generation=$requestGeneration '
+      'loadMore=$loadMore '
+      'refresh=$refresh',
+    );
 
     try {
       final posts = await _communityService.getPosts(
@@ -157,38 +189,144 @@ class _CommunityPageState extends State<CommunityPage> {
 
       if (!mounted) return;
 
+      // =========================================================================
+      // DEBUG
+      // =========================================================================
+
+      debugPrint(
+        'COMMUNITY DEBUG: RESPONSE '
+        'page=$requestPage '
+        'generation=$requestGeneration '
+        'count=${posts.length}',
+      );
+
+      if (posts.isEmpty) {
+        debugPrint(
+          'COMMUNITY DEBUG: RESPONSE IS EMPTY',
+        );
+      } else {
+        for (var i = 0; i < posts.length; i++) {
+          final post = posts[i];
+
+          debugPrint(
+            'COMMUNITY DEBUG POST [$i]: '
+            'id=${post.id} '
+            'userId=${post.userId} '
+            'text="${post.text}" '
+            'createdAt=${post.createdAt} '
+            'isVisible=${post.isVisible} '
+            'visibilityState=${post.visibilityState} '
+            'deletedAt=${post.deletedAt} '
+            'hiddenAt=${post.hiddenAt}',
+          );
+        }
+      }
+
+      // =========================================================================
+      // REQUEST GENERATION
+      // =========================================================================
+
+      if (requestGeneration != _postsRequestGeneration) {
+        debugPrint(
+          'COMMUNITY DEBUG: IGNORE OLD RESPONSE '
+          'requestGeneration=$requestGeneration '
+          'currentGeneration=$_postsRequestGeneration',
+        );
+        return;
+      }
+
       setState(() {
         if (loadMore) {
           _posts.addAll(posts);
           _currentPage = requestPage;
           _isLoadingMore = false;
-          // إذا أعادت الصفحة أقل من الحد الأقصى فلا توجد صفحات أخرى.
+
           _hasMore = posts.length >= _pageSize;
         } else {
           _posts
             ..clear()
             ..addAll(posts);
+
           _currentPage = 1;
           _hasMore = posts.length >= _pageSize;
           _isLoading = false;
+          _isLoadingMore = false;
         }
       });
+
+      // =========================================================================
+      // DEBUG AFTER STATE UPDATE
+      // =========================================================================
+
+      debugPrint(
+        'COMMUNITY DEBUG: STATE UPDATED '
+        'posts=${_posts.length} '
+        'currentPage=$_currentPage '
+        'hasMore=$_hasMore '
+        'isLoading=$_isLoading',
+      );
+
+      for (var i = 0; i < _posts.length; i++) {
+        debugPrint(
+          'COMMUNITY DEBUG STATE POST [$i]: '
+          'id=${_posts[i].id}',
+        );
+      }
     } on ApiClientException catch (e) {
       if (!mounted) return;
 
-      setState(() {
-        _isLoading = false;
-        _isLoadingMore = false;
-        // عند فشل تحميل صفحة إضافية نحتفظ بالمنشورات القديمة.
-        if (!loadMore) _errorMessage = e.message;
-      });
-    } catch (_) {
-      if (!mounted) return;
+      if (requestGeneration != _postsRequestGeneration) {
+        debugPrint(
+          'COMMUNITY DEBUG: IGNORE OLD ERROR '
+          'requestGeneration=$requestGeneration '
+          'currentGeneration=$_postsRequestGeneration',
+        );
+        return;
+      }
+
+      debugPrint(
+        'COMMUNITY DEBUG: API ERROR '
+        'page=$requestPage '
+        'message=${e.message}',
+      );
 
       setState(() {
         _isLoading = false;
         _isLoadingMore = false;
-        if (!loadMore) _errorMessage = 'تعذر تحميل المجتمع حاليًا';
+
+        if (!loadMore) {
+          _errorMessage = e.message;
+        }
+      });
+    } catch (e, stackTrace) {
+      if (!mounted) return;
+
+      if (requestGeneration != _postsRequestGeneration) {
+        debugPrint(
+          'COMMUNITY DEBUG: IGNORE OLD EXCEPTION '
+          'requestGeneration=$requestGeneration '
+          'currentGeneration=$_postsRequestGeneration',
+        );
+        return;
+      }
+
+      debugPrint(
+        'COMMUNITY DEBUG: EXCEPTION '
+        'page=$requestPage '
+        'error=$e',
+      );
+
+      debugPrint(
+        'COMMUNITY DEBUG: STACK TRACE\n$stackTrace',
+      );
+
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+
+        if (!loadMore) {
+          _errorMessage = 'تعذر تحميل المجتمع حاليًا';
+        }
       });
     }
   }
@@ -318,16 +456,45 @@ class _CommunityPageState extends State<CommunityPage> {
   // ===========================================================================
 
   Future<void> _openCreatePostPage() async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => CreatePostPage(
-          communityService: _communityService,
-        ),
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      barrierColor: Colors.black.withValues(alpha: 0.30),
+      isDismissible: true,
+      enableDrag: true,
+      showDragHandle: false,
+      clipBehavior: Clip.none,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: Duration(milliseconds: 420),
+        reverseDuration: Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
       ),
+      builder: (_) {
+        return _CreatePostSheet(
+          communityService: _communityService,
+        );
+      },
+    );
+
+    debugPrint(
+      'COMMUNITY DEBUG: CREATE SHEET RESULT=$result',
     );
 
     if (result == true && mounted) {
+      debugPrint(
+        'COMMUNITY DEBUG: STARTING REFRESH AFTER CREATE',
+      );
+
       await _loadPosts(refresh: true);
+
+      debugPrint(
+        'COMMUNITY DEBUG: REFRESH AFTER CREATE FINISHED '
+        'posts=${_posts.length}',
+      );
     }
   }
 
@@ -449,7 +616,9 @@ class _CommunityPageState extends State<CommunityPage> {
                 onMenuPressed: _onMenuPressed,
                 onNotificationsPressed: _onNotificationsPressed,
               ),
-              Expanded(child: _buildBody()),
+              Expanded(
+                child: _buildBody(),
+              ),
             ],
           ),
         ),
@@ -534,7 +703,10 @@ class _CommunityPageState extends State<CommunityPage> {
           children: [
             if (_isGuest)
               const Padding(
-                padding: EdgeInsets.only(top: 12, bottom: 12),
+                padding: EdgeInsets.only(
+                  top: 12,
+                  bottom: 12,
+                ),
                 child: WaynGuestBanner(
                   placement: WaynGuestBannerPlacement.inline,
                 ),
@@ -585,12 +757,9 @@ class _CommunityPageState extends State<CommunityPage> {
           14,
           20,
         ),
-        // عنصر إضافي في النهاية: إشعار الزائر + مؤشر تحميل الصفحة التالية.
         itemCount:
             _posts.length + (_isGuest ? 1 : 0) + (_hasMore ? 1 : 0),
         itemBuilder: (context, rawIndex) {
-          // إشعار تسجيل الدخول كأول عنصر في القائمة أسفل الهيدر مباشرة،
-          // ويختفي عند السحب للأعلى أو زر X أو التمرير بعيدًا.
           if (_isGuest && rawIndex == 0) {
             return const WaynGuestBanner(
               placement: WaynGuestBannerPlacement.inline,
@@ -599,10 +768,11 @@ class _CommunityPageState extends State<CommunityPage> {
 
           final guestOffset = _isGuest ? 1 : 0;
 
-          // مؤشر تحميل الصفحة التالية في نهاية القائمة.
           if (rawIndex == _posts.length + guestOffset) {
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 18),
+              padding: const EdgeInsets.symmetric(
+                vertical: 18,
+              ),
               child: Center(
                 child: _isLoadingMore
                     ? SizedBox(
@@ -620,6 +790,24 @@ class _CommunityPageState extends State<CommunityPage> {
 
           final postIndex = rawIndex - guestOffset;
           final post = _posts[postIndex];
+
+          // =========================================================================
+          // DEBUG (تشخيص بناء عناصر القائمة)
+          // =========================================================================
+
+          debugPrint(
+            'COMMUNITY DEBUG: BUILD ITEM '
+            'rawIndex=$rawIndex '
+            'itemCount=${_posts.length + (_isGuest ? 1 : 0) + (_hasMore ? 1 : 0)} '
+            'posts=${_posts.length}',
+          );
+
+          debugPrint(
+            'COMMUNITY DEBUG: BUILD POST '
+            'postIndex=$postIndex '
+            'id=${post.id} '
+            'text="${post.text}"',
+          );
 
           return Padding(
             padding: const EdgeInsets.only(
@@ -652,7 +840,78 @@ class _CommunityPageState extends State<CommunityPage> {
 }
 
 // ============================================================================
-// زر إنشاء المنشور — يظهر كزر عائم (pill) أنيق أسفل الشاشة
+// بطاقة إنشاء المنشور العائمة
+// ============================================================================
+
+class _CreatePostSheet extends StatelessWidget {
+  final CommunityService communityService;
+
+  const _CreatePostSheet({
+    required this.communityService,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
+    final mediaQuery = MediaQuery.of(context);
+
+    final topInset = mediaQuery.padding.top;
+    final bottomInset = mediaQuery.padding.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: topInset + 10,
+        left: 8,
+        right: 8,
+        bottom: bottomInset + 8,
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.all(
+          Radius.circular(32),
+        ),
+        child: Material(
+          color: colors.background,
+          elevation: 0,
+          child: Stack(
+            children: [
+              Positioned(
+                top: 10,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.textMuted.withValues(
+                          alpha: 0.28,
+                        ),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(
+                  top: 8,
+                ),
+                child: CreatePostPage(
+                  communityService: communityService,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// زر إنشاء المنشور
 // ============================================================================
 
 class _AddPostBar extends StatefulWidget {
@@ -670,10 +929,22 @@ class _AddPostBar extends StatefulWidget {
 
 class _AddPostBarState extends State<_AddPostBar> {
   bool _pressed = false;
+  bool _hovered = false;
 
   void _setPressed(bool value) {
     if (_pressed == value) return;
-    setState(() => _pressed = value);
+
+    setState(() {
+      _pressed = value;
+    });
+  }
+
+  void _setHovered(bool value) {
+    if (_hovered == value) return;
+
+    setState(() {
+      _hovered = value;
+    });
   }
 
   @override
@@ -687,94 +958,149 @@ class _AddPostBarState extends State<_AddPostBar> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 4, 22, 14),
-        child: AnimatedScale(
-          scale: _pressed ? 0.97 : 1,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          child: Container(
-            height: 56,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF22C7B2),
-                  Color(0xFF0C8B80),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.brand.withValues(alpha: 0.38),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+        padding: const EdgeInsets.fromLTRB(
+          22,
+          4,
+          22,
+          14,
+        ),
+        child: MouseRegion(
+          onEnter: (_) => _setHovered(true),
+          onExit: (_) => _setHovered(false),
+          child: AnimatedScale(
+            scale: _pressed
+                ? 0.965
+                : _hovered
+                    ? 1.008
+                    : 1,
+            duration: const Duration(
+              milliseconds: 160,
             ),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(28),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: widget.onPressed,
-                onHighlightChanged: _setPressed,
-                splashColor: Colors.white.withValues(alpha: 0.14),
-                highlightColor: Colors.white.withValues(alpha: 0.08),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // لمعة علوية خفيفة تعطي إحساسًا زجاجيًا هادئًا.
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(28),
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.10),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.55],
+            curve: Curves.easeOutCubic,
+            child: AnimatedContainer(
+              duration: const Duration(
+                milliseconds: 180,
+              ),
+              curve: Curves.easeOutCubic,
+              height: 58,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(29),
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF22C7B2),
+                    Color(0xFF0C8B80),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.brand.withValues(
+                      alpha: _pressed ? 0.24 : 0.36,
+                    ),
+                    blurRadius: _pressed ? 16 : 24,
+                    offset: Offset(
+                      0,
+                      _pressed ? 6 : 10,
+                    ),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: 0.045,
+                    ),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(29),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: widget.onPressed,
+                  onHighlightChanged: _setPressed,
+                  splashColor: Colors.white.withValues(
+                    alpha: 0.14,
+                  ),
+                  highlightColor: Colors.white.withValues(
+                    alpha: 0.07,
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: AnimatedOpacity(
+                            opacity: _hovered ? 1 : 0.7,
+                            duration: const Duration(
+                              milliseconds: 180,
+                            ),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(29),
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.white.withValues(
+                                      alpha: 0.13,
+                                    ),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [
+                                    0,
+                                    0.58,
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 27,
-                          height: 27,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.18),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(
+                              milliseconds: 180,
+                            ),
+                            curve: Curves.easeOutCubic,
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(
+                                alpha: _pressed ? 0.24 : 0.18,
+                              ),
+                            ),
+                            child: AnimatedRotation(
+                              duration: const Duration(
+                                milliseconds: 220,
+                              ),
+                              curve: Curves.easeOutCubic,
+                              turns: _pressed ? 0.08 : 0,
+                              child: const Icon(
+                                Icons.add_rounded,
+                                color: Colors.white,
+                                size: 19,
+                              ),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.add_rounded,
-                            color: Colors.white,
-                            size: 18,
+                          const SizedBox(width: 10),
+                          const Text(
+                            'إضافة منشور جديد',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15.5,
+                              letterSpacing: -0.1,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'إضافة منشور جديد',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15.5,
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
