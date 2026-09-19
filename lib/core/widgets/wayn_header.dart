@@ -1,4 +1,8 @@
+import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/wayn_colors.dart';
 import '../../features/location/saved_locations_store.dart';
@@ -6,20 +10,13 @@ import '../../features/location/widgets/location_selector_sheet.dart';
 import '../../features/map/location_picker_page.dart';
 import '../../services/social_service.dart';
 
-/// الهيدر الموحّد لصفحات WAYN.
-///
-/// يعرض دائمًا نفس الترتيب بنفس المسافات للنصين RTL:
-/// [زر القائمة] [📍 الموقع الحالي] [زر الإشعارات]
-///
-/// عند الضغط على الموقع يفتح [showLocationSelectorSheet] لعرض المواقع
-/// المحفوظة واختيار/إضافة موقع.
-///
-/// نقطة الإشعار تظهر فقط عند وجود إشعار حقيقي غير مقروء.
+/// الحالة المشتركة لقائمة WAYN.
+/// يغيّرها [showWaynMenu] فيتحرك زر القائمة تلقائيًا (هامبرغر ⇄ إغلاق).
+final ValueNotifier<bool> waynMenuIsOpen = ValueNotifier<bool>(false);
+
 class WaynHeader extends StatefulWidget {
   final VoidCallback onMenuPressed;
   final VoidCallback onNotificationsPressed;
-
-  /// عناصر إضافية اختيارية تُعرض على يسار زر الإشعارات (مثل زر التحديث).
   final List<Widget>? trailing;
 
   const WaynHeader({
@@ -36,17 +33,10 @@ class WaynHeader extends StatefulWidget {
 class _WaynHeaderState extends State<WaynHeader> {
   static const Duration _notificationCacheDuration = Duration(seconds: 30);
 
-  /// حالة مشتركة بين جميع نسخ WaynHeader.
-  ///
-  /// هذا يمنع كل صفحة من إعادة طلب حالة الإشعارات بشكل مستقل.
   static final ValueNotifier<bool> _sharedHasUnreadNotifications =
       ValueNotifier<bool>(false);
 
-  /// الطلب الحالي المشترك، حتى لو أنشأت عدة صفحات الهيدر في نفس الوقت
-  /// فلن نرسل عدة requests متزامنة.
   static Future<void>? _sharedLoadFuture;
-
-  /// وقت آخر تحديث ناجح لحالة الإشعارات.
   static DateTime? _sharedLoadedAt;
 
   final SocialService _socialService = SocialService();
@@ -57,14 +47,7 @@ class _WaynHeaderState extends State<WaynHeader> {
     _loadNotificationStatus();
   }
 
-  /// تحميل حالة الإشعارات من endpoint خفيف بدل تحميل قائمة كاملة
-  /// من الإشعارات.
-  ///
-  /// يتم استخدام cache مشترك لمدة قصيرة لمنع تكرار نفس الطلب بين
-  /// نسخ WaynHeader الموجودة في صفحات التطبيق.
-  Future<void> _loadNotificationStatus({
-    bool forceRefresh = false,
-  }) async {
+  Future<void> _loadNotificationStatus({bool forceRefresh = false}) async {
     final now = DateTime.now();
     final lastLoadedAt = _sharedLoadedAt;
 
@@ -98,7 +81,6 @@ class _WaynHeaderState extends State<WaynHeader> {
       _sharedHasUnreadNotifications.value = unreadCount > 0;
       _sharedLoadedAt = DateTime.now();
     } catch (_) {
-      // إذا تعذر تحميل حالة الإشعارات، لا نظهر النقطة.
       _sharedHasUnreadNotifications.value = false;
     }
   }
@@ -106,8 +88,6 @@ class _WaynHeaderState extends State<WaynHeader> {
   Future<void> _openNotifications() async {
     widget.onNotificationsPressed();
 
-    // عند العودة من صفحة الإشعارات نعيد الفحص،
-    // لأن المستخدم قد يكون علّم الإشعارات كمقروءة.
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
     if (!mounted) return;
@@ -118,35 +98,34 @@ class _WaynHeaderState extends State<WaynHeader> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          _HeaderIconButton(
-            icon: Icons.menu_rounded,
-            onPressed: widget.onMenuPressed,
-          ),
-
-          const SizedBox(width: 10),
-
-          Expanded(
-            child: _LocationPill(
-              onTap: () => _handleLocationTap(context),
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
           ValueListenableBuilder<bool>(
-            valueListenable: _sharedHasUnreadNotifications,
-            builder: (context, hasUnreadNotifications, _) {
-              return _HeaderIconButton(
-                icon: Icons.notifications_none_rounded,
-                onPressed: _openNotifications,
-                showBadge: hasUnreadNotifications,
+            valueListenable: waynMenuIsOpen,
+            builder: (context, isOpen, _) {
+              return _MenuButton(
+                isOpen: isOpen,
+                onPressed: widget.onMenuPressed,
               );
             },
           ),
-
+          const SizedBox(width: 10),
+          Expanded(
+            child: _LocationSelector(
+              onTap: () => _handleLocationTap(context),
+            ),
+          ),
+          const SizedBox(width: 10),
+          ValueListenableBuilder<bool>(
+            valueListenable: _sharedHasUnreadNotifications,
+            builder: (context, hasUnread, _) {
+              return _BellButton(
+                hasUnread: hasUnread,
+                onPressed: _openNotifications,
+              );
+            },
+          ),
           ...?widget.trailing,
         ],
       ),
@@ -155,9 +134,11 @@ class _WaynHeaderState extends State<WaynHeader> {
 
   Future<void> _handleLocationTap(BuildContext context) async {
     await SavedLocationsStore.instance.ensureLoaded();
+
     if (!context.mounted) return;
 
     final result = await showLocationSelectorSheet(context);
+
     if (!context.mounted || result == null) return;
 
     switch (result) {
@@ -176,11 +157,509 @@ class _WaynHeaderState extends State<WaynHeader> {
   }
 }
 
-/// تدفق إضافة موقع يدوي: خريطة اختيار → إدخال اسم → حفظ واختياره كموقع حالي.
+// ---------------------------------------------------------------------------
+// عنصر ضغط مشترك: تصغير لطيف + اهتزاز خفيف + دعم قارئ الشاشة.
+// ---------------------------------------------------------------------------
+class _Pressable extends StatefulWidget {
+  final VoidCallback onTap;
+  final Widget child;
+  final double pressedScale;
+  final String semanticsLabel;
 
-/// إضافة موقع يدويًا عبر [LocationPickerPage] ثم طلب اسم وتخزينه. التصميم:
+  const _Pressable({
+    required this.onTap,
+    required this.child,
+    required this.semanticsLabel,
+    this.pressedScale = 0.92,
+  });
 
-/// أنشئ ورق أسفلين تطلب اسم الموقع بعد اختيار الإحداثيات.
+  @override
+  State<_Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<_Pressable> {
+  bool _down = false;
+
+  void _set(bool value) {
+    if (_down == value || !mounted) return;
+    setState(() => _down = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: widget.semanticsLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _set(true),
+        onTapUp: (_) => _set(false),
+        onTapCancel: () => _set(false),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          widget.onTap();
+        },
+        child: AnimatedScale(
+          scale: _down ? widget.pressedScale : 1.0,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// زر القائمة: مربع ناعم يتحول إلى دائرة بلون الهوية، والأيقونة تتحول
+// (هامبرغر ⇄ X) بحركة Morph حقيقية.
+// ---------------------------------------------------------------------------
+class _MenuButton extends StatefulWidget {
+  final bool isOpen;
+  final VoidCallback onPressed;
+
+  const _MenuButton({
+    required this.isOpen,
+    required this.onPressed,
+  });
+
+  @override
+  State<_MenuButton> createState() => _MenuButtonState();
+}
+
+class _MenuButtonState extends State<_MenuButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+      reverseDuration: const Duration(milliseconds: 280),
+      value: widget.isOpen ? 1.0 : 0.0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _MenuButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.isOpen != widget.isOpen) {
+      widget.isOpen ? _controller.forward() : _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.waynColors;
+
+    return _Pressable(
+      semanticsLabel: 'قائمة وين',
+      onTap: widget.onPressed,
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final t = Curves.easeOutCubic.transform(_controller.value);
+
+            return Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Color.lerp(colors.surfaceElevated, colors.brand, t),
+                borderRadius: BorderRadius.circular(lerpDouble(16, 23, t)!),
+              ),
+              child: Center(
+                child: AnimatedIcon(
+                  icon: AnimatedIcons.menu_close,
+                  progress: _controller,
+                  size: 24,
+                  color: Color.lerp(colors.textPrimary, Colors.white, t),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// زر الإشعارات: الجرس يرن عند وجود غير مقروء، والنقطة تنبض.
+// ---------------------------------------------------------------------------
+class _BellButton extends StatefulWidget {
+  final bool hasUnread;
+  final VoidCallback onPressed;
+
+  const _BellButton({
+    required this.hasUnread,
+    required this.onPressed,
+  });
+
+  @override
+  State<_BellButton> createState() => _BellButtonState();
+}
+
+class _BellButtonState extends State<_BellButton>
+    with TickerProviderStateMixin {
+  static const Color _alert = Color(0xFFE95353);
+
+  late final AnimationController _ring;
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _ring = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
+
+    if (widget.hasUnread) _startAttention();
+  }
+
+  @override
+  void didUpdateWidget(covariant _BellButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.hasUnread == widget.hasUnread) return;
+
+    if (widget.hasUnread) {
+      _startAttention();
+    } else {
+      _pulse
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  void _startAttention() {
+    _ring.forward(from: 0);
+    _pulse.repeat();
+  }
+
+  @override
+  void dispose() {
+    _ring.dispose();
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.waynColors;
+    final active = widget.hasUnread;
+
+    return _Pressable(
+      semanticsLabel: 'الإشعارات',
+      onTap: widget.onPressed,
+      child: RepaintBoundary(
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: active
+                ? colors.brand.withValues(alpha: 0.12)
+                : colors.surfaceElevated,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              AnimatedBuilder(
+                animation: _ring,
+                builder: (context, child) {
+                  // اهتزاز متضائل: يبدأ قويًا ثم يهدأ.
+                  final t = _ring.value;
+                  final angle = math.sin(t * math.pi * 5) * 0.30 * (1 - t);
+
+                  return Transform.rotate(
+                    angle: angle,
+                    alignment: Alignment.topCenter,
+                    child: child,
+                  );
+                },
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutBack,
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                    scale: animation,
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: Icon(
+                    active
+                        ? Icons.notifications_rounded
+                        : Icons.notifications_none_rounded,
+                    key: ValueKey<bool>(active),
+                    size: 25,
+                    color: active ? colors.brand : colors.textPrimary,
+                  ),
+                ),
+              ),
+              if (active)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: AnimatedBuilder(
+                      animation: _pulse,
+                      builder: (context, _) {
+                        final t = Curves.easeOut.transform(_pulse.value);
+
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 10 + (10 * t),
+                              height: 10 + (10 * t),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _alert.withValues(
+                                  alpha: 0.38 * (1 - t),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 11,
+                              height: 11,
+                              decoration: BoxDecoration(
+                                color: _alert,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: colors.surface,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// محدد الموقع: كبسولة واحدة، دبوس بلون الهوية ينبض، والاسم يتبدل بحركة.
+// ---------------------------------------------------------------------------
+class _LocationSelector extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _LocationSelector({
+    required this.onTap,
+  });
+
+  @override
+  State<_LocationSelector> createState() => _LocationSelectorState();
+}
+
+class _LocationSelectorState extends State<_LocationSelector>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.waynColors;
+    final store = SavedLocationsStore.instance;
+
+    return _Pressable(
+      semanticsLabel: 'الموقع الحالي',
+      pressedScale: 0.975,
+      onTap: widget.onTap,
+      child: Container(
+        height: 46,
+        padding: const EdgeInsetsDirectional.only(start: 6, end: 10),
+        decoration: BoxDecoration(
+          color: colors.surfaceElevated,
+          borderRadius: BorderRadius.circular(23),
+        ),
+        child: Row(
+          children: [
+            RepaintBoundary(
+              child: _PinBadge(
+                pulse: _pulse,
+                color: colors.brand,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: AnimatedBuilder(
+                animation: store,
+                builder: (context, _) {
+                  final label = store.currentLabel;
+
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '',
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          height: 1.2,
+                          fontWeight: FontWeight.w500,
+                          color: colors.textMuted,
+                        ),
+                      ),
+                      SizedBox(
+                        height: 19,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 260),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          layoutBuilder: (current, previous) => Stack(
+                            alignment: AlignmentDirectional.centerStart,
+                            children: [...previous, if (current != null) current],
+                          ),
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 0.45),
+                                  end: Offset.zero,
+                                ).animate(animation),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: Text(
+                            label,
+                            key: ValueKey<String>(label),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.3,
+                              fontWeight: FontWeight.w800,
+                              color: colors.textPrimary,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 22,
+              color: colors.textMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PinBadge extends StatelessWidget {
+  final Animation<double> pulse;
+  final Color color;
+
+  const _PinBadge({
+    required this.pulse,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 34,
+      height: 34,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedBuilder(
+            animation: pulse,
+            builder: (context, _) {
+              final t = Curves.easeOut.transform(pulse.value);
+
+              return Transform.scale(
+                scale: 1 + (0.6 * t),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color.withValues(alpha: 0.30 * (1 - t)),
+                  ),
+                  child: const SizedBox(width: 34, height: 34),
+                ),
+              );
+            },
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+            ),
+            child: const SizedBox(
+              width: 34,
+              height: 34,
+              child: Center(
+                child: Icon(
+                  Icons.location_on_rounded,
+                  size: 19,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// تدفق إضافة موقع (بدون تغيير في المنطق).
+// ---------------------------------------------------------------------------
 Future<String?> _promptLocationName(BuildContext context) {
   final controller = TextEditingController();
 
@@ -205,12 +684,17 @@ Future<String?> _promptLocationName(BuildContext context) {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
             child: const Text('إلغاء'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
+            onPressed: () {
+              Navigator.of(dialogContext).pop(
+                controller.text.trim(),
+              );
+            },
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF18A99A),
             ),
@@ -222,9 +706,10 @@ Future<String?> _promptLocationName(BuildContext context) {
   );
 }
 
-/// يفتح خريطة اختيار الموقع، ثم يطلب اسمًا، ثم يحفظ الموقع ويختاره كموقع حالي.
+/// يفتح خريطة اختيار الموقع، ثم يطلب اسمًا، ثم يحفظ الموقع.
 Future<void> openAddLocationFlow(BuildContext context) async {
   await SavedLocationsStore.instance.ensureLoaded();
+
   if (!context.mounted) return;
 
   final coordinates = await Navigator.of(context).push<Map<String, double>>(
@@ -236,10 +721,15 @@ Future<void> openAddLocationFlow(BuildContext context) async {
   final latitude = coordinates?['latitude'];
   final longitude = coordinates?['longitude'];
 
-  if (!context.mounted || latitude == null || longitude == null) return;
+  if (!context.mounted || latitude == null || longitude == null) {
+    return;
+  }
 
   final name = await _promptLocationName(context);
-  if (!context.mounted || name == null || name.isEmpty) return;
+
+  if (!context.mounted || name == null || name.isEmpty) {
+    return;
+  }
 
   await SavedLocationsStore.instance.add(
     name: name,
@@ -258,138 +748,4 @@ Future<void> openAddLocationFlow(BuildContext context) async {
       behavior: SnackBarBehavior.floating,
     ),
   );
-}
-
-/// كبسولة تعرض الموقع الحالي وتفتح ورقة المواقع عند الضغط عليها.
-///
-/// ورقة المواقع هي المكان الوحيد لتغيير الموقع الحالي.
-class _LocationPill extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _LocationPill({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final store = SavedLocationsStore.instance;
-    final colors = context.waynColors;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: AnimatedBuilder(
-        animation: store,
-        builder: (context_, _) {
-          final label = store.currentLabel;
-
-          return Container(
-            height: 46,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.shadow,
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.location_on_rounded,
-                  color: Color(0xFF18A99A),
-                  size: 21,
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: colors.textMuted,
-                  size: 18,
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
-  final bool showBadge;
-
-  const _HeaderIconButton({
-    required this.icon,
-    required this.onPressed,
-    this.showBadge = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.waynColors;
-
-    return GestureDetector(
-      onTap: onPressed,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.shadow,
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(
-              icon,
-              color: colors.textPrimary,
-              size: 23,
-            ),
-          ),
-          if (showBadge)
-            Positioned(
-              top: -2,
-              right: -2,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE95353),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFFF7F9FC),
-                    width: 2,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
