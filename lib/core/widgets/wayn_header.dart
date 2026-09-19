@@ -158,7 +158,7 @@ class _WaynHeaderState extends State<WaynHeader> {
 }
 
 // ---------------------------------------------------------------------------
-// عنصر ضغط مشترك: تصغير لطيف + اهتزاز خفيف + دعم قارئ الشاشة.
+// عنصر ضغط مشترك.
 // ---------------------------------------------------------------------------
 class _Pressable extends StatefulWidget {
   final VoidCallback onTap;
@@ -211,8 +211,7 @@ class _PressableState extends State<_Pressable> {
 }
 
 // ---------------------------------------------------------------------------
-// زر القائمة: مربع ناعم يتحول إلى دائرة بلون الهوية، والأيقونة تتحول
-// (هامبرغر ⇄ X) بحركة Morph حقيقية.
+// زر القائمة.
 // ---------------------------------------------------------------------------
 class _MenuButton extends StatefulWidget {
   final bool isOpen;
@@ -276,14 +275,20 @@ class _MenuButtonState extends State<_MenuButton>
               height: 46,
               decoration: BoxDecoration(
                 color: Color.lerp(colors.surfaceElevated, colors.brand, t),
-                borderRadius: BorderRadius.circular(lerpDouble(16, 23, t)!),
+                borderRadius: BorderRadius.circular(
+                  lerpDouble(16, 23, t)!,
+                ),
               ),
               child: Center(
                 child: AnimatedIcon(
                   icon: AnimatedIcons.menu_close,
                   progress: _controller,
                   size: 24,
-                  color: Color.lerp(colors.textPrimary, Colors.white, t),
+                  color: Color.lerp(
+                    colors.textPrimary,
+                    Colors.white,
+                    t,
+                  ),
                 ),
               ),
             );
@@ -295,7 +300,7 @@ class _MenuButtonState extends State<_MenuButton>
 }
 
 // ---------------------------------------------------------------------------
-// زر الإشعارات: الجرس يرن عند وجود غير مقروء، والنقطة تنبض.
+// زر الإشعارات.
 // ---------------------------------------------------------------------------
 class _BellButton extends StatefulWidget {
   final bool hasUnread;
@@ -331,7 +336,9 @@ class _BellButtonState extends State<_BellButton>
       duration: const Duration(milliseconds: 1600),
     );
 
-    if (widget.hasUnread) _startAttention();
+    if (widget.hasUnread) {
+      _startAttention();
+    }
   }
 
   @override
@@ -386,9 +393,9 @@ class _BellButtonState extends State<_BellButton>
               AnimatedBuilder(
                 animation: _ring,
                 builder: (context, child) {
-                  // اهتزاز متضائل: يبدأ قويًا ثم يهدأ.
                   final t = _ring.value;
-                  final angle = math.sin(t * math.pi * 5) * 0.30 * (1 - t);
+                  final angle =
+                      math.sin(t * math.pi * 5) * 0.30 * (1 - t);
 
                   return Transform.rotate(
                     angle: angle,
@@ -399,17 +406,24 @@ class _BellButtonState extends State<_BellButton>
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOutBack,
-                  transitionBuilder: (child, animation) => ScaleTransition(
-                    scale: animation,
-                    child: FadeTransition(opacity: animation, child: child),
-                  ),
+                  transitionBuilder: (child, animation) {
+                    return ScaleTransition(
+                      scale: animation,
+                      child: FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
+                    );
+                  },
                   child: Icon(
                     active
                         ? Icons.notifications_rounded
                         : Icons.notifications_none_rounded,
                     key: ValueKey<bool>(active),
                     size: 25,
-                    color: active ? colors.brand : colors.textPrimary,
+                    color: active
+                        ? colors.brand
+                        : colors.textPrimary,
                   ),
                 ),
               ),
@@ -423,7 +437,8 @@ class _BellButtonState extends State<_BellButton>
                     child: AnimatedBuilder(
                       animation: _pulse,
                       builder: (context, _) {
-                        final t = Curves.easeOut.transform(_pulse.value);
+                        final t =
+                            Curves.easeOut.transform(_pulse.value);
 
                         return Stack(
                           alignment: Alignment.center,
@@ -465,7 +480,7 @@ class _BellButtonState extends State<_BellButton>
 }
 
 // ---------------------------------------------------------------------------
-// محدد الموقع: كبسولة واحدة، دبوس بلون الهوية ينبض، والاسم يتبدل بحركة.
+// محدد الموقع.
 // ---------------------------------------------------------------------------
 class _LocationSelector extends StatefulWidget {
   final VoidCallback onTap;
@@ -509,7 +524,10 @@ class _LocationSelectorState extends State<_LocationSelector>
       onTap: widget.onTap,
       child: Container(
         height: 46,
-        padding: const EdgeInsetsDirectional.only(start: 6, end: 10),
+        padding: const EdgeInsetsDirectional.only(
+          start: 6,
+          end: 10,
+        ),
         decoration: BoxDecoration(
           color: colors.surfaceElevated,
           borderRadius: BorderRadius.circular(23),
@@ -533,34 +551,39 @@ class _LocationSelectorState extends State<_LocationSelector>
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '',
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          height: 1.2,
-                          fontWeight: FontWeight.w500,
-                          color: colors.textMuted,
-                        ),
-                      ),
+                      const SizedBox(height: 2),
                       SizedBox(
-                        height: 19,
+                        height: 21,
                         child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 260),
+                          duration: const Duration(milliseconds: 280),
                           switchInCurve: Curves.easeOutCubic,
                           switchOutCurve: Curves.easeInCubic,
-                          layoutBuilder: (current, previous) => Stack(
-                            alignment: AlignmentDirectional.centerStart,
-                            children: [...previous, if (current != null) current],
-                          ),
-                          transitionBuilder: (child, animation) {
+                          layoutBuilder: (current, previous) {
+                            return Stack(
+                              alignment:
+                                  AlignmentDirectional.centerStart,
+                              children: [
+                                ...previous,
+                                if (current != null) current,
+                              ],
+                            );
+                          },
+                          transitionBuilder: (
+                            child,
+                            animation,
+                          ) {
+                            final curved = CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutCubic,
+                            );
+
                             return FadeTransition(
-                              opacity: animation,
+                              opacity: curved,
                               child: SlideTransition(
                                 position: Tween<Offset>(
-                                  begin: const Offset(0, 0.45),
+                                  begin: const Offset(0, 0.35),
                                   end: Offset.zero,
-                                ).animate(animation),
+                                ).animate(curved),
                                 child: child,
                               ),
                             );
@@ -627,9 +650,14 @@ class _PinBadge extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: color.withValues(alpha: 0.30 * (1 - t)),
+                    color: color.withValues(
+                      alpha: 0.30 * (1 - t),
+                    ),
                   ),
-                  child: const SizedBox(width: 34, height: 34),
+                  child: const SizedBox(
+                    width: 34,
+                    height: 34,
+                  ),
                 ),
               );
             },
@@ -658,7 +686,7 @@ class _PinBadge extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// تدفق إضافة موقع (بدون تغيير في المنطق).
+// تدفق إضافة موقع.
 // ---------------------------------------------------------------------------
 Future<String?> _promptLocationName(BuildContext context) {
   final controller = TextEditingController();
@@ -712,7 +740,8 @@ Future<void> openAddLocationFlow(BuildContext context) async {
 
   if (!context.mounted) return;
 
-  final coordinates = await Navigator.of(context).push<Map<String, double>>(
+  final coordinates =
+      await Navigator.of(context).push<Map<String, double>>(
     MaterialPageRoute(
       builder: (_) => const LocationPickerPage(),
     ),
