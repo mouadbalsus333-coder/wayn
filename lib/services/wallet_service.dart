@@ -10,6 +10,21 @@ class WalletService {
     );
   }
 
+  Future<String> lookupRecipientName(
+    String walletNumber,
+  ) async {
+    final data = await waynApi.get(
+      '/api/v1/wallet/lookup',
+      queryParams: {
+        'wallet_number': walletNumber.trim(),
+      },
+    );
+
+    final response = Map<String, dynamic>.from(data);
+
+    return (response['full_name'] as String).trim();
+  }
+
   Future<List<WalletTransaction>> getTransactions({
     int limit = 50,
     int offset = 0,

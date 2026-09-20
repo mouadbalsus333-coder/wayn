@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.wallet import UserWallet, WalletStatus
 from app.models.wallet_transaction import (
@@ -62,8 +63,14 @@ class WalletRepository:
         *,
         for_update: bool = False,
     ) -> UserWallet | None:
-        query = select(UserWallet).where(
-            UserWallet.wallet_number == wallet_number
+        query = (
+            select(UserWallet)
+            .where(
+                UserWallet.wallet_number == wallet_number
+            )
+            .options(
+                selectinload(UserWallet.user),
+            )
         )
 
         if for_update:

@@ -40,6 +40,15 @@ class WalletResponse(BaseModel):
 
 
 # ============================================================
+# Wallet recipient lookup response
+# ============================================================
+
+class WalletRecipientResponse(BaseModel):
+    wallet_number: str
+    full_name: str
+
+
+# ============================================================
 # Wallet transaction response
 # ============================================================
 
@@ -121,6 +130,76 @@ async def get_my_wallet(
     )
 
     return WalletResponse.model_validate(wallet)
+
+
+# ============================================================
+# Lookup recipient wallet
+# ============================================================
+
+@router.get(
+    "/lookup",
+    response_model=WalletRecipientResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def lookup_wallet_recipient(
+    wallet_number: str = Query(
+        min_length=1,
+        max_length=12,
+    ),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> WalletRecipientResponse:
+    """
+    Return only the recipient's public transfer identity.
+
+    This endpoint is intentionally different from the admin wallet
+    lookup endpoint. Mobile users must not receive administrative
+    wallet information such as user ID, wallet ID, phone number,
+    balance, verification state, or account status details.
+    """
+
+    wallet_number = wallet_number.strip()
+
+    if not wallet_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Wallet number is required",
+        )
+
+    service = WalletService(session)
+
+    wallet = await service.repository.get_wallet_by_number(
+        wallet_number
+    )
+
+    if wallet is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Receiver wallet not found",
+        )
+
+    if wallet.user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot transfer to your own wallet",
+        )
+
+    if wallet.user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Receiver account not found",
+        )
+
+    if wallet.status.value != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Receiver wallet is not active",
+        )
+
+    return WalletRecipientResponse(
+        wallet_number=wallet.wallet_number,
+        full_name=wallet.user.full_name,
+    )
 
 
 # ============================================================
